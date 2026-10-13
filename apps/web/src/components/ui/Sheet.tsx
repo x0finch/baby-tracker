@@ -14,8 +14,13 @@ export interface SheetProps {
  */
 export function Sheet({ open, onClose, title, children }: SheetProps) {
   const ref = useRef<HTMLDialogElement>(null)
+  // Mirrors `open` so the native close event can tell a user dismissal (Escape) from the
+  // parent closing the sheet, which must not call onClose again (e.g. when one sheet
+  // hands over to another).
+  const openRef = useRef(open)
 
   useEffect(() => {
+    openRef.current = open
     const dialog = ref.current
     if (!dialog) return
     if (open && !dialog.open) {
@@ -34,7 +39,9 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
       ref={ref}
       tabIndex={-1}
       aria-label={title}
-      onClose={onClose}
+      onClose={() => {
+        if (openRef.current) onClose()
+      }}
       onClick={(event) => {
         // Clicks on the backdrop target the dialog element itself.
         if (event.target === event.currentTarget) onClose()

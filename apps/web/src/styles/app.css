@@ -41,6 +41,9 @@
   --bobo-danger-edge: #c22626;
   --bobo-danger-soft: #ffe1e1;
   --bobo-danger-text: #d83030;
+
+  --bobo-avatar-pink: #e0569a;
+  --bobo-avatar-yellow: #d19b00;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -116,6 +119,8 @@
   --color-danger-edge: var(--bobo-danger-edge);
   --color-danger-soft: var(--bobo-danger-soft);
   --color-danger-text: var(--bobo-danger-text);
+  --color-avatar-pink: var(--bobo-avatar-pink);
+  --color-avatar-yellow: var(--bobo-avatar-yellow);
 }
 
 @theme {
