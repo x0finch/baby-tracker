@@ -1,93 +1,161 @@
-/* Minimal mobile-first layout. Design tokens and primitives arrive in #5. */
+@import 'tailwindcss';
+@import '@fontsource-variable/nunito';
+
+/*
+ * Design tokens. Raw values live in --bobo-* variables, redefined per theme; Tailwind
+ * utilities reference them through `@theme inline`, so components never need `dark:`.
+ *
+ * Accent fills are slightly deeper than Duolingo's so white bold labels reach >= 3:1
+ * (WCAG large text). Brighter hues are used for accent text/icons on dark surfaces.
+ */
 :root {
-  color-scheme: light dark;
-  --bg: #ffffff;
-  --fg: #3c3c3c;
-  --muted: #777777;
-  --border: #e5e5e5;
-  --accent: #58cc02;
-  --tab-height: 64px;
-  --max-width: 480px;
+  color-scheme: light;
+  --bobo-bg: #ffffff;
+  --bobo-surface: #f7f7f7;
+  --bobo-border: #e5e5e5;
+  --bobo-fg: #3c3c3c;
+  --bobo-fg-muted: #6b6b6b;
+  --bobo-on-accent: #ffffff;
+
+  --bobo-primary: #46a302;
+  --bobo-primary-edge: #3a8700;
+  --bobo-primary-soft: #e3f8d3;
+  --bobo-primary-text: #3f9a00;
+
+  --bobo-feeding: #e07a00;
+  --bobo-feeding-edge: #b86400;
+  --bobo-feeding-soft: #fff0d9;
+  --bobo-feeding-text: #c86d00;
+
+  --bobo-sleep: #a560e8;
+  --bobo-sleep-edge: #8547c4;
+  --bobo-sleep-soft: #f4e8ff;
+  --bobo-sleep-text: #9a4fe0;
+
+  --bobo-diaper: #0e8fd6;
+  --bobo-diaper-edge: #0b74ae;
+  --bobo-diaper-soft: #ddf4ff;
+  --bobo-diaper-text: #0a84c8;
+
+  --bobo-danger: #e83a3a;
+  --bobo-danger-edge: #c22626;
+  --bobo-danger-soft: #ffe1e1;
+  --bobo-danger-text: #d83030;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #131f24;
-    --fg: #f1f7fb;
-    --muted: #8a9ba3;
-    --border: #37464f;
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bobo-bg: #131f24;
+    --bobo-surface: #1b2a31;
+    --bobo-border: #37464f;
+    --bobo-fg: #f1f7fb;
+    --bobo-fg-muted: #8a9ba3;
+    --bobo-primary-soft: #1f3517;
+    --bobo-primary-text: #58cc02;
+    --bobo-feeding-soft: #3a2a14;
+    --bobo-feeding-text: #ff9600;
+    --bobo-sleep-soft: #2f2440;
+    --bobo-sleep-text: #ce82ff;
+    --bobo-diaper-soft: #12313f;
+    --bobo-diaper-text: #1cb0f6;
+    --bobo-danger-soft: #3d1c1e;
+    --bobo-danger-text: #ff4b4b;
   }
 }
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bobo-bg: #131f24;
+  --bobo-surface: #1b2a31;
+  --bobo-border: #37464f;
+  --bobo-fg: #f1f7fb;
+  --bobo-fg-muted: #8a9ba3;
+  --bobo-primary-soft: #1f3517;
+  --bobo-primary-text: #58cc02;
+  --bobo-feeding-soft: #3a2a14;
+  --bobo-feeding-text: #ff9600;
+  --bobo-sleep-soft: #2f2440;
+  --bobo-sleep-text: #ce82ff;
+  --bobo-diaper-soft: #12313f;
+  --bobo-diaper-text: #1cb0f6;
+  --bobo-danger-soft: #3d1c1e;
+  --bobo-danger-text: #ff4b4b;
 }
 
-html,
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--fg);
-  font-family: system-ui, -apple-system, 'PingFang SC', 'Noto Sans SC', sans-serif;
-  -webkit-text-size-adjust: 100%;
-  -webkit-tap-highlight-color: transparent;
-  overscroll-behavior-y: none;
+@theme inline {
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-black: #000000;
+  --color-white: #ffffff;
+  --color-bg: var(--bobo-bg);
+  --color-surface: var(--bobo-surface);
+  --color-border: var(--bobo-border);
+  --color-fg: var(--bobo-fg);
+  --color-fg-muted: var(--bobo-fg-muted);
+  --color-on-accent: var(--bobo-on-accent);
+
+  --color-primary: var(--bobo-primary);
+  --color-primary-edge: var(--bobo-primary-edge);
+  --color-primary-soft: var(--bobo-primary-soft);
+  --color-primary-text: var(--bobo-primary-text);
+  --color-feeding: var(--bobo-feeding);
+  --color-feeding-edge: var(--bobo-feeding-edge);
+  --color-feeding-soft: var(--bobo-feeding-soft);
+  --color-feeding-text: var(--bobo-feeding-text);
+  --color-sleep: var(--bobo-sleep);
+  --color-sleep-edge: var(--bobo-sleep-edge);
+  --color-sleep-soft: var(--bobo-sleep-soft);
+  --color-sleep-text: var(--bobo-sleep-text);
+  --color-diaper: var(--bobo-diaper);
+  --color-diaper-edge: var(--bobo-diaper-edge);
+  --color-diaper-soft: var(--bobo-diaper-soft);
+  --color-diaper-text: var(--bobo-diaper-text);
+  --color-danger: var(--bobo-danger);
+  --color-danger-edge: var(--bobo-danger-edge);
+  --color-danger-soft: var(--bobo-danger-soft);
+  --color-danger-text: var(--bobo-danger-text);
 }
 
-/* Phone-width column; on desktop the app renders centered at phone width. */
-.app {
-  display: flex;
-  flex-direction: column;
-  max-width: var(--max-width);
-  min-height: 100dvh;
-  margin: 0 auto;
+@theme {
+  --font-sans:
+    'Nunito Variable', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei',
+    system-ui, sans-serif;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  --text-caption: 13px;
+  --text-caption--line-height: 18px;
+  --text-body: 16px;
+  --text-body--line-height: 24px;
+  --text-label: 19px;
+  --text-label--line-height: 24px;
+  --text-title: 22px;
+  --text-title--line-height: 28px;
+  --text-display: 28px;
+  --text-display--line-height: 34px;
+
+  --spacing-tab-bar: 64px;
+  --spacing-touch: 48px;
+  --container-app: 480px;
 }
 
-.app-main {
-  flex: 1;
-  padding: calc(16px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right))
-    calc(var(--tab-height) + 16px + env(safe-area-inset-bottom))
-    calc(16px + env(safe-area-inset-left));
-}
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
 
-.page-title {
-  margin: 0 0 16px;
-  font-size: 28px;
-  font-weight: 800;
-}
+  body {
+    @apply bg-bg font-sans text-body text-fg antialiased;
+    overscroll-behavior-y: none;
+  }
 
-.page-empty {
-  color: var(--muted);
-}
-
-.tab-bar {
-  position: fixed;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  display: flex;
-  max-width: var(--max-width);
-  height: calc(var(--tab-height) + env(safe-area-inset-bottom));
-  margin: 0 auto;
-  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-  border-top: 2px solid var(--border);
-  background: var(--bg);
-}
-
-.tab-bar-item {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  justify-content: center;
-  min-height: 48px;
-  color: var(--muted);
-  font-size: 15px;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.tab-bar-item[aria-current='page'] {
-  color: var(--accent);
+  :focus-visible {
+    @apply outline-3 outline-offset-2 outline-diaper;
+  }
 }

@@ -15,9 +15,17 @@ export function TabBar() {
   const hydrated = useHydrated()
 
   return (
-    <nav key={hydrated ? 'client' : 'shell'} className="tab-bar">
+    <nav
+      key={hydrated ? 'client' : 'shell'}
+      className="fixed inset-x-0 bottom-0 mx-auto flex h-[calc(var(--spacing-tab-bar)+env(safe-area-inset-bottom))] max-w-app border-t-2 border-border bg-bg px-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]"
+    >
       {tabs.map((tab) => (
-        <Link key={tab.to} to={tab.to} className="tab-bar-item" activeOptions={{ exact: true }}>
+        <Link
+          key={tab.to}
+          to={tab.to}
+          activeOptions={{ exact: true }}
+          className="flex min-h-touch flex-1 items-center justify-center font-extrabold text-fg-muted aria-[current=page]:text-primary-text"
+        >
           {tab.label}
         </Link>
       ))}

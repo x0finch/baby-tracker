@@ -3,6 +3,7 @@ import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-r
 import type { ReactNode } from 'react'
 
 import { TabBar } from '../components/TabBar'
+import { THEME_COLORS, themeInitScript } from '../lib/theme'
 
 import appCss from '../styles/app.css?url'
 
@@ -14,7 +15,7 @@ export const Route = createRootRoute({
         name: 'viewport',
         content: 'width=device-width, initial-scale=1, viewport-fit=cover',
       },
-      { name: 'color-scheme', content: 'light dark' },
+      { name: 'theme-color', content: THEME_COLORS.light },
       { title: APP_NAME },
     ],
     links: [{ rel: 'stylesheet', href: appCss }],
@@ -25,12 +26,11 @@ export const Route = createRootRoute({
 
 function RootDocument({ children }: { children: ReactNode }) {
   return (
-    <html lang="zh-CN">
+    // The inline theme script sets data-theme before hydration.
+    <html lang="zh-CN" suppressHydrationWarning>
       <head>
         <HeadContent />
-        {/* Rendered directly: head() dedupes meta tags by name, which drops one theme. */}
-        <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-        <meta name="theme-color" content="#131f24" media="(prefers-color-scheme: dark)" />
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body>
         {children}
@@ -42,8 +42,8 @@ function RootDocument({ children }: { children: ReactNode }) {
 
 function RootLayout() {
   return (
-    <div className="app">
-      <main className="app-main">
+    <div className="mx-auto flex min-h-dvh max-w-app flex-col">
+      <main className="flex-1 px-[calc(16px+env(safe-area-inset-right))] pt-[calc(16px+env(safe-area-inset-top))] pb-[calc(var(--spacing-tab-bar)+16px+env(safe-area-inset-bottom))] pl-[calc(16px+env(safe-area-inset-left))]">
         <Outlet />
       </main>
       <TabBar />
