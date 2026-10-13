@@ -2,10 +2,14 @@ import { eventSchema, isRunning, newId } from '@bobo/shared'
 import { describe, expect, it } from 'vitest'
 
 import {
+  deleteEvent,
   logBottle,
   logDiaper,
   logSleep,
   logSolids,
+  moveEventStart,
+  restoreEvent,
+  setEventNote,
   sleepKindFor,
   startBreastFeed,
   startSleep,
@@ -78,5 +82,37 @@ describe('stopEvent', () => {
     const stopped = stopEvent(startSleep(BABY, T0), T0 + 45 * MINUTE)
     expect(stopped.endAt).toBe(T0 + 45 * MINUTE)
     expect(stopEvent(stopped, T0 + 99 * MINUTE)).toBe(stopped)
+  })
+})
+
+describe('editing', () => {
+  it('moves a breastfeed with its segments and keeps it valid', () => {
+    const feed = stopEvent(
+      switchBreastSide(startBreastFeed(BABY, 'left', T0), T0 + 10 * MINUTE),
+      T0 + 15 * MINUTE,
+    )
+    const moved = moveEventStart(feed, T0 - 60 * MINUTE, T0 + 20 * MINUTE)
+    expect(eventSchema.parse(moved)).toEqual(moved)
+    expect(moved.endAt).toBe(T0 - 45 * MINUTE)
+  })
+
+  it('moves the start of a running breastfeed', () => {
+    const moved = moveEventStart(startBreastFeed(BABY, 'left', T0), T0 - 5 * MINUTE, T0)
+    expect(eventSchema.safeParse(moved).success).toBe(true)
+    expect(isRunning(moved)).toBe(true)
+  })
+
+  it('normalizes empty notes to null', () => {
+    const diaper = logDiaper(BABY, T0, 'wet')
+    expect(setEventNote(diaper, '  ', T0).note).toBeNull()
+    expect(setEventNote(diaper, ' 有点红 ', T0).note).toBe('有点红')
+  })
+
+  it('soft deletes and restores', () => {
+    const diaper = logDiaper(BABY, T0, 'wet')
+    const deleted = deleteEvent(diaper, T0 + MINUTE)
+    expect(deleted.deletedAt).toBe(T0 + MINUTE)
+    expect(eventSchema.safeParse(deleted).success).toBe(true)
+    expect(restoreEvent(deleted, T0 + 2 * MINUTE).deletedAt).toBeNull()
   })
 })

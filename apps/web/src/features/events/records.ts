@@ -158,3 +158,43 @@ export function suggestedBreastSide(lastFeed: FeedingEvent | undefined): BreastS
   const last = lastFeed ? currentBreastSide(lastFeed) : undefined
   return last === 'left' ? 'right' : 'left'
 }
+
+/**
+ * Moves an event to a new start time. Breastfeeds shift all segments so per-side
+ * durations are kept; other events keep their end time.
+ */
+export function moveEventStart<T extends Event>(event: T, startAt: number, now: number): T {
+  if (event.type === 'feeding' && event.data.kind === 'breast') {
+    const delta = startAt - event.startAt
+    const shift = (at: number | null) => (at === null ? null : at + delta)
+    return {
+      ...event,
+      startAt,
+      endAt: shift(event.endAt),
+      updatedAt: touched(event, now),
+      data: {
+        ...event.data,
+        segments: event.data.segments.map((segment) => ({
+          ...segment,
+          startAt: segment.startAt + delta,
+          endAt: shift(segment.endAt),
+        })),
+      },
+    }
+  }
+  return { ...event, startAt, updatedAt: touched(event, now) }
+}
+
+export function setEventNote<T extends Event>(event: T, note: string, now: number): T {
+  const trimmed = note.trim()
+  return { ...event, note: trimmed === '' ? null : trimmed, updatedAt: touched(event, now) }
+}
+
+/** Soft delete, so the deletion can sync and be undone. */
+export function deleteEvent<T extends Event>(event: T, now: number): T {
+  return { ...event, deletedAt: Math.max(now, event.createdAt), updatedAt: touched(event, now) }
+}
+
+export function restoreEvent<T extends Event>(event: T, now: number): T {
+  return { ...event, deletedAt: null, updatedAt: touched(event, now) }
+}
