@@ -29,7 +29,11 @@ pnpm dev                                    # web on :3000 (proxies /api) + wran
 pnpm --filter @bobo/api db:generate         # after changing the schema
 ```
 
-First deploy: `wrangler d1 create bobo-db`, put the returned id into `apps/api/wrangler.jsonc`, run `pnpm --filter @bobo/api db:migrate:remote`, then `pnpm --filter @bobo/api deploy`.
+Local secrets: copy `apps/api/.dev.vars.example` to `apps/api/.dev.vars` and fill it in.
+
+First deploy: `wrangler d1 create bobo-db`, put the returned id into `apps/api/wrangler.jsonc`, run `pnpm --filter @bobo/api db:migrate:remote`, set the secrets with `wrangler secret put` (`BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`), then `pnpm --filter @bobo/api deploy`.
+
+Auth uses [Better Auth](https://better-auth.com) tuned for the Workers free plan (10ms CPU): minimal build, signed cookie cache so most requests validate the session without D1, no password hashing, no DB-backed rate limiting.
 
 ## Internationalization
 

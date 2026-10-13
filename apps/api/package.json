@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@bobo/shared": "workspace:*",
+    "better-auth": "^1.7.7",
     "drizzle-orm": "^0.45.4",
     "hono": "^4.13.13"
   },
