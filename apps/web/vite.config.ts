@@ -5,6 +5,10 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
 export default defineConfig({
+  server: {
+    // In development the API runs in `wrangler dev`; in production both share one origin.
+    proxy: { '/api': 'http://localhost:8787' },
+  },
   plugins: [
     // Compiler options live in project.inlang/paraglide.config.js.
     paraglideVitePlugin({ project: './project.inlang' }),
