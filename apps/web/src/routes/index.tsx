@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 
+import { PageHeader } from '../components/PageHeader'
 import { messages } from '../messages'
 
 export const Route = createFileRoute('/')({
@@ -8,9 +9,9 @@ export const Route = createFileRoute('/')({
 
 function TodayPage() {
   return (
-    <section className="page">
-      <h1 className="page-title">{messages.todayTitle}</h1>
-      <p className="page-empty">{messages.todayEmpty}</p>
+    <section>
+      <PageHeader title={messages.todayTitle} />
+      <p className="text-fg-muted">{messages.todayEmpty}</p>
     </section>
   )
 }

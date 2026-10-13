@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 
+import { PageHeader } from '../components/PageHeader'
 import { messages } from '../messages'
 
 export const Route = createFileRoute('/stats')({
@@ -8,9 +9,9 @@ export const Route = createFileRoute('/stats')({
 
 function StatsPage() {
   return (
-    <section className="page">
-      <h1 className="page-title">{messages.statsTitle}</h1>
-      <p className="page-empty">{messages.statsEmpty}</p>
+    <section>
+      <PageHeader title={messages.statsTitle} />
+      <p className="text-fg-muted">{messages.statsEmpty}</p>
     </section>
   )
 }
