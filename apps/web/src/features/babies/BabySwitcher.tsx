@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button'
 import { Sheet } from '../../components/ui/Sheet'
 import { useLocalStore } from '../../db'
 import { m } from '../../paraglide/messages.js'
+import { useBabiesWithRunningTimers } from '../events/use-events'
 import { createBaby } from './actions'
 import { ageLabel } from './age-label'
 import { BabyAvatar } from './BabyAvatar'
@@ -18,6 +19,8 @@ export function BabySwitcher() {
   const store = useLocalStore()
   const { active } = useBabies()
   const { baby, select } = useSelectedBaby()
+  const runningBabies = useBabiesWithRunningTimers()
+  const otherRunning = active.some((b) => b.id !== baby?.id && runningBabies.has(b.id))
   const [sheet, setSheet] = useState<'closed' | 'pick' | 'add'>('closed')
   const close = () => setSheet('closed')
 
@@ -31,7 +34,13 @@ export function BabySwitcher() {
         aria-label={m.switcherLabel({ name: baby.name })}
         className="mb-4 flex min-h-touch w-full items-center gap-3 rounded-xl border-2 border-b-4 border-border px-3 py-2 text-left active:translate-y-0.5 active:border-b-2"
       >
-        <BabyAvatar name={baby.name} color={baby.avatarColor} />
+        <span className="relative">
+          <BabyAvatar name={baby.name} color={baby.avatarColor} />
+          {otherRunning && (
+            // Another baby has a timer running; the picker shows which one.
+            <span className="absolute -top-0.5 -right-0.5 size-3.5 rounded-full border-2 border-bg bg-danger" />
+          )}
+        </span>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate font-extrabold">{baby.name}</span>
           <span className="text-caption text-fg-muted">{ageLabel(baby.birthDate)}</span>
@@ -71,6 +80,11 @@ export function BabySwitcher() {
                   <span className="font-extrabold">{option.name}</span>
                   <span className="text-caption text-fg-muted">{ageLabel(option.birthDate)}</span>
                 </span>
+                {runningBabies.has(option.id) && (
+                  <span className="ml-auto rounded-full bg-danger-soft px-2 text-caption font-bold text-danger-text">
+                    {m.runningBadge()}
+                  </span>
+                )}
               </button>
             </li>
           ))}
