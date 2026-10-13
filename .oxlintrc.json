@@ -33,5 +33,14 @@
     "**/.wrangler/**",
     "**/*.gen.ts",
     "**/src/paraglide/**"
+  ],
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/test/**/*.ts"],
+      "rules": {
+        "typescript/no-unsafe-type-assertion": "off",
+        "no-await-in-loop": "off"
+      }
+    }
   ]
 }

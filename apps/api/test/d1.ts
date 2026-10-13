@@ -20,7 +20,6 @@ export async function createTestEnv(): Promise<{
 
   const files = (await readdir(migrationsDir)).filter((file) => file.endsWith('.sql')).toSorted()
   // Migrations must run in order, one after another.
-  /* oxlint-disable no-await-in-loop */
   for (const file of files) {
     const sql = await readFile(new URL(file, migrationsDir), 'utf8')
     const statements = sql
@@ -29,7 +28,6 @@ export async function createTestEnv(): Promise<{
       .filter(Boolean)
     await db.batch(statements.map((statement) => db.prepare(statement)))
   }
-  /* oxlint-enable no-await-in-loop */
 
   return { env: { DB: db }, dispose: () => mf.dispose() }
 }

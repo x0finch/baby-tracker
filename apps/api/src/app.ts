@@ -1,25 +1,16 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import { createMiddleware } from 'hono/factory'
 
-import { type Auth, getAuth, trustedOrigins } from './auth'
-import type { Env } from './env'
+import { getAuth, trustedOrigins } from './auth'
+import { requireUser } from './middleware'
+import { familyRoutes } from './routes/families'
+import { syncRoutes } from './routes/sync'
+import type { AppEnv, AuthFor } from './types'
 
-type SessionData = NonNullable<Awaited<ReturnType<Auth['api']['getSession']>>>
-
-export type AppEnv = {
-  Bindings: Env
-  Variables: { user: SessionData['user']; session: SessionData['session'] }
-}
-
-/** The parts of a Better Auth instance the app uses; tests inject one with extra plugins. */
-export interface AuthLike {
-  handler: Auth['handler']
-  api: { getSession: Auth['api']['getSession'] }
-}
+export type { AppEnv, AuthLike } from './types'
 
 export interface AppOptions {
-  auth?: (env: Env) => AuthLike
+  auth?: AuthFor
 }
 
 export function createApp(options: AppOptions = {}) {
@@ -45,25 +36,17 @@ export function createApp(options: AppOptions = {}) {
 
   app.on(['GET', 'POST'], '/auth/*', (c) => authFor(c.env).handler(c.req.raw))
 
-  /** Resolves the session from the cookie (or bearer token); most requests hit the cookie cache. */
-  const requireUser = createMiddleware<AppEnv>(async (c, next) => {
-    const { headers, response: data } = await authFor(c.env).api.getSession({
-      headers: c.req.raw.headers,
-      returnHeaders: true,
-    })
-    if (!data) return c.json({ error: 'unauthorized' }, 401)
-    c.set('user', data.user)
-    c.set('session', data.session)
-    await next()
-    // Forward cookie updates (cache refresh, session renewal) so later requests skip D1.
-    for (const cookie of headers.getSetCookie()) c.res.headers.append('Set-Cookie', cookie)
-    return undefined
-  })
+  const auth = requireUser(authFor)
 
-  app.get('/me', requireUser, (c) => {
+  app.get('/me', auth, (c) => {
     const user = c.get('user')
     return c.json({ id: user.id, name: user.name, email: user.email, image: user.image ?? null })
   })
+
+  app.use('/families/*', auth)
+  app.route('/families', familyRoutes)
+  app.use('/sync/*', auth)
+  app.route('/sync', syncRoutes)
 
   app.notFound((c) => c.json({ error: 'not_found' }, 404))
   app.onError((error, c) => {

@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 // Server copies of the shared records (@bobo/shared). Timestamps are epoch milliseconds.
 const syncColumns = {
@@ -6,6 +6,11 @@ const syncColumns = {
   updatedAt: integer('updated_at').notNull(),
   deletedAt: integer('deleted_at'),
   createdBy: text('created_by'),
+  /**
+   * Server-assigned sync sequence (from sync_seq) of the last accepted write. Pull cursors use
+   * it instead of timestamps, which are not monotonic across Worker instances.
+   */
+  seq: integer('seq').notNull().default(0),
 }
 
 export const babies = sqliteTable(
@@ -20,7 +25,7 @@ export const babies = sqliteTable(
     archivedAt: integer('archived_at'),
     ...syncColumns,
   },
-  (table) => [index('babies_family_idx').on(table.familyId)],
+  (table) => [index('babies_family_seq_idx').on(table.familyId, table.seq, table.id)],
 )
 
 export const events = sqliteTable(
@@ -39,8 +44,38 @@ export const events = sqliteTable(
   },
   (table) => [
     index('events_baby_start_idx').on(table.babyId, table.startAt),
-    index('events_family_idx').on(table.familyId),
+    index('events_family_seq_idx').on(table.familyId, table.seq, table.id),
   ],
 )
+
+export const families = sqliteTable('families', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  createdBy: text('created_by').notNull(),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+})
+
+export const memberships = sqliteTable(
+  'memberships',
+  {
+    familyId: text('family_id')
+      .notNull()
+      .references(() => families.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull(),
+    role: text('role', { enum: ['owner', 'admin', 'caregiver', 'viewer'] }).notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.familyId, table.userId] }),
+    index('memberships_user_idx').on(table.userId),
+  ],
+)
+
+/** Single-row counter; every accepted push increments it inside the same D1 transaction. */
+export const syncSeq = sqliteTable('sync_seq', {
+  id: integer('id').primaryKey(),
+  value: integer('value').notNull(),
+})
 
 export * from './auth-schema'
