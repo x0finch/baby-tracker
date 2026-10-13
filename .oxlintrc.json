@@ -23,7 +23,8 @@
     "typescript/no-explicit-any": "error",
     "react/rules-of-hooks": "error",
     "react/exhaustive-deps": "warn",
-    "import/no-cycle": "error"
+    "import/no-cycle": "error",
+    "react/react-in-jsx-scope": "off"
   },
   "ignorePatterns": ["**/dist/**", "**/.output/**", "**/.wrangler/**", "**/*.gen.ts"]
 }

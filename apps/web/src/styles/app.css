@@ -1,0 +1,93 @@
+/* Minimal mobile-first layout. Design tokens and primitives arrive in #5. */
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #3c3c3c;
+  --muted: #777777;
+  --border: #e5e5e5;
+  --accent: #58cc02;
+  --tab-height: 64px;
+  --max-width: 480px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #131f24;
+    --fg: #f1f7fb;
+    --muted: #8a9ba3;
+    --border: #37464f;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: system-ui, -apple-system, 'PingFang SC', 'Noto Sans SC', sans-serif;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+/* Phone-width column; on desktop the app renders centered at phone width. */
+.app {
+  display: flex;
+  flex-direction: column;
+  max-width: var(--max-width);
+  min-height: 100dvh;
+  margin: 0 auto;
+}
+
+.app-main {
+  flex: 1;
+  padding: calc(16px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right))
+    calc(var(--tab-height) + 16px + env(safe-area-inset-bottom))
+    calc(16px + env(safe-area-inset-left));
+}
+
+.page-title {
+  margin: 0 0 16px;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.page-empty {
+  color: var(--muted);
+}
+
+.tab-bar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  max-width: var(--max-width);
+  height: calc(var(--tab-height) + env(safe-area-inset-bottom));
+  margin: 0 auto;
+  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  border-top: 2px solid var(--border);
+  background: var(--bg);
+}
+
+.tab-bar-item {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.tab-bar-item[aria-current='page'] {
+  color: var(--accent);
+}
