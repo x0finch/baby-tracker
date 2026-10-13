@@ -1,0 +1,34 @@
+import type { AvatarColor } from '@bobo/shared'
+import { clsx } from 'clsx'
+
+export const avatarBackground: Record<AvatarColor, string> = {
+  green: 'bg-primary',
+  blue: 'bg-diaper',
+  orange: 'bg-feeding',
+  purple: 'bg-sleep',
+  pink: 'bg-avatar-pink',
+  yellow: 'bg-avatar-yellow',
+}
+
+export function BabyAvatar({
+  name,
+  color,
+  size = 'md',
+}: {
+  name: string
+  color: AvatarColor
+  size?: 'md' | 'lg'
+}) {
+  return (
+    <span
+      aria-hidden
+      className={clsx(
+        'inline-flex shrink-0 items-center justify-center rounded-full font-extrabold text-on-accent',
+        size === 'md' ? 'size-10 text-body' : 'size-14 text-title',
+        avatarBackground[color],
+      )}
+    >
+      {Array.from(name)[0] ?? ''}
+    </span>
+  )
+}

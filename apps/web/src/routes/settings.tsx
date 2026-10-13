@@ -4,6 +4,7 @@ import { PageHeader } from '../components/PageHeader'
 import { StorageStatus } from '../components/StorageStatus'
 import { Card } from '../components/ui/Card'
 import { SegmentedControl } from '../components/ui/SegmentedControl'
+import { BabyList } from '../features/babies/BabyList'
 import { type Locale, getLocale, localeDisplayName, locales, setLocale } from '../lib/i18n'
 import type { ThemePreference } from '../lib/theme'
 import { useTheme } from '../lib/use-theme'
@@ -49,8 +50,9 @@ function SettingsPage() {
           />
         </Card>
       )}
-      <Card>
-        <p className="text-fg-muted">{m.settingsBabies()}</p>
+      <Card className="flex flex-col gap-2">
+        <h2 className="text-title font-extrabold">{m.settingsBabies()}</h2>
+        <BabyList />
       </Card>
       <Card className="flex flex-col gap-2">
         <h2 className="text-title font-extrabold">{m.storageTitle()}</h2>

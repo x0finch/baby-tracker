@@ -53,7 +53,7 @@ export function Button({
     <button
       type={type}
       className={clsx(
-        'inline-flex select-none items-center justify-center gap-2 rounded-lg font-extrabold transition-[transform,border-width] duration-75',
+        'inline-flex shrink-0 select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg font-extrabold transition-[transform,border-width] duration-75',
         'disabled:pointer-events-none disabled:opacity-50',
         size === 'md' && 'min-h-touch px-4 text-body',
         size === 'lg' && 'min-h-14 px-6 text-label',

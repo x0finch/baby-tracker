@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 import { PageHeader } from '../components/PageHeader'
+import { RequireBaby } from '../features/babies/RequireBaby'
 import { m } from '../paraglide/messages.js'
 
 export const Route = createFileRoute('/')({
@@ -9,9 +10,9 @@ export const Route = createFileRoute('/')({
 
 function TodayPage() {
   return (
-    <section>
+    <RequireBaby>
       <PageHeader title={m.todayTitle()} />
       <p className="text-fg-muted">{m.todayEmpty()}</p>
-    </section>
+    </RequireBaby>
   )
 }

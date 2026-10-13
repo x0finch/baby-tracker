@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 import { PageHeader } from '../components/PageHeader'
+import { RequireBaby } from '../features/babies/RequireBaby'
 import { m } from '../paraglide/messages.js'
 
 export const Route = createFileRoute('/stats')({
@@ -9,9 +10,9 @@ export const Route = createFileRoute('/stats')({
 
 function StatsPage() {
   return (
-    <section>
+    <RequireBaby>
       <PageHeader title={m.statsTitle()} />
       <p className="text-fg-muted">{m.statsEmpty()}</p>
-    </section>
+    </RequireBaby>
   )
 }
