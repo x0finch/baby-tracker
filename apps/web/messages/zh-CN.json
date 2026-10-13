@@ -119,5 +119,14 @@
   "bottleDetail": "{amount} 毫升 · {milk}",
   "breastDetail": "左 {left} · 右 {right}",
   "inProgress": "进行中",
-  "durationUnderMinute": "不到 1 分钟"
+  "durationUnderMinute": "不到 1 分钟",
+  "editEventTitle": "编辑记录",
+  "eventNote": "备注",
+  "eventNotePlaceholder": "可选",
+  "eventDelete": "删除这条记录",
+  "eventDeleted": "已删除一条记录",
+  "undo": "撤销",
+  "sleepKindLabel": "类型",
+  "diaperContents": "类型",
+  "editEventLabel": "编辑 {time} 的{title}"
 }

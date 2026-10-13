@@ -1,0 +1,188 @@
+import { type Event, isRunning, isTimed } from '@bobo/shared'
+import { type FormEvent, useState } from 'react'
+
+import { Button } from '../../components/ui/Button'
+import { Input } from '../../components/ui/Input'
+import { SegmentedControl } from '../../components/ui/SegmentedControl'
+import { useLocalStore } from '../../db'
+import { m } from '../../paraglide/messages.js'
+import { saveEvent } from './actions'
+import { deleteEvent, moveEventStart, setEventNote } from './records'
+import { toDateTimeLocal } from './time'
+import { TimeField } from './TimeField'
+import { useNow } from './use-events'
+import { overlapsSleep, validateTime } from './validation'
+
+type Errors = Partial<Record<'start' | 'end' | 'amount' | 'food' | 'form', string>>
+
+/** Edits any event; changes are applied through the pure helpers in records.ts. */
+export function EditEventForm({
+  event,
+  events,
+  onDone,
+  onDeleted,
+}: {
+  event: Event
+  events: readonly Event[]
+  onDone: () => void
+  onDeleted: (event: Event) => void
+}) {
+  const store = useLocalStore()
+  const now = useNow(60_000)
+  const running = isRunning(event)
+  const [start, setStart] = useState(() => toDateTimeLocal(event.startAt))
+  const [end, setEnd] = useState(() => (event.endAt === null ? '' : toDateTimeLocal(event.endAt)))
+  const [note, setNote] = useState(event.note ?? '')
+  const [amount, setAmount] = useState(() =>
+    event.type === 'feeding' && event.data.kind === 'bottle' ? String(event.data.amountMl) : '',
+  )
+  const [milk, setMilk] = useState(() =>
+    event.type === 'feeding' && event.data.kind === 'bottle' ? event.data.milk : 'formula',
+  )
+  const [food, setFood] = useState(() =>
+    event.type === 'feeding' && event.data.kind === 'solids' ? event.data.food : '',
+  )
+  const [contents, setContents] = useState(() =>
+    event.type === 'diaper' ? event.data.contents : 'wet',
+  )
+  const [sleepKind, setSleepKind] = useState(() =>
+    event.type === 'sleep' ? event.data.kind : 'nap',
+  )
+  const [errors, setErrors] = useState<Errors>({})
+  // Only finished sleeps have an editable end; breastfeed ends follow their segments.
+  const editableEnd = event.type === 'sleep' && !running
+
+  function submit(formEvent: FormEvent) {
+    formEvent.preventDefault()
+    const current = Date.now()
+    const nextErrors: Errors = {}
+    const startResult = validateTime(start, current)
+    if ('error' in startResult) nextErrors.start = startResult.error
+    const endResult = editableEnd ? validateTime(end, current) : undefined
+    if (endResult && 'error' in endResult) nextErrors.end = endResult.error
+
+    let next: Event = event
+    if ('at' in startResult) next = moveEventStart(next, startResult.at, current)
+    if (next.type === 'sleep') {
+      if (endResult && 'at' in endResult && 'at' in startResult) {
+        if (endResult.at < startResult.at) nextErrors.end = m.endBeforeStart()
+        else next = { ...next, endAt: endResult.at }
+      }
+      next = { ...next, data: { kind: sleepKind } }
+      if (overlapsSleep(events, next.startAt, next.endAt ?? current, current, next.id)) {
+        nextErrors.form = m.sleepOverlap()
+      }
+    }
+    if (next.type === 'feeding' && next.data.kind === 'bottle') {
+      const amountMl = Number(amount)
+      if (!(amountMl > 0 && amountMl <= 1000)) nextErrors.amount = m.bottleAmountInvalid()
+      else next = { ...next, data: { kind: 'bottle', amountMl, milk } }
+    }
+    if (next.type === 'feeding' && next.data.kind === 'solids') {
+      if (!food.trim()) nextErrors.food = m.solidsFoodRequired()
+      else next = { ...next, data: { kind: 'solids', food: food.trim() } }
+    }
+    if (next.type === 'diaper') next = { ...next, data: { contents } }
+
+    setErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0) return
+    saveEvent(store, setEventNote(next, note, current))
+    onDone()
+  }
+
+  function remove() {
+    const deleted = deleteEvent(event, Date.now())
+    saveEvent(store, deleted)
+    onDeleted(deleted)
+    onDone()
+  }
+
+  return (
+    <form noValidate onSubmit={submit} className="flex flex-col gap-4">
+      {event.type === 'feeding' && event.data.kind === 'bottle' && (
+        <>
+          <Input
+            label={m.bottleAmount()}
+            type="number"
+            inputMode="numeric"
+            value={amount}
+            error={errors.amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
+          <SegmentedControl
+            label={m.bottleMilk()}
+            options={[
+              { value: 'formula', label: m.milkFormula() },
+              { value: 'breast', label: m.milkBreast() },
+              { value: 'mixed', label: m.milkMixed() },
+            ]}
+            value={milk}
+            onChange={setMilk}
+          />
+        </>
+      )}
+      {event.type === 'feeding' && event.data.kind === 'solids' && (
+        <Input
+          label={m.solidsFood()}
+          value={food}
+          maxLength={100}
+          error={errors.food}
+          onChange={(e) => setFood(e.target.value)}
+        />
+      )}
+      {event.type === 'diaper' && (
+        <SegmentedControl
+          label={m.diaperContents()}
+          options={[
+            { value: 'wet', label: m.diaperWet() },
+            { value: 'dirty', label: m.diaperDirty() },
+            { value: 'mixed', label: m.diaperMixed() },
+          ]}
+          value={contents}
+          onChange={setContents}
+        />
+      )}
+      {event.type === 'sleep' && (
+        <SegmentedControl
+          label={m.sleepKindLabel()}
+          options={[
+            { value: 'nap', label: m.sleepNap() },
+            { value: 'night', label: m.sleepNight() },
+          ]}
+          value={sleepKind}
+          onChange={setSleepKind}
+        />
+      )}
+      <TimeField
+        label={isTimed(event) ? m.eventStart() : m.eventTime()}
+        value={start}
+        onChange={setStart}
+        error={errors.start}
+        now={now}
+      />
+      {editableEnd && (
+        <TimeField
+          label={m.eventEnd()}
+          value={end}
+          onChange={setEnd}
+          error={errors.end}
+          now={now}
+        />
+      )}
+      <Input
+        label={m.eventNote()}
+        placeholder={m.eventNotePlaceholder()}
+        value={note}
+        maxLength={500}
+        onChange={(e) => setNote(e.target.value)}
+      />
+      {errors.form && <p className="font-bold text-danger-text">{errors.form}</p>}
+      <Button type="submit" size="lg" block>
+        {m.actionSave()}
+      </Button>
+      <Button variant="ghost" tone="danger" onClick={remove}>
+        {m.eventDelete()}
+      </Button>
+    </form>
+  )
+}
