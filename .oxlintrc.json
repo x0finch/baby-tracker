@@ -24,7 +24,14 @@
     "react/rules-of-hooks": "error",
     "react/exhaustive-deps": "warn",
     "import/no-cycle": "error",
-    "react/react-in-jsx-scope": "off"
+    "react/react-in-jsx-scope": "off",
+    "react/jsx-no-literals": "error"
   },
-  "ignorePatterns": ["**/dist/**", "**/.output/**", "**/.wrangler/**", "**/*.gen.ts"]
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/.output/**",
+    "**/.wrangler/**",
+    "**/*.gen.ts",
+    "**/src/paraglide/**"
+  ]
 }
