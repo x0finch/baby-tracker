@@ -19,6 +19,18 @@ pnpm test          # vitest
 
 Tooling: [oxlint](https://oxc.rs/docs/guide/usage/linter) (type-aware via `oxlint-tsgolint`), [oxfmt](https://oxc.rs/docs/guide/usage/formatter), TypeScript 7 and Vitest. In VS Code, install the recommended Oxc extension for format-on-save and lint fixes.
 
+## API and deployment
+
+`apps/api` is a [Hono](https://hono.dev) Worker on Cloudflare with a D1 database (schema in `src/db/schema.ts`, Drizzle migrations in `migrations/`). The SPA build is served by the same Worker through Workers Static Assets; only `/api/*` runs Worker code.
+
+```sh
+pnpm --filter @bobo/api db:migrate:local   # create/upgrade the local D1 database
+pnpm dev                                    # web on :3000 (proxies /api) + wrangler dev on :8787
+pnpm --filter @bobo/api db:generate         # after changing the schema
+```
+
+First deploy: `wrangler d1 create bobo-db`, put the returned id into `apps/api/wrangler.jsonc`, run `pnpm --filter @bobo/api db:migrate:remote`, then `pnpm --filter @bobo/api deploy`.
+
 ## Internationalization
 
 UI strings live in `apps/web/messages/{locale}.json` and are compiled by [Paraglide JS](https://paraglidejs.com) into typed functions (`m.someKey()`) in `apps/web/src/paraglide` (generated on install and by the Vite plugin; not committed). Only `zh-CN` ships today.
