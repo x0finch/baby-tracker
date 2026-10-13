@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "pnpm -r --parallel --if-present dev",
     "build": "pnpm -r --if-present build",
-    "lint": "oxlint",
+    "lint": "pnpm codegen && oxlint",
     "lint:fix": "oxlint --fix",
     "format": "oxfmt",
     "format:check": "oxfmt --check",

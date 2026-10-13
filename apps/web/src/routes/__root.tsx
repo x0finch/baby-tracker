@@ -1,6 +1,6 @@
 import { APP_NAME } from '@bobo/shared'
 import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-router'
-import { type ReactNode, useEffect } from 'react'
+import { type ReactNode, Suspense, useEffect } from 'react'
 
 import { TabBar } from '../components/TabBar'
 import { getLocale } from '../lib/i18n'
@@ -51,7 +51,10 @@ function RootLayout() {
   return (
     <div className="mx-auto flex min-h-dvh max-w-app flex-col">
       <main className="flex-1 px-[calc(16px+env(safe-area-inset-right))] pt-[calc(16px+env(safe-area-inset-top))] pb-[calc(var(--spacing-tab-bar)+16px+env(safe-area-inset-bottom))] pl-[calc(16px+env(safe-area-inset-left))]">
-        <Outlet />
+        {/* Pages suspend while the local store opens (a few ms on startup). */}
+        <Suspense>
+          <Outlet />
+        </Suspense>
       </main>
       <TabBar />
     </div>

@@ -1,6 +1,7 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 
 import { PageHeader } from '../components/PageHeader'
+import { StorageStatus } from '../components/StorageStatus'
 import { Card } from '../components/ui/Card'
 import { SegmentedControl } from '../components/ui/SegmentedControl'
 import { type Locale, getLocale, localeDisplayName, locales, setLocale } from '../lib/i18n'
@@ -50,6 +51,10 @@ function SettingsPage() {
       )}
       <Card>
         <p className="text-fg-muted">{m.settingsBabies()}</p>
+      </Card>
+      <Card className="flex flex-col gap-2">
+        <h2 className="text-title font-extrabold">{m.storageTitle()}</h2>
+        <StorageStatus />
       </Card>
       {import.meta.env.DEV && (
         <Link to="/ui" className="font-bold text-diaper-text underline">
