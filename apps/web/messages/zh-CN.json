@@ -30,5 +30,9 @@
   "uiNameHint": "之后可以随时修改",
   "uiOpenSheet": "打开底部面板",
   "uiSheetTitle": "记录瓶喂",
-  "settingsLanguage": "语言"
+  "settingsLanguage": "语言",
+  "storageTitle": "数据存储",
+  "storagePersistent": "记录保存在这台设备上。",
+  "storageBestEffort": "记录保存在这台设备上，但存储空间不足时浏览器可能会清理。把 Bobo 添加到主屏幕可以避免这种情况。",
+  "storageMemory": "当前浏览器无法保存数据，刷新后记录会丢失。如果开启了无痕模式，请关闭后再使用。"
 }
