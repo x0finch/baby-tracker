@@ -4,6 +4,7 @@ import { RequireBaby } from '../features/babies/RequireBaby'
 import { useSelectedBaby } from '../features/babies/use-babies'
 import { QuickActions } from '../features/events/QuickActions'
 import { RunningTimers } from '../features/events/RunningTimers'
+import { SinceLast } from '../features/events/SinceLast'
 import { TodayList } from '../features/events/TodayList'
 import { useBabyEvents } from '../features/events/use-events'
 
@@ -29,6 +30,7 @@ function BabyToday({ babyId }: { babyId: string }) {
   const events = useBabyEvents(babyId)
   return (
     <div className="flex flex-col gap-6">
+      <SinceLast events={events} />
       <RunningTimers events={events} />
       <QuickActions babyId={babyId} events={events} />
       <TodayList events={events} />
