@@ -1,0 +1,75 @@
+import { newId } from '@bobo/shared'
+import { describe, expect, it } from 'vitest'
+
+import {
+  deleteEvent,
+  logBottle,
+  logDiaper,
+  logSleep,
+  startBreastFeed,
+  startSleep,
+  stopEvent,
+  switchBreastSide,
+} from './records'
+import { lastActivityAt, summarizeDay } from './summary'
+
+const BABY = newId()
+const MIN = 60_000
+const H = 60 * MIN
+const DAY_START = new Date(2026, 9, 13).getTime()
+const DAY_END = new Date(2026, 9, 14).getTime()
+const at = (hour: number, minute = 0) => new Date(2026, 9, 13, hour, minute).getTime()
+
+describe('summarizeDay', () => {
+  it('totals feeds, sleep and diapers for the day', () => {
+    const breast = stopEvent(
+      switchBreastSide(startBreastFeed(BABY, 'left', at(8)), at(8, 10)),
+      at(8, 15),
+    )
+    const events = [
+      breast,
+      logBottle(BABY, at(11), 90, 'formula'),
+      logBottle(BABY, at(15), 120, 'breast'),
+      logSleep(BABY, at(9), at(10, 30), at(10, 30)),
+      logSleep(BABY, at(13), at(13, 45), at(13, 45)),
+      logDiaper(BABY, at(7), 'wet'),
+      logDiaper(BABY, at(12), 'dirty'),
+      deleteEvent(logDiaper(BABY, at(14), 'wet'), at(14)),
+    ]
+    expect(summarizeDay(events, DAY_START, DAY_END, at(23))).toEqual({
+      feedings: 3,
+      bottleMl: 210,
+      breastMs: 15 * MIN,
+      sleepMs: 135 * MIN,
+      naps: 2,
+      longestSleepMs: 90 * MIN,
+      diapers: { wet: 1, dirty: 1, mixed: 0 },
+    })
+  })
+
+  it('splits a night across midnight and counts running sleep up to now', () => {
+    const lastNight = logSleep(BABY, at(0) - 2 * H, at(6), at(6))
+    const running = startSleep(BABY, at(20))
+    const summary = summarizeDay([lastNight, running], DAY_START, DAY_END, at(21))
+    expect(summary.sleepMs).toBe(6 * H + H)
+    expect(summary.naps).toBe(0)
+  })
+
+  it('ignores events from other days', () => {
+    const yesterday = logBottle(BABY, DAY_START - H, 60, 'formula')
+    expect(summarizeDay([yesterday], DAY_START, DAY_END, at(12)).feedings).toBe(0)
+  })
+})
+
+describe('lastActivityAt', () => {
+  it('uses the end of timed events and the time of instants', () => {
+    const events = [
+      logSleep(BABY, at(9), at(10), at(10)),
+      logDiaper(BABY, at(11), 'wet'),
+      logDiaper(BABY, at(8), 'wet'),
+    ]
+    expect(lastActivityAt(events, 'sleep', at(12))).toBe(at(10))
+    expect(lastActivityAt(events, 'diaper', at(12))).toBe(at(11))
+    expect(lastActivityAt(events, 'feeding', at(12))).toBeUndefined()
+  })
+})
