@@ -1,5 +1,5 @@
 import { APP_NAME } from '@bobo/shared'
-import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-router'
+import { HeadContent, Outlet, Scripts, createRootRoute, useHydrated } from '@tanstack/react-router'
 import { type ReactNode, Suspense, useEffect } from 'react'
 
 import { TabBar } from '../components/TabBar'
@@ -42,6 +42,10 @@ function RootDocument({ children }: { children: ReactNode }) {
 }
 
 function RootLayout() {
+  // The prerendered shell never contains page content. Rendering pages only after
+  // hydration keeps the first client render identical to the shell; otherwise a page
+  // whose data is already available (the local store opens fast) would mismatch.
+  const hydrated = useHydrated()
   // The shell is prerendered in the base locale; reflect the resolved locale for
   // screen readers and font selection.
   useEffect(() => {
@@ -52,9 +56,11 @@ function RootLayout() {
     <div className="mx-auto flex min-h-dvh max-w-app flex-col">
       <main className="flex-1 px-[calc(16px+env(safe-area-inset-right))] pt-[calc(16px+env(safe-area-inset-top))] pb-[calc(var(--spacing-tab-bar)+16px+env(safe-area-inset-bottom))] pl-[calc(16px+env(safe-area-inset-left))]">
         {/* Pages suspend while the local store opens (a few ms on startup). */}
-        <Suspense>
-          <Outlet />
-        </Suspense>
+        {hydrated && (
+          <Suspense>
+            <Outlet />
+          </Suspense>
+        )}
       </main>
       <TabBar />
     </div>

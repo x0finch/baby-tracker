@@ -7,7 +7,7 @@ import { isActiveBaby, resolveSelectedBaby, sortBabies } from './records'
 
 export function useBabies(): { active: Baby[]; archived: Baby[] } {
   const { babies } = useLocalStore()
-  const { data } = useLiveQuery(() => babies, [babies])
+  const { data } = useLiveQuery({ query: (q) => q.from({ baby: babies }) })
 
   return useMemo(() => {
     const all = sortBabies((data ?? []).filter((baby) => baby.deletedAt === null))
