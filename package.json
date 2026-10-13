@@ -11,7 +11,9 @@
     "format:check": "oxfmt --check",
     "typecheck": "tsc && pnpm -r --if-present typecheck",
     "test": "vitest run",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test"
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
+    "codegen": "pnpm -r --if-present codegen",
+    "postinstall": "pnpm codegen"
   },
   "devDependencies": {
     "oxfmt": "^0.72.0",

@@ -1,8 +1,9 @@
 import { APP_NAME } from '@bobo/shared'
 import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-router'
-import type { ReactNode } from 'react'
+import { type ReactNode, useEffect } from 'react'
 
 import { TabBar } from '../components/TabBar'
+import { getLocale } from '../lib/i18n'
 import { THEME_COLORS, themeInitScript } from '../lib/theme'
 
 import appCss from '../styles/app.css?url'
@@ -27,7 +28,7 @@ export const Route = createRootRoute({
 function RootDocument({ children }: { children: ReactNode }) {
   return (
     // The inline theme script sets data-theme before hydration.
-    <html lang="zh-CN" suppressHydrationWarning>
+    <html lang={getLocale()} suppressHydrationWarning>
       <head>
         <HeadContent />
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
@@ -41,6 +42,12 @@ function RootDocument({ children }: { children: ReactNode }) {
 }
 
 function RootLayout() {
+  // The shell is prerendered in the base locale; reflect the resolved locale for
+  // screen readers and font selection.
+  useEffect(() => {
+    document.documentElement.lang = getLocale()
+  }, [])
+
   return (
     <div className="mx-auto flex min-h-dvh max-w-app flex-col">
       <main className="flex-1 px-[calc(16px+env(safe-area-inset-right))] pt-[calc(16px+env(safe-area-inset-top))] pb-[calc(var(--spacing-tab-bar)+16px+env(safe-area-inset-bottom))] pl-[calc(16px+env(safe-area-inset-left))]">

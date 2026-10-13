@@ -19,6 +19,14 @@ pnpm test          # vitest
 
 Tooling: [oxlint](https://oxc.rs/docs/guide/usage/linter) (type-aware via `oxlint-tsgolint`), [oxfmt](https://oxc.rs/docs/guide/usage/formatter), TypeScript 7 and Vitest. In VS Code, install the recommended Oxc extension for format-on-save and lint fixes.
 
+## Internationalization
+
+UI strings live in `apps/web/messages/{locale}.json` and are compiled by [Paraglide JS](https://paraglidejs.com) into typed functions (`m.someKey()`) in `apps/web/src/paraglide` (generated on install and by the Vite plugin; not committed). Only `zh-CN` ships today.
+
+- Never hard-code user-facing text in JSX; `react/jsx-no-literals` enforces this.
+- Format numbers and dates with the helpers in `apps/web/src/lib/i18n.ts`, which use `Intl` with the active locale.
+- To add a locale, add it to `apps/web/project.inlang/settings.json` and create `messages/<locale>.json`; the language picker in settings appears once there is more than one locale.
+
 ## Layout
 
 | Path              | Package        | Description                             |

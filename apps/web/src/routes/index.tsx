@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 import { PageHeader } from '../components/PageHeader'
-import { messages } from '../messages'
+import { m } from '../paraglide/messages.js'
 
 export const Route = createFileRoute('/')({
   component: TodayPage,
@@ -10,8 +10,8 @@ export const Route = createFileRoute('/')({
 function TodayPage() {
   return (
     <section>
-      <PageHeader title={messages.todayTitle} />
-      <p className="text-fg-muted">{messages.todayEmpty}</p>
+      <PageHeader title={m.todayTitle()} />
+      <p className="text-fg-muted">{m.todayEmpty()}</p>
     </section>
   )
 }

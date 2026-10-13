@@ -7,17 +7,17 @@ import { Card } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'
 import { SegmentedControl } from '../components/ui/SegmentedControl'
 import { Sheet } from '../components/ui/Sheet'
-import { messages } from '../messages'
+import { m } from '../paraglide/messages.js'
 
 // Component preview for development; linked from settings in dev builds only.
 export const Route = createFileRoute('/ui')({
   component: UiPreviewPage,
 })
 
-const categories: { tone: ButtonTone; label: string }[] = [
-  { tone: 'feeding', label: messages.uiFeeding },
-  { tone: 'sleep', label: messages.uiSleep },
-  { tone: 'diaper', label: messages.uiDiaper },
+const categories: { tone: ButtonTone; label: () => string }[] = [
+  { tone: 'feeding', label: m.uiFeeding },
+  { tone: 'sleep', label: m.uiSleep },
+  { tone: 'diaper', label: m.uiDiaper },
 ]
 
 function UiPreviewPage() {
@@ -26,39 +26,39 @@ function UiPreviewPage() {
 
   return (
     <section className="flex flex-col gap-6">
-      <PageHeader title={messages.uiTitle} />
+      <PageHeader title={m.uiTitle()} />
 
       <div className="flex flex-col gap-3">
-        <h2 className="text-title font-extrabold">{messages.uiButtons}</h2>
+        <h2 className="text-title font-extrabold">{m.uiButtons()}</h2>
         <Button size="lg" block>
-          {messages.uiSave}
+          {m.uiSave()}
         </Button>
         <div className="flex gap-3">
           <Button variant="outline" className="flex-1">
-            {messages.uiCancel}
+            {m.uiCancel()}
           </Button>
           <Button tone="danger" className="flex-1">
-            {messages.uiDelete}
+            {m.uiDelete()}
           </Button>
         </div>
         <Button variant="ghost" tone="diaper">
-          {messages.uiCancel}
+          {m.uiCancel()}
         </Button>
       </div>
 
       <div className="flex flex-col gap-3">
-        <h2 className="text-title font-extrabold">{messages.uiCategories}</h2>
+        <h2 className="text-title font-extrabold">{m.uiCategories()}</h2>
         <div className="grid grid-cols-3 gap-3">
           {categories.map((category) => (
             <Button key={category.tone} tone={category.tone} size="lg">
-              {category.label}
+              {category.label()}
             </Button>
           ))}
         </div>
         <div className="grid grid-cols-3 gap-3">
           {categories.map((category) => (
             <Button key={category.tone} tone={category.tone} variant="soft">
-              {category.label}
+              {category.label()}
             </Button>
           ))}
         </div>
@@ -66,24 +66,24 @@ function UiPreviewPage() {
 
       <Card className="flex flex-col gap-4">
         <SegmentedControl
-          label={messages.uiSide}
+          label={m.uiSide()}
           options={[
-            { value: 'left', label: messages.uiLeft },
-            { value: 'right', label: messages.uiRight },
+            { value: 'left', label: m.uiLeft() },
+            { value: 'right', label: m.uiRight() },
           ]}
           value={side}
           onChange={setSide}
         />
-        <Input label={messages.uiNameLabel} hint={messages.uiNameHint} />
+        <Input label={m.uiNameLabel()} hint={m.uiNameHint()} />
       </Card>
 
       <Button variant="soft" tone="diaper" onClick={() => setSheetOpen(true)}>
-        {messages.uiOpenSheet}
+        {m.uiOpenSheet()}
       </Button>
-      <Sheet open={sheetOpen} onClose={() => setSheetOpen(false)} title={messages.uiSheetTitle}>
-        <Input label={messages.uiNameLabel} inputMode="numeric" />
+      <Sheet open={sheetOpen} onClose={() => setSheetOpen(false)} title={m.uiSheetTitle()}>
+        <Input label={m.uiNameLabel()} inputMode="numeric" />
         <Button size="lg" block onClick={() => setSheetOpen(false)}>
-          {messages.uiSave}
+          {m.uiSave()}
         </Button>
       </Sheet>
     </section>

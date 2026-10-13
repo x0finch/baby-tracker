@@ -7,11 +7,13 @@
     "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc"
+    "typecheck": "pnpm codegen && tsc",
+    "codegen": "paraglide-js compile --project ./project.inlang --silent"
   },
   "dependencies": {
     "@bobo/shared": "workspace:*",
     "@fontsource-variable/nunito": "^5.3.0",
+    "@inlang/paraglide-js": "^2.27.0",
     "@tanstack/react-router": "^1.170.42",
     "@tanstack/react-start": "^1.168.61",
     "clsx": "^2.1.1",

@@ -1,3 +1,4 @@
+import { paraglideVitePlugin } from '@inlang/paraglide-js'
 import tailwindcss from '@tailwindcss/vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import react from '@vitejs/plugin-react'
@@ -5,6 +6,8 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   plugins: [
+    // Compiler options live in project.inlang/paraglide.config.js.
+    paraglideVitePlugin({ project: './project.inlang' }),
     tailwindcss(),
     tanstackStart({
       spa: {

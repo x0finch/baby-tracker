@@ -1,11 +1,11 @@
 import { Link, useHydrated } from '@tanstack/react-router'
 
-import { messages } from '../messages'
+import { m } from '../paraglide/messages.js'
 
 const tabs = [
-  { to: '/', label: messages.tabToday },
-  { to: '/stats', label: messages.tabStats },
-  { to: '/settings', label: messages.tabSettings },
+  { to: '/', label: m.tabToday },
+  { to: '/stats', label: m.tabStats },
+  { to: '/settings', label: m.tabSettings },
 ] as const
 
 export function TabBar() {
@@ -26,7 +26,7 @@ export function TabBar() {
           activeOptions={{ exact: true }}
           className="flex min-h-touch flex-1 items-center justify-center font-extrabold text-fg-muted aria-[current=page]:text-primary-text"
         >
-          {tab.label}
+          {tab.label()}
         </Link>
       ))}
     </nav>
