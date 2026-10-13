@@ -1,5 +1,6 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 
+import { InstallCard } from '../components/InstallCard'
 import { PageHeader } from '../components/PageHeader'
 import { StorageStatus } from '../components/StorageStatus'
 import { Card } from '../components/ui/Card'
@@ -54,6 +55,7 @@ function SettingsPage() {
         <h2 className="text-title font-extrabold">{m.settingsBabies()}</h2>
         <BabyList />
       </Card>
+      <InstallCard />
       <Card className="flex flex-col gap-2">
         <h2 className="text-title font-extrabold">{m.storageTitle()}</h2>
         <StorageStatus />

@@ -3,6 +3,7 @@ import { HeadContent, Outlet, Scripts, createRootRoute, useHydrated } from '@tan
 import { type ReactNode, Suspense, useEffect } from 'react'
 
 import { TabBar } from '../components/TabBar'
+import { UpdatePrompt } from '../components/UpdatePrompt'
 import { getLocale } from '../lib/i18n'
 import { THEME_COLORS, themeInitScript } from '../lib/theme'
 
@@ -17,9 +18,18 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1, viewport-fit=cover',
       },
       { name: 'theme-color', content: THEME_COLORS.light },
+      { name: 'mobile-web-app-capable', content: 'yes' },
+      { name: 'apple-mobile-web-app-capable', content: 'yes' },
+      { name: 'apple-mobile-web-app-status-bar-style', content: 'default' },
+      { name: 'apple-mobile-web-app-title', content: APP_NAME },
       { title: APP_NAME },
     ],
-    links: [{ rel: 'stylesheet', href: appCss }],
+    links: [
+      { rel: 'stylesheet', href: appCss },
+      { rel: 'manifest', href: '/manifest.webmanifest' },
+      { rel: 'icon', href: '/icons/icon.svg', type: 'image/svg+xml' },
+      { rel: 'apple-touch-icon', href: '/icons/apple-touch-icon.png' },
+    ],
   }),
   shellComponent: RootDocument,
   component: RootLayout,
@@ -63,6 +73,7 @@ function RootLayout() {
         )}
       </main>
       <TabBar />
+      {hydrated && <UpdatePrompt />}
     </div>
   )
 }

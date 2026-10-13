@@ -147,5 +147,12 @@
   "sinceDiaper": "上次换尿布",
   "ago": "{duration}前",
   "neverLogged": "还没有记录",
-  "sleepingNow": "正在睡"
+  "sleepingNow": "正在睡",
+  "updateAvailable": "Bobo 有新版本了",
+  "updateNow": "更新",
+  "installTitle": "添加到主屏幕",
+  "installBody": "像普通 App 一样从主屏幕打开，离线也能用，记录也不容易被浏览器清理。",
+  "installButton": "添加到主屏幕",
+  "installIosSteps": "在 Safari 中点底部的“分享”按钮，然后选择“添加到主屏幕”。",
+  "installAndroidSteps": "在浏览器菜单中选择“安装应用”或“添加到主屏幕”。"
 }
