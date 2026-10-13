@@ -42,3 +42,5 @@ export const events = sqliteTable(
     index('events_family_idx').on(table.familyId),
   ],
 )
+
+export * from './auth-schema'
