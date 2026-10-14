@@ -15,18 +15,11 @@ const WET_FILL = '#e8d77a'
 /**
  * Flat open-diaper illustration: an hourglass pad with side tabs, plus an optional wet patch
  * and poop stain. Light colors on purpose, so it reads the same in light and dark themes.
+ * `DiaperArt` is the artwork alone (120×90), for embedding in other icons.
  */
-export function DiaperIcon({
-  wet = false,
-  poop,
-  className,
-}: {
-  wet?: boolean
-  poop?: PoopDetails['color']
-  className?: string
-}) {
+export function DiaperArt({ wet = false, poop }: { wet?: boolean; poop?: PoopDetails['color'] }) {
   return (
-    <svg aria-hidden viewBox="0 0 120 90" className={className}>
+    <>
       {/* Side tabs */}
       <rect x="4" y="12" width="20" height="13" rx="4" fill="#cfe5d3" />
       <rect x="96" y="12" width="20" height="13" rx="4" fill="#cfe5d3" />
@@ -51,6 +44,22 @@ export function DiaperIcon({
           strokeWidth="1.5"
         />
       )}
+    </>
+  )
+}
+
+export function DiaperIcon({
+  wet = false,
+  poop,
+  className,
+}: {
+  wet?: boolean
+  poop?: PoopDetails['color']
+  className?: string
+}) {
+  return (
+    <svg aria-hidden viewBox="0 0 120 90" className={className}>
+      <DiaperArt wet={wet} poop={poop} />
     </svg>
   )
 }

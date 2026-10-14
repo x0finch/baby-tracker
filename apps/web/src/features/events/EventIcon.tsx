@@ -3,7 +3,7 @@ import { clsx } from 'clsx'
 import type { ReactNode } from 'react'
 
 import type { Category } from './describe'
-import { POOP_FILL } from './DiaperIcon'
+import { DiaperArt } from './DiaperIcon'
 
 /** Icon subjects: each category, with feeds and sleeps split by kind. */
 export type IconKind =
@@ -73,39 +73,6 @@ const TONE: Record<IconKind, string> = {
 const W = '#ffffff'
 type PoopColor = PoopDetails['color']
 
-/** The wet patch on the diaper's pad. */
-const WET_PAD = 'M15.5 14 H32.5 L28.5 24 Q27 27 28.5 30 L32.5 37.5 H15.5 L19.5 30 Q21 27 19.5 24 Z'
-
-const DIAPER_BODY =
-  'M10 12 H38 Q42 12 40 16 L33 24 Q31 27 33 30 L38 35 Q40 39 36 39 H12 Q8 39 10 35 L15 30 Q17 27 15 24 L8 16 Q6 12 10 12 Z'
-
-function Poop({
-  x,
-  y,
-  scale = 1,
-  color,
-}: {
-  x: number
-  y: number
-  scale?: number
-  color: PoopColor
-}) {
-  return (
-    <g
-      transform={`translate(${x} ${y}) scale(${scale})`}
-      fill={POOP_FILL[color]}
-      // White stool would vanish on the white diaper.
-      stroke={color === 'white' ? '#9e9e9e' : 'none'}
-      strokeWidth="1"
-    >
-      <ellipse cx="0" cy="5" rx="8" ry="3.6" />
-      <ellipse cx="0" cy="0.5" rx="6" ry="3.2" />
-      <ellipse cx="0.5" cy="-3.6" rx="3.6" ry="2.6" />
-      <path d="M1 -5.8 Q3.5 -8.5 1.5 -10 Q2.5 -7.5 -1 -6.2 Z" />
-    </g>
-  )
-}
-
 /** Flat white artwork on a 48×48 grid; `tone` paints details in the kind's color. */
 function glyph(kind: IconKind, tone: string, poop: PoopColor): ReactNode {
   switch (kind) {
@@ -169,28 +136,17 @@ function glyph(kind: IconKind, tone: string, poop: PoopColor): ReactNode {
         </>
       )
     case 'diaper':
-      return <path d={DIAPER_BODY} fill={W} />
     case 'diaperWet':
-      return (
-        <>
-          <path d={DIAPER_BODY} fill={W} />
-          <path d={WET_PAD} className={tone} opacity="0.35" />
-        </>
-      )
     case 'diaperDirty':
-      return (
-        <>
-          <path d={DIAPER_BODY} fill={W} />
-          <Poop x={24} y={25} color={poop} />
-        </>
-      )
     case 'diaperMixed':
+      // The same illustration as the diaper form, with the stool in its logged color.
       return (
-        <>
-          <path d={DIAPER_BODY} fill={W} />
-          <path d={WET_PAD} className={tone} opacity="0.35" />
-          <Poop x={24} y={25} color={poop} />
-        </>
+        <svg x="4" y="9" width="40" height="30" viewBox="0 0 120 90">
+          <DiaperArt
+            wet={kind === 'diaperWet' || kind === 'diaperMixed'}
+            poop={kind === 'diaperDirty' || kind === 'diaperMixed' ? poop : undefined}
+          />
+        </svg>
       )
     case 'pumping':
       return (
