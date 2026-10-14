@@ -1,6 +1,7 @@
-import type { Baby, FamilyMember, FamilyRole, FamilySummary, Invite } from '@bobo/shared'
+import type { Baby, FamilyMember, FamilyRole, FamilySummary } from '@bobo/shared'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { clsx } from 'clsx'
-import { type FormEvent, useCallback, useEffect, useState } from 'react'
+import { type FormEvent, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
@@ -13,7 +14,7 @@ import { requestSync } from '../../sync/runner'
 import { useAccess } from '../../sync/use-access'
 import { BabyAvatar } from '../babies/BabyAvatar'
 import { useBabies } from '../babies/use-babies'
-import { familyApi, inviteUrl, useMembers } from './api'
+import { familyApi, invitesQuery, inviteUrl, useMembers } from './api'
 
 type MemberRole = Exclude<FamilyRole, 'owner'>
 
@@ -157,19 +158,12 @@ function InviteContent({
 }) {
   const [role, setRole] = useState<MemberRole>('caregiver')
   const [babyIds, setBabyIds] = useState<string[] | null>(null)
-  const [invite, setInvite] = useState<Invite | null>(null)
-  const [failed, setFailed] = useState(false)
   const [copied, setCopied] = useState(false)
-
-  async function create() {
-    setFailed(false)
-    try {
-      setInvite(await familyApi.createInvite(family.id, { role, babyIds }))
-      onCreated()
-    } catch {
-      setFailed(true)
-    }
-  }
+  const create = useMutation({
+    mutationFn: () => familyApi.createInvite(family.id, { role, babyIds }),
+    onSuccess: onCreated,
+  })
+  const invite = create.data
 
   const url = invite ? inviteUrl(invite.code) : ''
   async function share() {
@@ -210,10 +204,15 @@ function InviteContent({
       {babies.length > 1 && (
         <BabyScopePicker babies={babies} value={babyIds} onChange={setBabyIds} />
       )}
-      <Button size="lg" block disabled={babyIds?.length === 0} onClick={() => void create()}>
+      <Button
+        size="lg"
+        block
+        disabled={babyIds?.length === 0 || create.isPending}
+        onClick={() => create.mutate()}
+      >
         {m.inviteCreate()}
       </Button>
-      {failed && <FormError>{m.actionFailed()}</FormError>}
+      {create.isError && <FormError>{m.actionFailed()}</FormError>}
     </div>
   )
 }
@@ -262,17 +261,10 @@ function MemberForm({
 }) {
   const [role, setRole] = useState<MemberRole>(member.role)
   const [babyIds, setBabyIds] = useState<string[] | null>(member.babyIds)
-  const [failed, setFailed] = useState(false)
-
-  async function run(action: () => Promise<void>) {
-    setFailed(false)
-    try {
-      await action()
-      onDone()
-    } catch {
-      setFailed(true)
-    }
-  }
+  const change = useMutation({
+    mutationFn: (action: () => Promise<void>) => action(),
+    onSuccess: onDone,
+  })
 
   return (
     <div className="flex flex-col gap-4">
@@ -283,9 +275,9 @@ function MemberForm({
       <Button
         size="lg"
         block
-        disabled={babyIds?.length === 0}
+        disabled={babyIds?.length === 0 || change.isPending}
         onClick={() =>
-          void run(() => familyApi.updateMember(family.id, member.userId, { role, babyIds }))
+          change.mutate(() => familyApi.updateMember(family.id, member.userId, { role, babyIds }))
         }
       >
         {m.memberSave()}
@@ -293,11 +285,12 @@ function MemberForm({
       <Button
         variant="ghost"
         tone="danger"
-        onClick={() => void run(() => familyApi.removeMember(family.id, member.userId))}
+        disabled={change.isPending}
+        onClick={() => change.mutate(() => familyApi.removeMember(family.id, member.userId))}
       >
         {m.memberRemove()}
       </Button>
-      {failed && <FormError>{m.actionFailed()}</FormError>}
+      {change.isError && <FormError>{m.actionFailed()}</FormError>}
     </div>
   )
 }
@@ -312,35 +305,34 @@ function RenameSheet({
   onClose: () => void
 }) {
   const [name, setName] = useState(family.name)
-  const [failed, setFailed] = useState(false)
-
-  async function submit(event: FormEvent) {
-    event.preventDefault()
-    const trimmed = name.trim()
-    if (!trimmed) return
-    try {
-      await familyApi.rename(family.id, trimmed)
+  const rename = useMutation({
+    mutationFn: (next: string) => familyApi.rename(family.id, next),
+    onSuccess: async () => {
       onClose()
       // The new name arrives with the next pull's access list.
       await requestSync()
-    } catch {
-      setFailed(true)
-    }
+    },
+  })
+
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    const trimmed = name.trim()
+    if (trimmed) rename.mutate(trimmed)
   }
 
   return (
     <Sheet open={open} onClose={onClose} title={m.familyRename()}>
-      <form noValidate onSubmit={(e) => void submit(e)} className="flex flex-col gap-4">
+      <form noValidate onSubmit={submit} className="flex flex-col gap-4">
         <Input
           label={m.familyNameLabel()}
           value={name}
           maxLength={50}
           onChange={(e) => setName(e.target.value)}
         />
-        <Button type="submit" size="lg" block disabled={!name.trim()}>
+        <Button type="submit" size="lg" block disabled={!name.trim() || rename.isPending}>
           {m.actionSave()}
         </Button>
-        {failed && <FormError>{m.actionFailed()}</FormError>}
+        {rename.isError && <FormError>{m.actionFailed()}</FormError>}
       </form>
     </Sheet>
   )
@@ -349,50 +341,30 @@ function RenameSheet({
 function FamilyCard({ family, userId }: { family: FamilySummary; userId: string | undefined }) {
   const { active, archived } = useBabies()
   const babies = [...active, ...archived].filter((baby) => baby.familyId === family.id)
-  const [version, setVersion] = useState(0)
-  const refresh = useCallback(() => setVersion((v) => v + 1), [])
-  const members = useMembers(family.id, version)
+  const queryClient = useQueryClient()
+  const members = useMembers(family.id)
   const managing = family.role === 'owner' || family.role === 'admin'
-  const [invites, setInvites] = useState<Invite[]>([])
+  const { data: invites = [] } = useQuery({ ...invitesQuery(family.id), enabled: managing })
   const [sheet, setSheet] = useState<'invite' | 'rename' | 'leave' | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [failed, setFailed] = useState(false)
   const editing = members?.find((member) => member.userId === editingId)
+  // Members and invites both change after inviting, editing or revoking.
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: ['family', family.id] })
 
-  useEffect(() => {
-    if (!managing) return undefined
-    let current = true
-    familyApi.invites(family.id).then(
-      (list) => current && setInvites(list),
-      () => undefined,
-    )
-    return () => {
-      current = false
-    }
-    // `version` re-fetches after invites are created or revoked.
-    // oxlint-disable-next-line react/exhaustive-effect-dependencies
-  }, [family.id, managing, version])
-
-  async function leave() {
-    setFailed(false)
-    try {
+  const leave = useMutation({
+    mutationFn: async () => {
       if (userId) await familyApi.removeMember(family.id, userId)
+    },
+    onSuccess: async () => {
       setSheet(null)
       // The next pull no longer lists the family, which removes its data from this device.
       await requestSync()
-    } catch {
-      setFailed(true)
-    }
-  }
-
-  async function revoke(code: string) {
-    try {
-      await familyApi.revokeInvite(family.id, code)
-      refresh()
-    } catch {
-      setFailed(true)
-    }
-  }
+    },
+  })
+  const revoke = useMutation({
+    mutationFn: (code: string) => familyApi.revokeInvite(family.id, code),
+    onSuccess: refresh,
+  })
 
   return (
     <Card className="flex flex-col gap-3">
@@ -444,7 +416,12 @@ function FamilyCard({ family, userId }: { family: FamilySummary; userId: string 
                 <span className="min-w-0 flex-1 truncate">
                   {`${roleLabel[invite.role]()} · ${scopeLabel(invite.babyIds, babies)}`}
                 </span>
-                <Button variant="ghost" tone="danger" onClick={() => void revoke(invite.code)}>
+                <Button
+                  variant="ghost"
+                  tone="danger"
+                  disabled={revoke.isPending}
+                  onClick={() => revoke.mutate(invite.code)}
+                >
                   {m.inviteRevoke()}
                 </Button>
               </li>
@@ -470,7 +447,7 @@ function FamilyCard({ family, userId }: { family: FamilySummary; userId: string 
           {m.familyLeave()}
         </Button>
       )}
-      {failed && <FormError>{m.actionFailed()}</FormError>}
+      {(leave.isError || revoke.isError) && <FormError>{m.actionFailed()}</FormError>}
 
       <InviteSheet
         family={family}
@@ -497,7 +474,8 @@ function FamilyCard({ family, userId }: { family: FamilySummary; userId: string 
         onClose={() => setSheet(null)}
         title={m.familyLeave()}
         confirmLabel={m.familyLeaveConfirm()}
-        onConfirm={() => void leave()}
+        onConfirm={() => leave.mutate()}
+        busy={leave.isPending}
       >
         {m.familyLeaveBody({ name: family.name })}
       </ConfirmSheet>

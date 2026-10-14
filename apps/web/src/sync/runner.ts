@@ -1,6 +1,5 @@
-import { useSyncExternalStore } from 'react'
-
 import type { LocalStore } from '../db'
+import { createStore, useStore } from '../lib/store'
 import { HttpError, httpSyncApi } from './api'
 import { type SyncApi, syncOnce } from './engine'
 import { getAccount } from './local'
@@ -17,24 +16,10 @@ export interface SyncState {
 const LOCAL_CHANGE_DELAY_MS = 3_000
 const INTERVAL_MS = 60_000
 
-let state: SyncState = { phase: 'signed-out' }
-const listeners = new Set<() => void>()
+const syncState = createStore<SyncState>({ phase: 'signed-out' })
+const setState = syncState.set
 
-function setState(next: SyncState) {
-  state = next
-  for (const listener of listeners) listener()
-}
-
-export function useSyncState(): SyncState {
-  return useSyncExternalStore(
-    (onChange) => {
-      listeners.add(onChange)
-      return () => listeners.delete(onChange)
-    },
-    () => state,
-    () => state,
-  )
-}
+export const useSyncState = (): SyncState => useStore(syncState)
 
 let running: Promise<void> | null = null
 let again = false
@@ -67,10 +52,10 @@ async function runRound() {
     return
   }
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
-    setState({ ...state, phase: 'offline' })
+    setState({ ...syncState.get(), phase: 'offline' })
     return
   }
-  setState({ ...state, phase: 'syncing' })
+  setState({ ...syncState.get(), phase: 'syncing' })
   try {
     const result = await syncOnce(store, api)
     const at = Date.now()
@@ -78,14 +63,17 @@ async function runRound() {
     setState({
       phase: 'idle',
       lastSyncedAt: at,
-      rejected: result.rejected.length > 0 ? { count: result.rejected.length, at } : state.rejected,
+      rejected:
+        result.rejected.length > 0
+          ? { count: result.rejected.length, at }
+          : syncState.get().rejected,
     })
   } catch (error) {
     if (error instanceof HttpError && error.status === 401) {
-      setState({ ...state, phase: 'unauthorized' })
+      setState({ ...syncState.get(), phase: 'unauthorized' })
     } else {
       console.warn('Sync failed', error)
-      setState({ ...state, phase: navigator.onLine ? 'error' : 'offline' })
+      setState({ ...syncState.get(), phase: navigator.onLine ? 'error' : 'offline' })
     }
   }
 }

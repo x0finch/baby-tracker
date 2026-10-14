@@ -1,8 +1,9 @@
 import type { Baby } from '@bobo/shared'
 import { useLiveQuery } from '@tanstack/react-db'
-import { useCallback, useMemo, useSyncExternalStore } from 'react'
+import { useCallback, useMemo } from 'react'
 
 import { useLocalStore } from '../../db'
+import { createStoredValue, stringCodec, useStore } from '../../lib/store'
 import { isActiveBaby, resolveSelectedBaby, sortBabies } from './records'
 
 export function useBabies(): { active: Baby[]; archived: Baby[] } {
@@ -19,48 +20,16 @@ export function useBabies(): { active: Baby[]; archived: Baby[] } {
 }
 
 // The selected baby is a per-device preference, not synced data.
-const SELECTED_KEY = 'bobo.selectedBabyId'
-const SELECTED_EVENT = 'bobo:selected-baby'
+const selectedBabyId = createStoredValue('bobo.selectedBabyId', stringCodec, null)
 
-// Used when localStorage is unavailable, so the selection still works until reload.
-let memorySelectedId: string | null = null
-
-function readSelectedId(): string | null {
-  try {
-    return localStorage.getItem(SELECTED_KEY) ?? memorySelectedId
-  } catch {
-    return memorySelectedId
-  }
-}
-
-function subscribeSelectedId(onChange: () => void) {
-  const onStorage = (event: StorageEvent) => {
-    if (event.key === SELECTED_KEY) onChange()
-  }
-  window.addEventListener(SELECTED_EVENT, onChange)
-  window.addEventListener('storage', onStorage)
-  return () => {
-    window.removeEventListener(SELECTED_EVENT, onChange)
-    window.removeEventListener('storage', onStorage)
-  }
-}
-
-export function selectBaby(id: string) {
-  memorySelectedId = id
-  try {
-    localStorage.setItem(SELECTED_KEY, id)
-  } catch {
-    // Falls back to memorySelectedId.
-  }
-  window.dispatchEvent(new Event(SELECTED_EVENT))
-}
+export const selectBaby = (id: string) => selectedBabyId.set(id)
 
 export function useSelectedBaby(): {
   baby: Baby | undefined
   select: (id: string) => void
 } {
   const { active } = useBabies()
-  const storedId = useSyncExternalStore(subscribeSelectedId, readSelectedId, () => null)
+  const storedId = useStore(selectedBabyId)
   const baby = useMemo(() => resolveSelectedBaby(active, storedId), [active, storedId])
   const select = useCallback((id: string) => selectBaby(id), [])
   return { baby, select }

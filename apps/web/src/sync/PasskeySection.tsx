@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 
 import { Button } from '../components/ui/Button'
 import { formatDate } from '../lib/i18n'
@@ -13,50 +14,37 @@ import {
   passkeysSupported,
 } from './passkey'
 
+const PASSKEYS_KEY = ['passkeys']
+
 /** The signed-in account's passkeys: add one for this device, or remove old ones. */
 export function PasskeySection() {
-  const [passkeys, setPasskeys] = useState<PasskeyInfo[]>()
+  const queryClient = useQueryClient()
+  const list = useQuery({ queryKey: PASSKEYS_KEY, queryFn: listPasskeys })
   const [message, setMessage] = useState<string>()
-  const [busy, setBusy] = useState(false)
+  const refresh = () => queryClient.invalidateQueries({ queryKey: PASSKEYS_KEY })
 
-  useEffect(() => {
-    let current = true
-    listPasskeys().then(
-      (list) => current && setPasskeys(list),
-      () => current && setPasskeys([]),
-    )
-    return () => {
-      current = false
-    }
-  }, [])
-
-  if (!passkeysSupported() || !passkeys) return null
-
-  async function add() {
-    setBusy(true)
-    setMessage(undefined)
-    try {
-      await addPasskey(m.passkeyDefaultName({ date: formatDate(Date.now()) }))
-      setPasskeys(await listPasskeys())
+  const add = useMutation({
+    mutationFn: () => addPasskey(m.passkeyDefaultName({ date: formatDate(Date.now()) })),
+    onMutate: () => setMessage(undefined),
+    onSuccess: async () => {
+      await refresh()
       setMessage(m.passkeyAdded())
-    } catch (error) {
-      if (!isPasskeyCancel(error)) {
-        setMessage(needsFreshSignIn(error) ? m.passkeyNeedsFreshSignIn() : m.passkeyAddFailed())
-      }
-    } finally {
-      setBusy(false)
-    }
-  }
+    },
+    onError: (error) => {
+      if (isPasskeyCancel(error)) return
+      setMessage(needsFreshSignIn(error) ? m.passkeyNeedsFreshSignIn() : m.passkeyAddFailed())
+    },
+  })
+  const remove = useMutation({
+    mutationFn: deletePasskey,
+    onMutate: () => setMessage(undefined),
+    onSuccess: refresh,
+    onError: () => setMessage(m.actionFailed()),
+  })
 
-  async function remove(id: string) {
-    setMessage(undefined)
-    try {
-      await deletePasskey(id)
-      setPasskeys((list) => list?.filter((item) => item.id !== id))
-    } catch {
-      setMessage(m.actionFailed())
-    }
-  }
+  // A failed list (e.g. offline) still offers adding one.
+  const passkeys: PasskeyInfo[] | undefined = list.isError ? [] : list.data
+  if (!passkeysSupported() || !passkeys) return null
 
   return (
     <section className="flex flex-col gap-2 border-t-2 border-border pt-3">
@@ -73,7 +61,8 @@ export function PasskeySection() {
                 variant="ghost"
                 tone="danger"
                 aria-label={m.passkeyRemoveLabel({ name: item.name ?? '' })}
-                onClick={() => void remove(item.id)}
+                disabled={remove.isPending}
+                onClick={() => remove.mutate(item.id)}
               >
                 {m.passkeyRemove()}
               </Button>
@@ -81,7 +70,7 @@ export function PasskeySection() {
           ))}
         </ul>
       )}
-      <Button variant="soft" tone="primary" disabled={busy} onClick={() => void add()}>
+      <Button variant="soft" tone="primary" disabled={add.isPending} onClick={() => add.mutate()}>
         {m.passkeyAdd()}
       </Button>
       {message && <output className="m-0 font-bold">{message}</output>}

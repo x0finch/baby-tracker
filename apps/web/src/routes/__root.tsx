@@ -1,17 +1,24 @@
 import { APP_NAME } from '@bobo/shared'
-import { HeadContent, Outlet, Scripts, createRootRoute, useHydrated } from '@tanstack/react-router'
+import type { QueryClient } from '@tanstack/react-query'
+import {
+  HeadContent,
+  Outlet,
+  Scripts,
+  createRootRouteWithContext,
+  useHydrated,
+} from '@tanstack/react-router'
 import { type ReactNode, Suspense, useEffect } from 'react'
 
 import { TabBar } from '../components/TabBar'
 import { UpdatePrompt } from '../components/UpdatePrompt'
 import { getLocale } from '../lib/i18n'
 import { THEME_COLORS, themeInitScript } from '../lib/theme'
-import { watchSystemTheme } from '../lib/use-theme'
+import { watchTheme } from '../lib/use-theme'
 import { SyncRunner } from '../sync/SyncRunner'
 
 import appCss from '../styles/app.css?url'
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
@@ -63,7 +70,7 @@ function RootLayout() {
   useEffect(() => {
     document.documentElement.lang = getLocale()
   }, [])
-  useEffect(watchSystemTheme, [])
+  useEffect(watchTheme, [])
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-app flex-col">

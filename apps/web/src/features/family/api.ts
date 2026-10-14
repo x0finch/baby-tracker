@@ -5,7 +5,8 @@ import type {
   Invite,
   InvitePreview,
 } from '@bobo/shared'
-import { useEffect, useState } from 'react'
+import { queryOptions, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
 
 import { apiFetch } from '../../sync/api'
 
@@ -51,53 +52,52 @@ export function inviteUrl(code: string): string {
   return new URL(`/join/${code}`, window.location.origin).toString()
 }
 
-// Member names rarely change; one fetch per family per app session is enough.
-const memberCache = new Map<string, Promise<FamilyMember[]>>()
-
-function loadMembers(familyId: string, refresh = false): Promise<FamilyMember[]> {
-  let members = memberCache.get(familyId)
-  if (!members || refresh) {
-    members = familyApi.members(familyId)
-    memberCache.set(familyId, members)
-    // Retry on the next call if it failed (e.g. offline).
-    members.catch(() => memberCache.delete(familyId))
-  }
-  return members
+export const familyKeys = {
+  members: (familyId: string) => ['family', familyId, 'members'] as const,
+  invites: (familyId: string) => ['family', familyId, 'invites'] as const,
 }
+
+// Member names rarely change; one fetch per family per app session is enough.
+export const membersQuery = (familyId: string) =>
+  queryOptions({
+    queryKey: familyKeys.members(familyId),
+    queryFn: () => familyApi.members(familyId),
+    staleTime: Infinity,
+  })
+
+export const invitesQuery = (familyId: string) =>
+  queryOptions({
+    queryKey: familyKeys.invites(familyId),
+    queryFn: () => familyApi.invites(familyId),
+  })
+
+export const invitePreviewQuery = (code: string) =>
+  queryOptions({
+    queryKey: ['invite', code],
+    queryFn: () => familyApi.previewInvite(code),
+    staleTime: 0,
+  })
 
 /** Members of a family, or undefined while loading, offline or signed out. */
-export function useMembers(familyId: string | null | undefined, version = 0) {
-  const [members, setMembers] = useState<FamilyMember[] | undefined>()
-  useEffect(() => {
-    if (!familyId) return undefined
-    let current = true
-    loadMembers(familyId, version > 0).then(
-      (list) => current && setMembers(list),
-      () => current && setMembers(undefined),
-    )
-    return () => {
-      current = false
-    }
-  }, [familyId, version])
-  return members
+export function useMembers(familyId: string | null | undefined) {
+  return useQuery({ ...membersQuery(familyId ?? ''), enabled: Boolean(familyId) }).data
 }
+
+// Members already looked up again after a cache miss, so a member who left isn't refetched
+// by every record that mentions them.
+const refetchedFor = new Set<string>()
 
 /** Display name of a family member; refetches once if they joined after the list was cached. */
 export function useMemberName(familyId: string | null, userId: string | null) {
-  const [name, setName] = useState<string | undefined>()
+  const queryClient = useQueryClient()
+  const members = useMembers(familyId)
+  const member = members?.find((item) => item.userId === userId)
+  const missing = familyId !== null && userId !== null && members !== undefined && !member
   useEffect(() => {
-    if (!familyId || !userId) return undefined
-    let current = true
-    const find = (list: FamilyMember[]) => list.find((member) => member.userId === userId)
-    loadMembers(familyId)
-      .then((list) => find(list) ?? loadMembers(familyId, true).then(find))
-      .then(
-        (member) => current && setName(member?.name),
-        () => undefined,
-      )
-    return () => {
-      current = false
-    }
-  }, [familyId, userId])
-  return name
+    const key = `${familyId}:${userId}`
+    if (!missing || !familyId || refetchedFor.has(key)) return
+    refetchedFor.add(key)
+    void queryClient.invalidateQueries({ queryKey: familyKeys.members(familyId) })
+  }, [missing, familyId, userId, queryClient])
+  return member?.name
 }
