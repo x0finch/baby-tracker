@@ -480,5 +480,9 @@
   "yesterdayRecords": "昨天的记录",
   "dayRecords": "{date}的记录",
   "dayEmpty": "这一天没有记录",
-  "backToToday": "回到今天"
+  "backToToday": "回到今天",
+  "timeJustNow": "刚刚",
+  "timeMinutesAgo": "{minutes} 分钟前",
+  "timeHoursAgo": "{hours} 小时前",
+  "timeShortcuts": "快速选择时间"
 }

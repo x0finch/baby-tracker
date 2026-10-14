@@ -10,9 +10,9 @@ import { type GrowthErrors, parseGrowth } from '../growth/growth-input'
 import { addEvent } from './actions'
 import { type OtherCategory, categoryTone } from './category'
 import { parseTemperature, parseVolume } from './measure-input'
+import { QuickTimeField } from './QuickTimeField'
 import { logGrowth, logMedication, logNote, logPumping, logTemperature } from './records'
 import { toDateTimeLocal } from './time'
-import { TimeField } from './TimeField'
 import { useNow } from './use-events'
 import { validateTime } from './validation'
 
@@ -162,7 +162,7 @@ export function OtherEventForm({
           onChange={(e) => setText(e.target.value)}
         />
       )}
-      <TimeField
+      <QuickTimeField
         label={m.eventTime()}
         value={time}
         onChange={setTime}
