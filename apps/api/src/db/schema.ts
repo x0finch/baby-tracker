@@ -35,7 +35,16 @@ export const events = sqliteTable(
     babyId: text('baby_id').notNull(),
     familyId: text('family_id'),
     type: text('type', {
-      enum: ['feeding', 'sleep', 'diaper', 'pumping', 'temperature', 'medication', 'note'],
+      enum: [
+        'feeding',
+        'sleep',
+        'diaper',
+        'pumping',
+        'temperature',
+        'medication',
+        'note',
+        'growth',
+      ],
     }).notNull(),
     startAt: integer('start_at').notNull(),
     endAt: integer('end_at'),

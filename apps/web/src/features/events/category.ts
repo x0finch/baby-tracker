@@ -9,6 +9,7 @@ export const categoryTone: Record<Category, ButtonTone> = {
   temperature: 'danger',
   medication: 'primary',
   note: 'primary',
+  growth: 'primary',
 }
 
 export const categoryDot: Record<Category, string> = {
@@ -19,10 +20,11 @@ export const categoryDot: Record<Category, string> = {
   temperature: 'bg-danger',
   medication: 'bg-primary',
   note: 'bg-fg-muted',
+  growth: 'bg-primary',
 }
 
 /** Event types logged from the "more" sheet rather than the three big buttons. */
-export const OTHER_CATEGORIES = ['pumping', 'temperature', 'medication', 'note'] as const
+export const OTHER_CATEGORIES = ['growth', 'pumping', 'temperature', 'medication', 'note'] as const
 export type OtherCategory = (typeof OTHER_CATEGORIES)[number]
 
 /** Timeline lane for each type; the less frequent types share one lane. */

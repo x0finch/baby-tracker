@@ -5,16 +5,18 @@ import { Input } from '../../components/ui/Input'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { useLocalStore } from '../../db'
 import { m } from '../../paraglide/messages.js'
+import { type GrowthErrors, parseGrowth } from '../growth/growth-input'
 import { addEvent } from './actions'
 import { type OtherCategory, categoryTone } from './category'
-import { logMedication, logNote, logPumping, logTemperature } from './records'
+import { logGrowth, logMedication, logNote, logPumping, logTemperature } from './records'
 import { toDateTimeLocal } from './time'
 import { TimeField } from './TimeField'
 import { useNow } from './use-events'
 import { validateTime } from './validation'
 
 type PumpingSide = 'left' | 'right' | 'both'
-type Errors = Partial<Record<'time' | 'amount' | 'celsius' | 'name' | 'text', string>>
+type Errors = Partial<Record<'time' | 'amount' | 'celsius' | 'name' | 'text', string>> &
+  GrowthErrors
 
 /** Plausible body temperatures; the schema allows a wider range for unusual readings. */
 export function validCelsius(value: number): boolean {
@@ -44,6 +46,9 @@ export function OtherEventForm({
   const [name, setName] = useState('')
   const [dose, setDose] = useState('')
   const [text, setText] = useState('')
+  const [weight, setWeight] = useState('')
+  const [length, setLength] = useState('')
+  const [head, setHead] = useState('')
   const [errors, setErrors] = useState<Errors>({})
 
   function submit(formEvent: FormEvent) {
@@ -60,18 +65,22 @@ export function OtherEventForm({
     }
     if (category === 'medication' && !name.trim()) next.name = m.medicationNameRequired()
     if (category === 'note' && !text.trim()) next.text = m.noteRequired()
+    const growth = category === 'growth' ? parseGrowth({ weight, length, head }) : undefined
+    if (growth && 'errors' in growth) Object.assign(next, growth.errors)
     setErrors(next)
     if (Object.keys(next).length > 0 || !('at' in timeResult)) return
 
     const at = timeResult.at
     const event =
-      category === 'pumping'
-        ? logPumping(babyId, at, side, Number(amount), current)
-        : category === 'temperature'
-          ? logTemperature(babyId, at, Number(celsius), current)
-          : category === 'medication'
-            ? logMedication(babyId, at, name, dose, current)
-            : logNote(babyId, at, text, current)
+      growth && 'data' in growth
+        ? logGrowth(babyId, at, growth.data, current)
+        : category === 'pumping'
+          ? logPumping(babyId, at, side, Number(amount), current)
+          : category === 'temperature'
+            ? logTemperature(babyId, at, Number(celsius), current)
+            : category === 'medication'
+              ? logMedication(babyId, at, name, dose, current)
+              : logNote(babyId, at, text, current)
     addEvent(store, event)
     onDone()
   }
@@ -98,6 +107,38 @@ export function OtherEventForm({
             error={errors.amount}
             onChange={(e) => setAmount(e.target.value)}
           />
+        </>
+      )}
+      {category === 'growth' && (
+        <>
+          <Input
+            label={m.growthWeight()}
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            value={weight}
+            error={errors.weight}
+            onChange={(e) => setWeight(e.target.value)}
+          />
+          <Input
+            label={m.growthLength()}
+            type="number"
+            inputMode="decimal"
+            step="0.1"
+            value={length}
+            error={errors.length}
+            onChange={(e) => setLength(e.target.value)}
+          />
+          <Input
+            label={m.growthHead()}
+            type="number"
+            inputMode="decimal"
+            step="0.1"
+            value={head}
+            error={errors.head}
+            onChange={(e) => setHead(e.target.value)}
+          />
+          {errors.form && <p className="m-0 font-bold text-danger-text">{errors.form}</p>}
         </>
       )}
       {category === 'temperature' && (

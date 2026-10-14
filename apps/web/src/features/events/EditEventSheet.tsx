@@ -8,6 +8,7 @@ import { useLocalStore } from '../../db'
 import { m } from '../../paraglide/messages.js'
 import { useAccess } from '../../sync/use-access'
 import { useMemberName } from '../family/api'
+import { type GrowthErrors, growthFieldValue, parseGrowth } from '../growth/growth-input'
 import { saveEvent } from './actions'
 import { validCelsius, validPumpingMl } from './OtherEventSheet'
 import { deleteEvent, moveEventStart, setEventNote } from './records'
@@ -18,7 +19,8 @@ import { overlapsSleep, validateTime } from './validation'
 
 type Errors = Partial<
   Record<'start' | 'end' | 'amount' | 'food' | 'celsius' | 'name' | 'note' | 'form', string>
->
+> &
+  GrowthErrors
 
 /** Edits any event; changes are applied through the pure helpers in records.ts. */
 export function EditEventForm({
@@ -54,6 +56,15 @@ export function EditEventForm({
     event.type === 'temperature' ? String(event.data.celsius) : '',
   )
   const [medName, setMedName] = useState(() => (event.type === 'medication' ? event.data.name : ''))
+  const [weight, setWeight] = useState(() =>
+    event.type === 'growth' ? growthFieldValue(event.data.weightKg) : '',
+  )
+  const [length, setLength] = useState(() =>
+    event.type === 'growth' ? growthFieldValue(event.data.lengthCm) : '',
+  )
+  const [head, setHead] = useState(() =>
+    event.type === 'growth' ? growthFieldValue(event.data.headCm) : '',
+  )
   const [medDose, setMedDose] = useState(() =>
     event.type === 'medication' ? (event.data.dose ?? '') : '',
   )
@@ -120,6 +131,11 @@ export function EditEventForm({
       else next = { ...next, data: { name: medName.trim(), dose: medDose.trim() || null } }
     }
     if (next.type === 'note' && !note.trim()) nextErrors.note = m.noteRequired()
+    if (next.type === 'growth') {
+      const growth = parseGrowth({ weight, length, head })
+      if ('errors' in growth) Object.assign(nextErrors, growth.errors)
+      else next = { ...next, data: growth.data }
+    }
 
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
@@ -203,6 +219,37 @@ export function EditEventForm({
               value={amount}
               error={errors.amount}
               onChange={(e) => setAmount(e.target.value)}
+            />
+          </>
+        )}
+        {event.type === 'growth' && (
+          <>
+            <Input
+              label={m.growthWeight()}
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              value={weight}
+              error={errors.weight}
+              onChange={(e) => setWeight(e.target.value)}
+            />
+            <Input
+              label={m.growthLength()}
+              type="number"
+              inputMode="decimal"
+              step="0.1"
+              value={length}
+              error={errors.length}
+              onChange={(e) => setLength(e.target.value)}
+            />
+            <Input
+              label={m.growthHead()}
+              type="number"
+              inputMode="decimal"
+              step="0.1"
+              value={head}
+              error={errors.head}
+              onChange={(e) => setHead(e.target.value)}
             />
           </>
         )}

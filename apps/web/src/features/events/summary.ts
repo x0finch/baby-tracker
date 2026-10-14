@@ -80,6 +80,9 @@ export function summarizeDay(
       case 'note':
         summary.notes += 1
         continue
+      case 'growth':
+        // Shown on the growth view, not in daily totals.
+        continue
       case 'feeding':
         break
     }

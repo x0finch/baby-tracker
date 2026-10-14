@@ -54,6 +54,17 @@ export const medicationDataSchema = z.object({
   dose: z.string().trim().max(50).nullable(),
 })
 
+/** Growth measurements; at least one is present. Canonical units are kg and cm. */
+export const growthDataSchema = z
+  .object({
+    weightKg: z.number().min(0.3).max(40).nullable(),
+    lengthCm: z.number().min(20).max(130).nullable(),
+    headCm: z.number().min(15).max(60).nullable(),
+  })
+  .refine((data) => data.weightKg !== null || data.lengthCm !== null || data.headCm !== null, {
+    message: 'At least one measurement is required',
+  })
+
 /** A free-form note; the text lives in the event's `note` field. */
 export const noteDataSchema = z.object({})
 
@@ -77,6 +88,7 @@ export const eventSchema = z
     z.object({ ...eventBase, type: z.literal('temperature'), data: temperatureDataSchema }),
     z.object({ ...eventBase, type: z.literal('medication'), data: medicationDataSchema }),
     z.object({ ...eventBase, type: z.literal('note'), data: noteDataSchema }),
+    z.object({ ...eventBase, type: z.literal('growth'), data: growthDataSchema }),
   ])
   .superRefine((event, ctx) => {
     checkTimestamps(event, ctx)
@@ -104,6 +116,7 @@ export type PumpingEvent = Extract<Event, { type: 'pumping' }>
 export type TemperatureEvent = Extract<Event, { type: 'temperature' }>
 export type MedicationEvent = Extract<Event, { type: 'medication' }>
 export type NoteEvent = Extract<Event, { type: 'note' }>
+export type GrowthEvent = Extract<Event, { type: 'growth' }>
 export type FeedingData = z.infer<typeof feedingDataSchema>
 export type BreastSide = z.infer<typeof breastSideSchema>
 export type BreastSegment = z.infer<typeof breastSegmentSchema>
