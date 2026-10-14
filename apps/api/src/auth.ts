@@ -1,3 +1,4 @@
+import { passkey } from '@better-auth/passkey'
 import { newId } from '@bobo/shared'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { betterAuth } from 'better-auth/minimal'
@@ -24,7 +25,7 @@ export function trustedOrigins(env: Env): string[] {
 
 /**
  * Better Auth configured for the Workers free plan (10ms CPU per request):
- * - `better-auth/minimal` (no Kysely) and only the bearer plugin, to keep the bundle small
+ * - `better-auth/minimal` (no Kysely) and few plugins, to keep the bundle small
  * - signed cookie cache (compact HMAC, not JWE) so most requests validate the session
  *   without a D1 read, and a long `updateAge` so sessions are rarely rewritten
  * - email/password without scrypt: the app stretches passwords and the server stores a
@@ -79,6 +80,13 @@ export function createAuthOptions(env: Env) {
     },
     plugins: [
       bearer(),
+      // Passkeys belong to the canonical origin; other origins (workers.dev) can't use them.
+      passkey({
+        rpID: new URL(env.BETTER_AUTH_URL).hostname,
+        rpName: 'Bobo',
+        origin: env.BETTER_AUTH_URL.replace(/\/+$/, ''),
+        authenticatorSelection: { residentKey: 'required', userVerification: 'preferred' },
+      }),
       emailOTP({
         otpLength: 6,
         expiresIn: OTP_TTL_SECONDS,
