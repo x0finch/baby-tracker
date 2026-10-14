@@ -14,6 +14,7 @@ import type { ThemePreference } from '../lib/theme'
 import { useTheme } from '../lib/use-theme'
 import { m } from '../paraglide/messages.js'
 import { AccountCard } from '../sync/AccountCard'
+import { RemindersCard } from '../sync/RemindersCard'
 
 export const Route = createFileRoute('/settings')({
   component: SettingsPage,
@@ -36,6 +37,7 @@ function SettingsPage() {
       <PageHeader title={m.settingsTitle()} />
       <AccountCard />
       <FamilySection />
+      <RemindersCard />
       <Card className="flex flex-col gap-3">
         <h2 className="text-title font-extrabold">{m.settingsTheme()}</h2>
         <SegmentedControl

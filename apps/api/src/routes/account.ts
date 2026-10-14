@@ -49,6 +49,8 @@ export const accountRoutes = new Hono<AppEnv>().delete('/', async (c) => {
       )
       .bind(userId, Date.now()),
     db.prepare('delete from memberships where user_id = ?').bind(userId),
+    db.prepare('delete from reminders where user_id = ?').bind(userId),
+    db.prepare('delete from push_subscriptions where user_id = ?').bind(userId),
     db.prepare('delete from session where user_id = ?').bind(userId),
     db.prepare('delete from account where user_id = ?').bind(userId),
     db.prepare('delete from user where id = ?').bind(userId),

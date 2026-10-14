@@ -7,7 +7,14 @@ const { count, size, warnings } = await generateSW({
   globDirectory: 'dist/client',
   globPatterns: ['**/*.{html,js,css,woff2,png,svg,webmanifest}'],
   // Only the Latin font subsets are needed for the UI; CJK uses system fonts.
-  globIgnores: ['**/*cyrillic*', '**/*vietnamese*', '**/*greek*', 'sw.js', 'workbox-*.js'],
+  globIgnores: [
+    '**/*cyrillic*',
+    '**/*vietnamese*',
+    '**/*greek*',
+    'sw.js',
+    'workbox-*.js',
+    'push-sw.js',
+  ],
   swDest: 'dist/client/sw.js',
   // Any in-app URL opens the app shell offline; API calls (Phase 2) go to the network.
   navigateFallback: '/index.html',
@@ -17,6 +24,8 @@ const { count, size, warnings } = await generateSW({
   // New versions wait until the user accepts the update prompt (never mid-feed).
   skipWaiting: false,
   sourcemap: false,
+  // Push notifications for reminders (#41).
+  importScripts: ['push-sw.js'],
 })
 
 for (const warning of warnings) console.warn(warning)

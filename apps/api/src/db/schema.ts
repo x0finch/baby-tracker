@@ -124,4 +124,46 @@ export const syncSeq = sqliteTable('sync_seq', {
   value: integer('value').notNull(),
 })
 
+/** Web Push subscriptions; one per browser, owned by the user signed in when it subscribed. */
+export const pushSubscriptions = sqliteTable(
+  'push_subscriptions',
+  {
+    endpoint: text('endpoint').primaryKey(),
+    userId: text('user_id').notNull(),
+    p256dh: text('p256dh').notNull(),
+    auth: text('auth').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => [index('push_subscriptions_user_idx').on(table.userId)],
+)
+
+/**
+ * "It's been a while" reminders a user set for a baby: notify when the latest event of the
+ * kind started more than interval_minutes ago. Independent of how notifications are delivered.
+ */
+export const reminders = sqliteTable(
+  'reminders',
+  {
+    userId: text('user_id').notNull(),
+    babyId: text('baby_id').notNull(),
+    kind: text('kind', { enum: ['feeding', 'diaper'] }).notNull(),
+    intervalMinutes: integer('interval_minutes').notNull(),
+    enabled: integer('enabled', { mode: 'boolean' }).notNull(),
+    /** start_at of the event the last reminder was sent for, so each gap notifies once. */
+    firedFor: integer('fired_for'),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.babyId, table.kind] }),
+    index('reminders_enabled_idx').on(table.enabled),
+  ],
+)
+
+/** Keys the server creates for itself on first use, such as the VAPID key pair. */
+export const serverKeys = sqliteTable('server_keys', {
+  name: text('name').primaryKey(),
+  value: text('value').notNull(),
+  createdAt: integer('created_at').notNull(),
+})
+
 export * from './auth-schema'

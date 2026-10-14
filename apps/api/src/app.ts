@@ -7,6 +7,7 @@ import { authRateLimit } from './rate-limit'
 import { accountRoutes } from './routes/account'
 import { familyRoutes } from './routes/families'
 import { familyInviteRoutes, inviteAcceptRoutes, invitePreviewRoutes } from './routes/invites'
+import { pushRoutes, reminderRoutes } from './routes/notifications'
 import { syncRoutes } from './routes/sync'
 import type { AppEnv, AuthFor } from './types'
 
@@ -58,6 +59,10 @@ export function createApp(options: AppOptions = {}) {
   app.route('/invites', inviteAcceptRoutes)
   app.use('/sync/*', auth)
   app.route('/sync', syncRoutes)
+  app.use('/push/*', auth)
+  app.route('/push', pushRoutes)
+  app.use('/reminders', auth)
+  app.route('/reminders', reminderRoutes)
 
   app.notFound((c) => c.json({ error: 'not_found' }, 404))
   app.onError((error, c) => {
