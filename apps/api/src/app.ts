@@ -46,6 +46,7 @@ export function createApp(options: AppOptions = {}) {
 
   app.use('/account', auth)
   app.route('/account', accountRoutes)
+  app.use('/families', auth)
   app.use('/families/*', auth)
   app.route('/families', familyRoutes)
   app.use('/sync/*', auth)

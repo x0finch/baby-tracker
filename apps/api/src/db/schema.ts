@@ -64,12 +64,26 @@ export const memberships = sqliteTable(
       .references(() => families.id, { onDelete: 'cascade' }),
     userId: text('user_id').notNull(),
     role: text('role', { enum: ['owner', 'admin', 'caregiver', 'viewer'] }).notNull(),
+    /** 'all' babies of the family, or only those listed in membership_babies. */
+    babyScope: text('baby_scope', { enum: ['all', 'selected'] })
+      .notNull()
+      .default('all'),
     createdAt: integer('created_at').notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.familyId, table.userId] }),
     index('memberships_user_idx').on(table.userId),
   ],
+)
+
+export const membershipBabies = sqliteTable(
+  'membership_babies',
+  {
+    familyId: text('family_id').notNull(),
+    userId: text('user_id').notNull(),
+    babyId: text('baby_id').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.familyId, table.userId, table.babyId] })],
 )
 
 /** Single-row counter; every accepted push increments it inside the same D1 transaction. */

@@ -79,21 +79,28 @@ describe('account deletion', () => {
     const owner = await t.signIn('主人')
     const other = await t.signIn('家人')
     const { familyId, babyId } = await familyWithBaby(owner.headers)
-    await t.env.DB.prepare(
-      "insert into memberships (family_id, user_id, role, created_at) values (?, ?, 'caregiver', ?)",
-    )
-      .bind(familyId, other.user.id, Date.now())
-      .run()
+    // The next member only sees one baby; as the new owner they must see all of them.
+    await t.env.DB.batch([
+      t.env.DB.prepare(
+        "insert into memberships (family_id, user_id, role, baby_scope, created_at) values (?, ?, 'caregiver', 'selected', ?)",
+      ).bind(familyId, other.user.id, Date.now()),
+      t.env.DB.prepare(
+        'insert into membership_babies (family_id, user_id, baby_id) values (?, ?, ?)',
+      ).bind(familyId, other.user.id, babyId),
+    ])
 
     await t.request('/api/account', { method: 'DELETE', headers: owner.headers })
 
     expect(await count('select count(*) as n from babies where id = ?', babyId)).toBe(1)
-    const role = await t.env.DB.prepare(
-      'select role from memberships where family_id = ? and user_id = ?',
+    const membership = await t.env.DB.prepare(
+      'select role, baby_scope as babyScope from memberships where family_id = ? and user_id = ?',
     )
       .bind(familyId, other.user.id)
-      .first<{ role: string }>()
-    expect(role?.role).toBe('owner')
+      .first<{ role: string; babyScope: string }>()
+    expect(membership).toEqual({ role: 'owner', babyScope: 'all' })
+    expect(
+      await count('select count(*) as n from membership_babies where family_id = ?', familyId),
+    ).toBe(0)
     expect(
       await count('select count(*) as n from memberships where user_id = ?', owner.user.id),
     ).toBe(0)

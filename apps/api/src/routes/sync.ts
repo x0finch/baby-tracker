@@ -9,8 +9,9 @@ import {
 } from '@bobo/shared'
 import { Hono } from 'hono'
 
-import { WRITE_ROLES, getMemberships } from '../families'
+import { checkBabyWrite, checkEventWrite, loadAccess, readScope, toSummaries } from '../access'
 import {
+  type ExistingRow,
   type SyncCursor,
   type TableCursor,
   decodeCursor,
@@ -28,13 +29,6 @@ import {
   upsertEvents,
 } from '../sync-sql'
 import type { AppEnv } from '../types'
-
-interface ExistingRow {
-  id: string
-  familyId: string | null
-  updatedAt: number
-  createdBy: string | null
-}
 
 type BabyRow = Baby & { seq: number }
 type EventRow = Omit<Event, 'data'> & { data: string; seq: number }
@@ -74,10 +68,7 @@ export const syncRoutes = new Hono<AppEnv>()
 
     const db = c.env.DB
     const userId = c.get('user').id
-    const memberships = await getMemberships(db, userId)
-    const writable = new Set(
-      memberships.filter((m) => WRITE_ROLES.includes(m.role)).map((m) => m.familyId),
-    )
+    const access = await loadAccess(db, userId)
 
     const [existingBabies, existingEvents] = await db.batch<ExistingRow>([
       selectExisting(db, 'babies', idsOf(babies)),
@@ -87,14 +78,20 @@ export const syncRoutes = new Hono<AppEnv>()
       babies,
       parseBaby,
       toMap(existingBabies?.results ?? []),
-      writable,
+      (baby, current) => checkBabyWrite(access, baby, current),
       userId,
     )
     const eventPlan = planWrites<Event>(
       events,
       parseEvent,
       toMap(existingEvents?.results ?? []),
-      writable,
+      (event, current) =>
+        checkEventWrite(
+          access,
+          event,
+          current && { ...current, babyId: current.babyId ?? event.babyId },
+          userId,
+        ),
       userId,
     )
 
@@ -114,11 +111,13 @@ export const syncRoutes = new Hono<AppEnv>()
   .get('/pull', async (c) => {
     const db = c.env.DB
     const cursor = decodeCursor(c.req.query('cursor'))
-    const familyIds = (await getMemberships(db, c.get('user').id)).map((m) => m.familyId)
-    if (familyIds.length === 0) {
+    const access = await loadAccess(db, c.get('user').id)
+    const scope = readScope(access)
+    if (scope.familyIds.length === 0 && scope.babyIds.length === 0) {
       const empty: PullResponse = {
         babies: [],
         events: [],
+        access: [],
         cursor: encodeCursor(cursor),
         hasMore: false,
       }
@@ -126,8 +125,8 @@ export const syncRoutes = new Hono<AppEnv>()
     }
 
     const [babyRows, eventRows] = await Promise.all([
-      selectBabiesPage(db, familyIds, cursor.babies, SYNC_PULL_LIMIT + 1).all<BabyRow>(),
-      selectEventsPage(db, familyIds, cursor.events, SYNC_PULL_LIMIT + 1).all<EventRow>(),
+      selectBabiesPage(db, scope, cursor.babies, SYNC_PULL_LIMIT + 1).all<BabyRow>(),
+      selectEventsPage(db, scope, cursor.events, SYNC_PULL_LIMIT + 1).all<EventRow>(),
     ])
     const babyPage = babyRows.results.slice(0, SYNC_PULL_LIMIT)
     const eventPage = eventRows.results.slice(0, SYNC_PULL_LIMIT)
@@ -142,6 +141,7 @@ export const syncRoutes = new Hono<AppEnv>()
     const response: PullResponse = {
       babies: babyPage.map(toBaby),
       events: eventPage.map(toEvent),
+      access: toSummaries(access),
       cursor: encodeCursor(next),
       hasMore,
     }
