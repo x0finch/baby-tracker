@@ -18,15 +18,14 @@ export const categoryTitle: Record<Category, () => string> = {
 }
 
 // Colors are full class names so Tailwind can find them; keep these maps side by side.
-// Buttons only come in the main tones, so the less frequent types borrow one.
 export const categoryTone: Record<Category, ButtonTone> = {
   feeding: 'feeding',
   sleep: 'sleep',
   diaper: 'diaper',
-  pumping: 'feeding',
+  pumping: 'pumping',
   temperature: 'danger',
-  medication: 'primary',
-  note: 'primary',
+  medication: 'medication',
+  note: 'note',
   growth: 'primary',
 }
 
@@ -35,10 +34,10 @@ export const categoryDot: Record<Category, string> = {
   feeding: 'bg-feeding',
   sleep: 'bg-sleep',
   diaper: 'bg-diaper',
-  pumping: 'bg-avatar-pink',
+  pumping: 'bg-pumping',
   temperature: 'bg-danger',
-  medication: 'bg-avatar-yellow',
-  note: 'bg-fg-muted',
+  medication: 'bg-medication',
+  note: 'bg-note',
   growth: 'bg-primary',
 }
 

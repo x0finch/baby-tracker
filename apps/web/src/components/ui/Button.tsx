@@ -1,7 +1,15 @@
 import { clsx } from 'clsx'
 import type { ButtonHTMLAttributes } from 'react'
 
-export type ButtonTone = 'primary' | 'feeding' | 'sleep' | 'diaper' | 'danger'
+export type ButtonTone =
+  | 'primary'
+  | 'feeding'
+  | 'sleep'
+  | 'diaper'
+  | 'pumping'
+  | 'medication'
+  | 'note'
+  | 'danger'
 export type ButtonVariant = 'solid' | 'soft' | 'outline' | 'ghost'
 export type ButtonSize = 'md' | 'lg'
 
@@ -10,6 +18,9 @@ const solidTones: Record<ButtonTone, string> = {
   feeding: 'bg-feeding border-feeding-edge',
   sleep: 'bg-sleep border-sleep-edge',
   diaper: 'bg-diaper border-diaper-edge',
+  pumping: 'bg-pumping border-pumping-edge',
+  medication: 'bg-medication border-medication-edge',
+  note: 'bg-note border-note-edge',
   danger: 'bg-danger border-danger-edge',
 }
 
@@ -18,6 +29,9 @@ const softTones: Record<ButtonTone, string> = {
   feeding: 'bg-feeding-soft text-feeding-text border-feeding/30',
   sleep: 'bg-sleep-soft text-sleep-text border-sleep/30',
   diaper: 'bg-diaper-soft text-diaper-text border-diaper/30',
+  pumping: 'bg-pumping-soft text-pumping-text border-pumping/30',
+  medication: 'bg-medication-soft text-medication-text border-medication/30',
+  note: 'bg-note-soft text-note-text border-note/30',
   danger: 'bg-danger-soft text-danger-text border-danger/30',
 }
 
@@ -26,6 +40,9 @@ const textTones: Record<ButtonTone, string> = {
   feeding: 'text-feeding-text',
   sleep: 'text-sleep-text',
   diaper: 'text-diaper-text',
+  pumping: 'text-pumping-text',
+  medication: 'text-medication-text',
+  note: 'text-note-text',
   danger: 'text-danger-text',
 }
 

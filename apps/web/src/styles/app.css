@@ -42,6 +42,21 @@
   --bobo-danger-soft: #ffe1e1;
   --bobo-danger-text: #d83030;
 
+  --bobo-pumping: #e0569a;
+  --bobo-pumping-edge: #b83f7c;
+  --bobo-pumping-soft: #ffe4f1;
+  --bobo-pumping-text: #c13f80;
+
+  --bobo-medication: #a87d00;
+  --bobo-medication-edge: #876400;
+  --bobo-medication-soft: #fff4d1;
+  --bobo-medication-text: #9a7200;
+
+  --bobo-note: #6b6b6b;
+  --bobo-note-edge: #4f4f4f;
+  --bobo-note-soft: #f0f0f0;
+  --bobo-note-text: #5c5c5c;
+
   --bobo-avatar-pink: #e0569a;
   --bobo-avatar-yellow: #d19b00;
 }
@@ -64,6 +79,12 @@
     --bobo-diaper-text: #1cb0f6;
     --bobo-danger-soft: #3d1c1e;
     --bobo-danger-text: #ff4b4b;
+    --bobo-pumping-soft: #3d1f2e;
+    --bobo-pumping-text: #ff7ab8;
+    --bobo-medication-soft: #3a3114;
+    --bobo-medication-text: #ffc800;
+    --bobo-note-soft: #26343b;
+    --bobo-note-text: #a9b8bf;
   }
 }
 
@@ -84,6 +105,12 @@
   --bobo-diaper-text: #1cb0f6;
   --bobo-danger-soft: #3d1c1e;
   --bobo-danger-text: #ff4b4b;
+  --bobo-pumping-soft: #3d1f2e;
+  --bobo-pumping-text: #ff7ab8;
+  --bobo-medication-soft: #3a3114;
+  --bobo-medication-text: #ffc800;
+  --bobo-note-soft: #26343b;
+  --bobo-note-text: #a9b8bf;
 }
 
 @theme inline {
@@ -119,6 +146,18 @@
   --color-danger-edge: var(--bobo-danger-edge);
   --color-danger-soft: var(--bobo-danger-soft);
   --color-danger-text: var(--bobo-danger-text);
+  --color-pumping: var(--bobo-pumping);
+  --color-pumping-edge: var(--bobo-pumping-edge);
+  --color-pumping-soft: var(--bobo-pumping-soft);
+  --color-pumping-text: var(--bobo-pumping-text);
+  --color-medication: var(--bobo-medication);
+  --color-medication-edge: var(--bobo-medication-edge);
+  --color-medication-soft: var(--bobo-medication-soft);
+  --color-medication-text: var(--bobo-medication-text);
+  --color-note: var(--bobo-note);
+  --color-note-edge: var(--bobo-note-edge);
+  --color-note-soft: var(--bobo-note-soft);
+  --color-note-text: var(--bobo-note-text);
   --color-avatar-pink: var(--bobo-avatar-pink);
   --color-avatar-yellow: var(--bobo-avatar-yellow);
 
