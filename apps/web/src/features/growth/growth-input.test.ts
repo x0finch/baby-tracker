@@ -5,7 +5,7 @@ import { parseGrowth } from './growth-input'
 describe('parseGrowth', () => {
   it('accepts any subset of measurements', () => {
     expect(parseGrowth({ weight: '5.234', length: '', head: ' 38 ' })).toEqual({
-      data: { weightKg: 5.23, lengthCm: null, headCm: 38 },
+      data: { weightKg: 5.234, lengthCm: null, headCm: 38 },
     })
   })
 

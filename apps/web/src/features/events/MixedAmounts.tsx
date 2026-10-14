@@ -1,5 +1,5 @@
 import { Input } from '../../components/ui/Input'
-import { formatNumber } from '../../lib/i18n'
+import { formatQuantity, quantityInputProps, unitLabel } from '../../lib/units'
 import { m } from '../../paraglide/messages.js'
 import { mixedTotal } from './bottle-input'
 
@@ -17,30 +17,30 @@ export function MixedAmounts({
   onBreast: (value: string) => void
   onFormula: (value: string) => void
 }) {
+  const unit = unitLabel('volume')
   return (
     <div className="flex flex-col gap-2">
       <div className="grid grid-cols-2 gap-3">
         <Input
-          label={m.mixedBreastMl()}
-          type="number"
-          inputMode="numeric"
+          label={m.mixedBreastMl({ unit })}
+          {...quantityInputProps('volume')}
           min={0}
-          max={1000}
           value={breast}
           onChange={(event) => onBreast(event.target.value)}
         />
         <Input
-          label={m.mixedFormulaMl()}
-          type="number"
-          inputMode="numeric"
+          label={m.mixedFormulaMl({ unit })}
+          {...quantityInputProps('volume')}
           min={0}
-          max={1000}
           value={formula}
           onChange={(event) => onFormula(event.target.value)}
         />
       </div>
       <p className="m-0 font-bold tabular-nums">
-        {m.mixedTotal({ amount: formatNumber(mixedTotal({ breast, formula })) })}
+        {m.mixedTotal({
+          amount: formatQuantity('volume', mixedTotal({ breast, formula })),
+          unit,
+        })}
       </p>
       {error && <p className="m-0 text-caption font-bold text-danger-text">{error}</p>}
     </div>

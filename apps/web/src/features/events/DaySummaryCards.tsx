@@ -1,8 +1,7 @@
 import type { Event } from '@bobo/shared'
 
-import { formatNumber } from '../../lib/i18n'
+import { formatQuantity, unitLabel } from '../../lib/units'
 import { m } from '../../paraglide/messages.js'
-import { formatCelsius } from './describe'
 import { durationLabel } from './duration-label'
 import { summarizeDay } from './summary'
 
@@ -18,18 +17,20 @@ export function DaySummaryCards({
   now: number
 }) {
   const s = summarizeDay(events, dayStart, dayEnd, now)
+  const volumeUnit = unitLabel('volume')
   const diaperCount = s.diapers.wet + s.diapers.dirty + s.diapers.mixed
   const cards: { title: string; value: string; details: string[]; accent: string }[] = [
     {
       title: m.categoryFeeding(),
       value: m.summaryFeedCount({ count: s.feedings }),
       details: [
-        m.summaryBottle({ amount: formatNumber(s.bottleMl) }),
+        m.summaryBottle({ amount: formatQuantity('volume', s.bottleMl), unit: volumeUnit }),
         ...(s.bottleBreastMl > 0 && s.bottleFormulaMl > 0
           ? [
               m.summaryBottleSplit({
-                breast: formatNumber(s.bottleBreastMl),
-                formula: formatNumber(s.bottleFormulaMl),
+                breast: formatQuantity('volume', s.bottleBreastMl),
+                formula: formatQuantity('volume', s.bottleFormulaMl),
+                unit: volumeUnit,
               }),
             ]
           : []),
@@ -54,8 +55,13 @@ export function DaySummaryCards({
     },
   ]
   const other = [
-    s.pumpingMl > 0 && m.summaryPumping({ amount: formatNumber(s.pumpingMl) }),
-    s.latestCelsius !== null && m.summaryTemperature({ value: formatCelsius(s.latestCelsius) }),
+    s.pumpingMl > 0 &&
+      m.summaryPumping({ amount: formatQuantity('volume', s.pumpingMl), unit: volumeUnit }),
+    s.latestCelsius !== null &&
+      m.summaryTemperature({
+        value: formatQuantity('temperature', s.latestCelsius),
+        unit: unitLabel('temperature'),
+      }),
     s.medications > 0 && m.summaryMedication({ count: s.medications }),
     s.notes > 0 && m.summaryNotes({ count: s.notes }),
   ].filter((detail) => typeof detail === 'string')

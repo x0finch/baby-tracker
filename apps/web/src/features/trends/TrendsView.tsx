@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Card } from '../../components/ui/Card'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { formatDate, formatNumber } from '../../lib/i18n'
+import { convertToDisplay, getUnits, unitLabel } from '../../lib/units'
 import { m } from '../../paraglide/messages.js'
 import { durationLabel } from '../events/duration-label'
 import { useNow } from '../events/use-events'
@@ -41,10 +42,16 @@ const METRICS: Metric[] = [
     key: 'bottle',
     title: m.trendBottle(),
     fill: 'fill-feeding',
-    value: (day) => day.bottleMl,
-    format: (value) => m.trendMl({ amount: formatNumber(Math.round(value)) }),
+    value: (day) => convertToDisplay('volume', day.bottleMl),
+    format: (value) =>
+      m.trendMl({
+        amount: formatNumber(value, { maximumFractionDigits: getUnits().volume === 'oz' ? 1 : 0 }),
+        unit: unitLabel('volume'),
+      }),
     tick: (value) => formatNumber(value),
-    unit: 10,
+    get unit() {
+      return getUnits().volume === 'oz' ? 1 : 10
+    },
   },
   {
     key: 'sleep',

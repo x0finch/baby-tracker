@@ -1,16 +1,24 @@
 import type { GrowthEvent } from '@bobo/shared'
 
+import { type Quantity, inputValue, parseQuantity, rangeParams } from '../../lib/units'
 import { m } from '../../paraglide/messages.js'
 
 export type GrowthErrors = Partial<Record<'weight' | 'length' | 'head' | 'form', string>>
 
+/** Accepted values in stored units (kilograms and centimeters). */
 const RANGES = {
-  weight: { min: 0.3, max: 40, message: m.growthWeightInvalid },
-  length: { min: 20, max: 130, message: m.growthLengthInvalid },
-  head: { min: 15, max: 60, message: m.growthHeadInvalid },
-} as const
+  weight: { quantity: 'weight', min: 0.3, max: 40, message: m.growthWeightInvalid },
+  length: { quantity: 'length', min: 20, max: 130, message: m.growthLengthInvalid },
+  head: { quantity: 'length', min: 15, max: 60, message: m.growthHeadInvalid },
+} as const satisfies Record<
+  string,
+  { quantity: Quantity; min: number; max: number; message: unknown }
+>
 
-/** Parses the three optional measurement fields; at least one must be filled in. */
+/**
+ * Parses the three optional measurement fields, entered in display units; at least one must be
+ * filled in.
+ */
 export function parseGrowth(input: {
   weight: string
   length: string
@@ -20,13 +28,13 @@ export function parseGrowth(input: {
   const read = (field: keyof typeof RANGES): number | null => {
     const raw = input[field].trim()
     if (raw === '') return null
-    const value = Number(raw)
     const range = RANGES[field]
+    const value = parseQuantity(range.quantity, raw)
     if (!(value >= range.min && value <= range.max)) {
-      errors[field] = range.message()
+      errors[field] = range.message(rangeParams(range.quantity, range.min, range.max))
       return null
     }
-    return Math.round(value * 100) / 100
+    return value
   }
   const data = { weightKg: read('weight'), lengthCm: read('length'), headCm: read('head') }
   if (Object.keys(errors).length > 0) return { errors }
@@ -36,4 +44,6 @@ export function parseGrowth(input: {
   return { data }
 }
 
-export const growthFieldValue = (value: number | null) => (value === null ? '' : String(value))
+/** A stored measurement as an editable value in display units. */
+export const growthFieldValue = (quantity: Quantity, value: number | null) =>
+  value === null ? '' : inputValue(quantity, value)
