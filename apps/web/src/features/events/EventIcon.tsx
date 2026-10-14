@@ -1,8 +1,9 @@
-import type { Event } from '@bobo/shared'
+import type { Event, PoopDetails } from '@bobo/shared'
 import { clsx } from 'clsx'
 import type { ReactNode } from 'react'
 
 import type { Category } from './describe'
+import { POOP_FILL } from './DiaperIcon'
 
 /** Icon subjects: each category, with feeds and sleeps split by kind. */
 export type IconKind =
@@ -41,6 +42,14 @@ export function iconKindOf(event: Event): IconKind {
   return CATEGORY_KIND[event.type]
 }
 
+/** Icon props for a record, including the stool color it was logged with. */
+export function eventIconProps(event: Event): { kind: IconKind; poop?: PoopColor } {
+  const kind = iconKindOf(event)
+  return event.type === 'diaper' && event.data.poop
+    ? { kind, poop: event.data.poop.color }
+    : { kind }
+}
+
 export const categoryIconKind = (category: Category): IconKind => CATEGORY_KIND[category]
 
 /** Fill class of each kind's color; also used for details drawn in that color. */
@@ -63,7 +72,7 @@ const TONE: Record<IconKind, string> = {
 
 const W = '#ffffff'
 const PEE = '#ffcf33'
-const POOP = '#8b5a2b'
+type PoopColor = PoopDetails['color']
 
 const DIAPER_BODY =
   'M10 12 H38 Q42 12 40 16 L33 24 Q31 27 33 30 L38 35 Q40 39 36 39 H12 Q8 39 10 35 L15 30 Q17 27 15 24 L8 16 Q6 12 10 12 Z'
@@ -78,9 +87,25 @@ function Drop({ x, y, scale = 1 }: { x: number; y: number; scale?: number }) {
   )
 }
 
-function Poop({ x, y, scale = 1 }: { x: number; y: number; scale?: number }) {
+function Poop({
+  x,
+  y,
+  scale = 1,
+  color,
+}: {
+  x: number
+  y: number
+  scale?: number
+  color: PoopColor
+}) {
   return (
-    <g transform={`translate(${x} ${y}) scale(${scale})`} fill={POOP}>
+    <g
+      transform={`translate(${x} ${y}) scale(${scale})`}
+      fill={POOP_FILL[color]}
+      // White stool would vanish on the white diaper.
+      stroke={color === 'white' ? '#9e9e9e' : 'none'}
+      strokeWidth="1"
+    >
       <ellipse cx="0" cy="5" rx="8" ry="3.6" />
       <ellipse cx="0" cy="0.5" rx="6" ry="3.2" />
       <ellipse cx="0.5" cy="-3.6" rx="3.6" ry="2.6" />
@@ -90,7 +115,7 @@ function Poop({ x, y, scale = 1 }: { x: number; y: number; scale?: number }) {
 }
 
 /** Flat white artwork on a 48×48 grid; `tone` paints details in the kind's color. */
-function glyph(kind: IconKind, tone: string): ReactNode {
+function glyph(kind: IconKind, tone: string, poop: PoopColor): ReactNode {
   switch (kind) {
     case 'bottle':
       return (
@@ -173,7 +198,7 @@ function glyph(kind: IconKind, tone: string): ReactNode {
       return (
         <>
           <path d={DIAPER_BODY} fill={W} />
-          <Poop x={24} y={25} />
+          <Poop x={24} y={25} color={poop} />
         </>
       )
     case 'diaperMixed':
@@ -181,7 +206,7 @@ function glyph(kind: IconKind, tone: string): ReactNode {
         <>
           <path d={DIAPER_BODY} fill={W} />
           <Drop x={18.5} y={27} scale={0.72} />
-          <Poop x={29} y={26} scale={0.72} />
+          <Poop x={29} y={26} scale={0.72} color={poop} />
         </>
       )
     case 'pumping':
@@ -250,10 +275,13 @@ function glyph(kind: IconKind, tone: string): ReactNode {
  */
 export function EventIcon({
   kind,
+  poop = 'yellow',
   variant = 'badge',
   className,
 }: {
   kind: IconKind
+  /** Stool color for dirty and mixed diapers; most baby stool is yellow. */
+  poop?: PoopColor
   variant?: 'badge' | 'plain'
   className?: string
 }) {
@@ -261,7 +289,7 @@ export function EventIcon({
   return (
     <svg aria-hidden viewBox="0 0 48 48" className={clsx('shrink-0', className)}>
       {variant === 'badge' && <circle cx="24" cy="24" r="24" className={tone} />}
-      {glyph(kind, tone)}
+      {glyph(kind, tone, poop)}
     </svg>
   )
 }
