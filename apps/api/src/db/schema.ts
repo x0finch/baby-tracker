@@ -34,7 +34,9 @@ export const events = sqliteTable(
     id: text('id').primaryKey(),
     babyId: text('baby_id').notNull(),
     familyId: text('family_id'),
-    type: text('type', { enum: ['feeding', 'sleep', 'diaper'] }).notNull(),
+    type: text('type', {
+      enum: ['feeding', 'sleep', 'diaper', 'pumping', 'temperature', 'medication', 'note'],
+    }).notNull(),
     startAt: integer('start_at').notNull(),
     endAt: integer('end_at'),
     // Type-specific payload, validated with the shared zod schema before writing.

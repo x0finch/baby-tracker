@@ -5,7 +5,11 @@ import {
   deleteEvent,
   logBottle,
   logDiaper,
+  logMedication,
+  logNote,
+  logPumping,
   logSleep,
+  logTemperature,
   startBreastFeed,
   startSleep,
   stopEvent,
@@ -44,6 +48,28 @@ describe('summarizeDay', () => {
       naps: 2,
       longestSleepMs: 90 * MIN,
       diapers: { wet: 1, dirty: 1, mixed: 0 },
+      pumpingMl: 0,
+      latestCelsius: null,
+      medications: 0,
+      notes: 0,
+    })
+  })
+
+  it('totals pumping, medication and notes and keeps the latest temperature', () => {
+    const events = [
+      logPumping(BABY, at(6), 'both', 150),
+      logPumping(BABY, at(18), 'left', 60),
+      logTemperature(BABY, at(20), 37.2),
+      logTemperature(BABY, at(9), 38.4),
+      logMedication(BABY, at(9, 5), '布洛芬', '2.5 毫升'),
+      logNote(BABY, at(16), '第一次翻身'),
+    ]
+    expect(summarizeDay(events, DAY_START, DAY_END, at(23))).toMatchObject({
+      feedings: 0,
+      pumpingMl: 210,
+      latestCelsius: 37.2,
+      medications: 1,
+      notes: 1,
     })
   })
 

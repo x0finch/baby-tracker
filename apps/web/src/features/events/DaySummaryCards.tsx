@@ -2,6 +2,7 @@ import type { Event } from '@bobo/shared'
 
 import { formatNumber } from '../../lib/i18n'
 import { m } from '../../paraglide/messages.js'
+import { formatCelsius } from './describe'
 import { durationLabel } from './duration-label'
 import { summarizeDay } from './summary'
 
@@ -18,7 +19,7 @@ export function DaySummaryCards({
 }) {
   const s = summarizeDay(events, dayStart, dayEnd, now)
   const diaperCount = s.diapers.wet + s.diapers.dirty + s.diapers.mixed
-  const cards = [
+  const cards: { title: string; value: string; details: string[]; accent: string }[] = [
     {
       title: m.categoryFeeding(),
       value: m.summaryFeedCount({ count: s.feedings }),
@@ -44,6 +45,21 @@ export function DaySummaryCards({
       accent: 'border-diaper/40 bg-diaper-soft text-diaper-text',
     },
   ]
+  const other = [
+    s.pumpingMl > 0 && m.summaryPumping({ amount: formatNumber(s.pumpingMl) }),
+    s.latestCelsius !== null && m.summaryTemperature({ value: formatCelsius(s.latestCelsius) }),
+    s.medications > 0 && m.summaryMedication({ count: s.medications }),
+    s.notes > 0 && m.summaryNotes({ count: s.notes }),
+  ].filter((detail) => typeof detail === 'string')
+  // Only shown on days that have any of the less frequent records.
+  if (other.length > 0) {
+    cards.push({
+      title: m.categoryOther(),
+      value: '',
+      details: other,
+      accent: 'border-primary/40 bg-primary-soft text-primary-text',
+    })
+  }
 
   return (
     <div className="flex flex-col gap-3">

@@ -22,6 +22,9 @@ const breast = (
   data: { kind: 'breast', segments },
 })
 
+const instant = (type: string, data: unknown, note: string | null = null) =>
+  eventSchema.safeParse({ ...baseEvent(), type, startAt: T0, endAt: null, note, data }).success
+
 describe('eventSchema', () => {
   it('accepts each event type', () => {
     expect(eventSchema.safeParse(sleep(T0 + 30 * MINUTE)).success).toBe(true)
@@ -43,6 +46,19 @@ describe('eventSchema', () => {
         data: { kind: 'bottle', amountMl: 90, milk: 'formula' },
       }).success,
     ).toBe(true)
+  })
+
+  it('accepts pumping, temperature, medication and notes', () => {
+    expect(instant('pumping', { side: 'both', amountMl: 120 })).toBe(true)
+    expect(instant('temperature', { celsius: 37.4 })).toBe(true)
+    expect(instant('medication', { name: '布洛芬', dose: '2.5 ml' })).toBe(true)
+    expect(instant('medication', { name: '维生素 D', dose: null })).toBe(true)
+    expect(instant('note', {}, '今天第一次翻身')).toBe(true)
+
+    expect(instant('temperature', { celsius: 50 })).toBe(false)
+    expect(instant('medication', { name: ' ', dose: null })).toBe(false)
+    expect(instant('pumping', { side: 'left', amountMl: 0 })).toBe(false)
+    expect(instant('note', {})).toBe(false)
   })
 
   it('rejects data that does not match the type', () => {

@@ -5,6 +5,8 @@ import {
   type PushRequest,
   type PushResponse,
   SYNC_PUSH_LIMIT,
+  babySchema,
+  eventSchema,
 } from '@bobo/shared'
 
 import type { LocalStore } from '../db'
@@ -84,7 +86,16 @@ function shouldApply(
   return !(local && isDirty(store, table, remote.id) && local.updatedAt >= remote.updatedAt)
 }
 
+/**
+ * Records this version cannot read (e.g. an event type added in a newer version) are
+ * skipped instead of failing the whole sync; they arrive again after an update.
+ */
+function readable(schema: typeof babySchema | typeof eventSchema, record: unknown): boolean {
+  return schema.safeParse(record).success
+}
+
 function applyRemoteBaby(store: LocalStore, remote: Baby): boolean {
+  if (!readable(babySchema, remote)) return false
   const local = store.babies.get(remote.id)
   if (!shouldApply(store, 'babies', local, remote)) return false
   if (local) store.babies.update(remote.id, (draft) => void Object.assign(draft, remote))
@@ -95,6 +106,7 @@ function applyRemoteBaby(store: LocalStore, remote: Baby): boolean {
 }
 
 function applyRemoteEvent(store: LocalStore, remote: Event): boolean {
+  if (!readable(eventSchema, remote)) return false
   const local = store.events.get(remote.id)
   if (!shouldApply(store, 'events', local, remote)) return false
   if (local) store.events.update(remote.id, (draft) => void Object.assign(draft, remote))
