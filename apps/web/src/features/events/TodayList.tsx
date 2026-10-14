@@ -9,7 +9,7 @@ import { m } from '../../paraglide/messages.js'
 import { saveEvent } from './actions'
 import { describeEvent } from './describe'
 import { EditEventForm } from './EditEventSheet'
-import { EventIcon, iconKindOf } from './EventIcon'
+import { EventIcon, eventIconProps } from './EventIcon'
 import { restoreEvent } from './records'
 import { startOfLocalDay } from './time'
 import { useNow } from './use-events'
@@ -113,7 +113,7 @@ export function TodayList({ events }: { events: readonly Event[] }) {
                   onClick={() => setEditingId(event.id)}
                   className="flex min-h-touch w-full items-center gap-3 py-3 text-left active:bg-surface"
                 >
-                  <EventIcon kind={iconKindOf(event)} className="size-7" />
+                  <EventIcon {...eventIconProps(event)} className="size-7" />
                   <span className="w-12 shrink-0 text-fg-muted tabular-nums">{time}</span>
                   <span className="shrink-0 font-extrabold">{title}</span>
                   <span className="truncate text-fg-muted">{detail}</span>
