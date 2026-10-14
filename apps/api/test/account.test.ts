@@ -1,0 +1,101 @@
+import { type Baby, newId } from '@bobo/shared'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+
+import { createTestApp } from './app'
+
+const T0 = Date.UTC(2026, 9, 13, 8)
+
+function baby(familyId: string): Baby {
+  return {
+    id: newId(),
+    familyId,
+    name: '小宝',
+    birthDate: '2026-09-30',
+    sex: 'unspecified',
+    avatarColor: 'green',
+    archivedAt: null,
+    createdAt: T0,
+    updatedAt: T0,
+    deletedAt: null,
+    createdBy: null,
+  }
+}
+
+describe('account deletion', () => {
+  let t: Awaited<ReturnType<typeof createTestApp>>
+
+  beforeAll(async () => {
+    t = await createTestApp()
+  })
+  afterAll(() => t.dispose())
+
+  const post = (path: string, body: unknown, headers: Headers) =>
+    t.request(path, {
+      method: 'POST',
+      headers: { ...Object.fromEntries(headers), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+
+  async function familyWithBaby(headers: Headers) {
+    const res = await post('/api/families', { name: '我们家' }, headers)
+    const { id }: { id: string } = await res.json()
+    const b = baby(id)
+    await post('/api/sync/push', { babies: [b] }, headers)
+    return { familyId: id, babyId: b.id }
+  }
+
+  const count = async (sql: string, ...params: string[]) =>
+    (
+      await t.env.DB.prepare(sql)
+        .bind(...params)
+        .first<{ n: number }>()
+    )?.n ?? -1
+
+  it('requires a session', async () => {
+    expect((await t.request('/api/account', { method: 'DELETE' })).status).toBe(401)
+  })
+
+  it('deletes the user, their sessions and families only they belong to', async () => {
+    const { user, headers } = await t.signIn()
+    const { familyId, babyId } = await familyWithBaby(headers)
+
+    const res = await t.request('/api/account', { method: 'DELETE', headers })
+    expect(res.status).toBe(204)
+    const cleared = res.headers.getSetCookie().filter((cookie) => cookie.includes('Max-Age=0'))
+    expect(cleared.some((cookie) => cookie.startsWith('better-auth.session_token='))).toBe(true)
+    expect(cleared.some((cookie) => cookie.startsWith('better-auth.session_data='))).toBe(true)
+
+    expect(await count('select count(*) as n from user where id = ?', user.id)).toBe(0)
+    expect(await count('select count(*) as n from session where user_id = ?', user.id)).toBe(0)
+    expect(await count('select count(*) as n from families where id = ?', familyId)).toBe(0)
+    expect(await count('select count(*) as n from babies where id = ?', babyId)).toBe(0)
+    // The old session no longer works once the short-lived cookie cache expires; without
+    // the cache cookie it is rejected immediately.
+    const tokenOnly = new Headers({ cookie: headers.get('cookie')?.split('; ')[0] ?? '' })
+    expect((await t.request('/api/me', { headers: tokenOnly })).status).toBe(401)
+  })
+
+  it('keeps shared families and hands ownership to the next member', async () => {
+    const owner = await t.signIn('主人')
+    const other = await t.signIn('家人')
+    const { familyId, babyId } = await familyWithBaby(owner.headers)
+    await t.env.DB.prepare(
+      "insert into memberships (family_id, user_id, role, created_at) values (?, ?, 'caregiver', ?)",
+    )
+      .bind(familyId, other.user.id, Date.now())
+      .run()
+
+    await t.request('/api/account', { method: 'DELETE', headers: owner.headers })
+
+    expect(await count('select count(*) as n from babies where id = ?', babyId)).toBe(1)
+    const role = await t.env.DB.prepare(
+      'select role from memberships where family_id = ? and user_id = ?',
+    )
+      .bind(familyId, other.user.id)
+      .first<{ role: string }>()
+    expect(role?.role).toBe('owner')
+    expect(
+      await count('select count(*) as n from memberships where user_id = ?', owner.user.id),
+    ).toBe(0)
+  })
+})

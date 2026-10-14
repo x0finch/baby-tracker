@@ -9,6 +9,7 @@ import { formatTime } from '../lib/i18n'
 import { m } from '../paraglide/messages.js'
 import {
   type SessionUser,
+  deleteAccountRemote,
   disconnectLocal,
   httpAccountApi,
   signInWithGoogle,
@@ -44,6 +45,8 @@ export function AccountCard() {
   const [user, setUser] = useState<SessionUser | null>(null)
   const [error, setError] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteFailed, setDeleteFailed] = useState(false)
 
   const userId = account?.userId
   useEffect(() => {
@@ -58,6 +61,20 @@ export function AccountCard() {
     } catch {
       setError(true)
     }
+  }
+
+  async function deleteAccount() {
+    setDeleteFailed(false)
+    try {
+      await deleteAccountRemote()
+    } catch {
+      // Keep everything on the device if the server could not delete the account.
+      setDeleteFailed(true)
+      return
+    }
+    disconnectLocal(store, true)
+    setUser(null)
+    setDeleting(false)
   }
 
   async function signOut(clearData: boolean) {
@@ -104,6 +121,21 @@ export function AccountCard() {
               {m.signOutClear()}
             </Button>
             <p className="m-0 text-center text-caption text-fg-muted">{m.signOutClearHint()}</p>
+          </Sheet>
+          <Button variant="ghost" tone="danger" onClick={() => setDeleting(true)}>
+            {m.deleteAccount()}
+          </Button>
+          <Sheet open={deleting} onClose={() => setDeleting(false)} title={m.deleteAccount()}>
+            <p className="m-0">{m.deleteAccountBody()}</p>
+            <Button tone="danger" size="lg" block onClick={() => void deleteAccount()}>
+              {m.deleteAccountConfirm()}
+            </Button>
+            <Button variant="outline" block onClick={() => setDeleting(false)}>
+              {m.actionCancel()}
+            </Button>
+            {deleteFailed && (
+              <p className="m-0 font-bold text-danger-text">{m.deleteAccountFailed()}</p>
+            )}
           </Sheet>
         </>
       ) : (

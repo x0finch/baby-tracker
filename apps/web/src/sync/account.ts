@@ -44,6 +44,11 @@ export async function signOutRemote() {
   await apiFetch('/api/auth/sign-out', { method: 'POST', body: '{}' })
 }
 
+/** Permanently deletes the account on the server (shared families are kept). */
+export async function deleteAccountRemote() {
+  await apiFetch<void>('/api/account', { method: 'DELETE' })
+}
+
 /** Babies and events created while signed out (not yet in any family). */
 export function unclaimedCount(store: LocalStore): number {
   const babies = store.babies.toArray.filter((b) => b.familyId === null && b.deletedAt === null)

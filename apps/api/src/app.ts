@@ -3,6 +3,7 @@ import { cors } from 'hono/cors'
 
 import { getAuth, trustedOrigins } from './auth'
 import { requireUser } from './middleware'
+import { accountRoutes } from './routes/account'
 import { familyRoutes } from './routes/families'
 import { syncRoutes } from './routes/sync'
 import type { AppEnv, AuthFor } from './types'
@@ -43,6 +44,8 @@ export function createApp(options: AppOptions = {}) {
     return c.json({ id: user.id, name: user.name, email: user.email, image: user.image ?? null })
   })
 
+  app.use('/account', auth)
+  app.route('/account', accountRoutes)
   app.use('/families/*', auth)
   app.route('/families', familyRoutes)
   app.use('/sync/*', auth)
