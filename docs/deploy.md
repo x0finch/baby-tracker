@@ -32,10 +32,10 @@ Secrets:
 
 Variables:
 
-| Name         | Required    | Value                                                                                                  |
-| ------------ | ----------- | ------------------------------------------------------------------------------------------------------ |
-| `APP_URL`    | no          | a custom domain such as `https://bobo.example.com`; defaults to `https://bobo.<subdomain>.workers.dev` |
-| `EMAIL_FROM` | with Resend | e.g. `Bobo <noreply@example.com>`, on a domain verified in Resend                                      |
+| Name         | Required             | Value                                                                               |
+| ------------ | -------------------- | ----------------------------------------------------------------------------------- |
+| `APP_URL`    | with a custom domain | e.g. `https://bobo.example.com`; defaults to `https://bobo.<subdomain>.workers.dev` |
+| `EMAIL_FROM` | with Resend          | e.g. `Bobo <noreply@example.com>`, on a domain verified in Resend                   |
 
 Changing `BETTER_AUTH_SECRET` later signs everyone out.
 
@@ -43,6 +43,14 @@ Changing `BETTER_AUTH_SECRET` later signs everyone out.
 
 Run **Actions → Deploy → Run workflow**. The first run creates the `bobo-db` D1 database
 (Asia-Pacific), applies the migrations and deploys. The run summary shows the app URL.
+
+## Optional: a custom domain
+
+1. In Cloudflare, open the `bobo` Worker → **Settings → Domains & Routes → Add → Custom domain**
+   (the domain must be on Cloudflare DNS).
+2. Set the `APP_URL` variable to it (e.g. `https://bobo.example.com`) and re-run the deploy.
+
+Sign-in uses `APP_URL` as the app's address. The workers.dev address keeps working too.
 
 ## Optional: Google sign-in
 

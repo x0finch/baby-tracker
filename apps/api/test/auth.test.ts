@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { trustedOrigins } from '../src/auth'
+import type { Env } from '../src/env'
 import { createTestApp } from './app'
 
 function preflightInit(origin: string): RequestInit {
@@ -53,7 +55,7 @@ describe('auth', () => {
     expect(state?.n).toBeGreaterThan(0)
   })
 
-  it('does not offer email and password sign-up', async () => {
+  it('refuses sign-up with a raw (not app-derived) password', async () => {
     const res = await t.request('/api/auth/sign-up/email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:8787' },
@@ -73,5 +75,32 @@ describe('auth', () => {
         'access-control-allow-origin',
       ),
     ).toBeNull()
+  })
+})
+
+describe('extra trusted origins', () => {
+  // The app answers on a custom domain and on its workers.dev address.
+  const extra = ' https://bobo.example.workers.dev/ , '
+
+  it('trusts every origin serving the app, normalised', () => {
+    const env = { BETTER_AUTH_URL: 'https://bobo.example.com', TRUSTED_ORIGINS: extra } as Env
+    expect(trustedOrigins(env)).toEqual([
+      'https://bobo.example.com',
+      'https://bobo.example.workers.dev',
+      'capacitor://localhost',
+      'https://localhost',
+    ])
+  })
+
+  it('allows CORS from the extra origins', async () => {
+    const t = await createTestApp({ TRUSTED_ORIGINS: extra })
+    try {
+      const res = await t.request('/api/me', preflightInit('https://bobo.example.workers.dev'))
+      expect(res.headers.get('access-control-allow-origin')).toBe(
+        'https://bobo.example.workers.dev',
+      )
+    } finally {
+      await t.dispose()
+    }
   })
 })
