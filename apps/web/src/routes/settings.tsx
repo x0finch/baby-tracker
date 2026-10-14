@@ -10,6 +10,7 @@ import { type Locale, getLocale, localeDisplayName, locales, setLocale } from '.
 import type { ThemePreference } from '../lib/theme'
 import { useTheme } from '../lib/use-theme'
 import { m } from '../paraglide/messages.js'
+import { AccountCard } from '../sync/AccountCard'
 
 export const Route = createFileRoute('/settings')({
   component: SettingsPage,
@@ -30,6 +31,7 @@ function SettingsPage() {
   return (
     <section className="flex flex-col gap-4">
       <PageHeader title={m.settingsTitle()} />
+      <AccountCard />
       <Card className="flex flex-col gap-3">
         <h2 className="text-title font-extrabold">{m.settingsTheme()}</h2>
         <SegmentedControl
