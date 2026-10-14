@@ -121,6 +121,8 @@
   --color-danger-text: var(--bobo-danger-text);
   --color-avatar-pink: var(--bobo-avatar-pink);
   --color-avatar-yellow: var(--bobo-avatar-yellow);
+
+  --shadow-segment: 0 2px 0 var(--bobo-border);
 }
 
 @theme {
@@ -147,6 +149,41 @@
   --spacing-tab-bar: 64px;
   --spacing-touch: 48px;
   --container-app: 480px;
+}
+
+/* Flat 3D press: the thick bottom edge collapses while held. Pair with `border-b-4`. */
+@utility press {
+  transition-property: transform, translate, border-width;
+  transition-duration: 75ms;
+  &:active {
+    translate: 0 0.125rem;
+    border-bottom-width: 2px;
+  }
+}
+
+/* Safe-area aware spacing, e.g. `pb-safe-4` is 1rem plus the home indicator inset. */
+@utility pt-safe-* {
+  padding-top: calc(--spacing(--value(integer)) + env(safe-area-inset-top));
+}
+@utility pr-safe-* {
+  padding-right: calc(--spacing(--value(integer)) + env(safe-area-inset-right));
+}
+@utility pb-safe-* {
+  padding-bottom: calc(--spacing(--value(integer)) + env(safe-area-inset-bottom));
+}
+@utility pl-safe-* {
+  padding-left: calc(--spacing(--value(integer)) + env(safe-area-inset-left));
+}
+
+/* Room for the fixed tab bar: page content ends above it, toasts float over it. */
+@utility h-tab-bar-safe {
+  height: calc(var(--spacing-tab-bar) + env(safe-area-inset-bottom));
+}
+@utility pb-above-tab-bar {
+  padding-bottom: calc(var(--spacing-tab-bar) + 1rem + env(safe-area-inset-bottom));
+}
+@utility bottom-above-tab-bar {
+  bottom: calc(var(--spacing-tab-bar) + 0.75rem + env(safe-area-inset-bottom));
 }
 
 @layer base {

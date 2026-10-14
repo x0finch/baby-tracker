@@ -53,23 +53,15 @@ export function Button({
     <button
       type={type}
       className={clsx(
-        'inline-flex shrink-0 select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg font-extrabold transition-[transform,border-width] duration-75',
+        'inline-flex shrink-0 select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg font-extrabold',
         'disabled:pointer-events-none disabled:opacity-50',
         size === 'md' && 'min-h-touch px-4 text-body',
         size === 'lg' && 'min-h-14 px-6 text-label',
         block && 'w-full',
-        variant === 'solid' &&
-          clsx(
-            'border-b-4 text-on-accent active:translate-y-0.5 active:border-b-2',
-            solidTones[tone],
-          ),
-        variant === 'soft' &&
-          clsx('border-2 border-b-4 active:translate-y-0.5 active:border-b-2', softTones[tone]),
+        variant === 'solid' && clsx('press border-b-4 text-on-accent', solidTones[tone]),
+        variant === 'soft' && clsx('press border-2 border-b-4', softTones[tone]),
         variant === 'outline' &&
-          clsx(
-            'border-2 border-b-4 border-border bg-bg active:translate-y-0.5 active:border-b-2',
-            textTones[tone],
-          ),
+          clsx('press border-2 border-b-4 border-border bg-bg', textTones[tone]),
         variant === 'ghost' && clsx('active:bg-surface', textTones[tone]),
         className,
       )}

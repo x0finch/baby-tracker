@@ -19,18 +19,17 @@ export function UnitsCard() {
     <Card className="flex flex-col gap-3">
       <h2 className="text-title font-extrabold">{m.settingsUnits()}</h2>
       {quantities.map((quantity) => (
-        <div key={quantity} className="flex flex-col gap-2">
-          <span className="text-caption font-bold text-fg-muted">{rows[quantity].label()}</span>
-          <SegmentedControl<string>
-            label={rows[quantity].label()}
-            options={rows[quantity].options.map((unit) => ({
-              value: unit,
-              label: unitLabel(quantity, { ...units, [quantity]: unit }),
-            }))}
-            value={units[quantity]}
-            onChange={(unit) => setUnits({ ...units, [quantity]: unit })}
-          />
-        </div>
+        <SegmentedControl<string>
+          key={quantity}
+          labelStyle="caption"
+          label={rows[quantity].label()}
+          options={rows[quantity].options.map((unit) => ({
+            value: unit,
+            label: unitLabel(quantity, { ...units, [quantity]: unit }),
+          }))}
+          value={units[quantity]}
+          onChange={(unit) => setUnits({ ...units, [quantity]: unit })}
+        />
       ))}
       <p className="m-0 text-caption text-fg-muted">{m.settingsUnitsHint()}</p>
     </Card>

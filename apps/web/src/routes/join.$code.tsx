@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { PageHeader } from '../components/PageHeader'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
+import { FormError } from '../components/ui/FormError'
 import { useLocalStore } from '../db'
 import { familyApi } from '../features/family/api'
 import { roleLabel } from '../features/family/FamilyCard'
@@ -161,7 +162,7 @@ function InviteBody({
       )}
       {(phase.name === 'ready' || phase.name === 'joining' || phase.name === 'failed') &&
         (preview.status !== 'active' ? (
-          <p className="m-0 font-bold text-danger-text">{statusMessage[preview.status]()}</p>
+          <FormError>{statusMessage[preview.status]()}</FormError>
         ) : signedIn ? (
           <Button
             size="lg"
@@ -181,9 +182,7 @@ function InviteBody({
             />
           </>
         ))}
-      {phase.name === 'failed' && (
-        <p className="m-0 font-bold text-danger-text">{m.actionFailed()}</p>
-      )}
+      {phase.name === 'failed' && <FormError>{m.actionFailed()}</FormError>}
     </>
   )
 }

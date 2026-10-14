@@ -1,8 +1,8 @@
 import type { DiaperEvent, PeeDetails, PoopDetails } from '@bobo/shared'
-import { clsx } from 'clsx'
 import type { ReactNode } from 'react'
 
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
+import { ToggleChip } from '../../components/ui/ToggleChip'
 import { m } from '../../paraglide/messages.js'
 import { amountLabel, poopColorLabel, poopConsistencyLabel } from './diaper-labels'
 import { DiaperIcon } from './DiaperIcon'
@@ -39,15 +39,12 @@ function ChoiceCard({
   children: ReactNode
 }) {
   return (
-    <button
-      type="button"
-      aria-pressed={selected}
+    <ToggleChip
+      pressed={selected}
+      tone="diaper"
+      tintText={false}
       onClick={onClick}
-      className={clsx(
-        'relative flex flex-col items-center gap-1 rounded-xl border-2 border-b-4 px-2 pt-2 pb-3 font-extrabold',
-        'transition-[transform,border-width] duration-75 active:translate-y-0.5 active:border-b-2',
-        selected ? 'border-diaper bg-diaper-soft' : 'border-border bg-surface',
-      )}
+      className="relative flex flex-col items-center gap-1 rounded-xl px-2 pt-2 pb-3 font-extrabold"
     >
       {selected && (
         <span
@@ -68,7 +65,7 @@ function ChoiceCard({
       )}
       {children}
       <span>{label}</span>
-    </button>
+    </ToggleChip>
   )
 }
 
@@ -126,36 +123,32 @@ export function DiaperFields({
       {hasPee && (
         <section className="flex flex-col gap-4">
           <SectionLabel>{m.peeSection()}</SectionLabel>
-          <div className="flex flex-col gap-2">
-            <span className="text-caption font-bold text-fg-muted">{m.peeAmount()}</span>
-            <SegmentedControl<PeeDetails['amount']>
-              label={m.peeAmount()}
-              options={(['small', 'normal', 'large'] as const).map((amount) => ({
-                value: amount,
-                label: amountLabel[amount](),
-              }))}
-              value={pee.amount}
-              onChange={(amount) => setPee({ amount })}
-            />
-          </div>
+          <SegmentedControl<PeeDetails['amount']>
+            labelStyle="caption"
+            label={m.peeAmount()}
+            options={(['small', 'normal', 'large'] as const).map((amount) => ({
+              value: amount,
+              label: amountLabel[amount](),
+            }))}
+            value={pee.amount}
+            onChange={(amount) => setPee({ amount })}
+          />
         </section>
       )}
 
       {hasPoop && (
         <section className="flex flex-col gap-4">
           <SectionLabel>{m.poopSection()}</SectionLabel>
-          <div className="flex flex-col gap-2">
-            <span className="text-caption font-bold text-fg-muted">{m.poopAmount()}</span>
-            <SegmentedControl<PoopDetails['amount']>
-              label={m.poopAmount()}
-              options={(['small', 'normal', 'large'] as const).map((amount) => ({
-                value: amount,
-                label: amountLabel[amount](),
-              }))}
-              value={poop.amount}
-              onChange={(amount) => setPoop({ amount })}
-            />
-          </div>
+          <SegmentedControl<PoopDetails['amount']>
+            labelStyle="caption"
+            label={m.poopAmount()}
+            options={(['small', 'normal', 'large'] as const).map((amount) => ({
+              value: amount,
+              label: amountLabel[amount](),
+            }))}
+            value={poop.amount}
+            onChange={(amount) => setPoop({ amount })}
+          />
           <div className="flex flex-col gap-2">
             <span className="text-caption font-bold text-fg-muted">{m.poopColor()}</span>
             <div className="grid grid-cols-3 gap-3">
@@ -174,30 +167,26 @@ export function DiaperFields({
               <p className="m-0 text-caption font-bold text-danger-text">{m.poopColorWarning()}</p>
             )}
           </div>
-          <div className="flex flex-col gap-2">
-            <span className="text-caption font-bold text-fg-muted">{m.poopConsistency()}</span>
-            <SegmentedControl<PoopDetails['consistency']>
-              label={m.poopConsistency()}
-              options={(['watery', 'soft', 'hard'] as const).map((consistency) => ({
-                value: consistency,
-                label: poopConsistencyLabel[consistency](),
-              }))}
-              value={poop.consistency}
-              onChange={(consistency) => setPoop({ consistency })}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <span className="text-caption font-bold text-fg-muted">{m.poopCurds()}</span>
-            <SegmentedControl<'no' | 'yes'>
-              label={m.poopCurds()}
-              options={[
-                { value: 'no', label: m.poopCurdsNo() },
-                { value: 'yes', label: m.poopCurdsYes() },
-              ]}
-              value={poop.curds ? 'yes' : 'no'}
-              onChange={(curds) => setPoop({ curds: curds === 'yes' })}
-            />
-          </div>
+          <SegmentedControl<PoopDetails['consistency']>
+            labelStyle="caption"
+            label={m.poopConsistency()}
+            options={(['watery', 'soft', 'hard'] as const).map((consistency) => ({
+              value: consistency,
+              label: poopConsistencyLabel[consistency](),
+            }))}
+            value={poop.consistency}
+            onChange={(consistency) => setPoop({ consistency })}
+          />
+          <SegmentedControl<'no' | 'yes'>
+            labelStyle="caption"
+            label={m.poopCurds()}
+            options={[
+              { value: 'no', label: m.poopCurdsNo() },
+              { value: 'yes', label: m.poopCurdsYes() },
+            ]}
+            value={poop.curds ? 'yes' : 'no'}
+            onChange={(curds) => setPoop({ curds: curds === 'yes' })}
+          />
         </section>
       )}
     </div>

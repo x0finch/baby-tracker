@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
+import { FormError } from '../../components/ui/FormError'
 import { Input } from '../../components/ui/Input'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { useLocalStore } from '../../db'
@@ -122,7 +123,7 @@ export function OtherEventForm({
             error={errors.head}
             onChange={(e) => setHead(e.target.value)}
           />
-          {errors.form && <p className="m-0 font-bold text-danger-text">{errors.form}</p>}
+          {errors.form && <FormError>{errors.form}</FormError>}
         </>
       )}
       {category === 'temperature' && (

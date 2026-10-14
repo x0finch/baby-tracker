@@ -2,7 +2,7 @@ import { type Event, startOfLocalDay } from '@bobo/shared'
 import { useEffect, useState } from 'react'
 
 import { Sheet } from '../../components/ui/Sheet'
-import { Toast } from '../../components/ui/Toast'
+import { Toast, ToastAction } from '../../components/ui/Toast'
 import { useLocalStore } from '../../db'
 import { formatDate, formatTime } from '../../lib/i18n'
 import { m } from '../../paraglide/messages.js'
@@ -130,18 +130,19 @@ export function TodayList({ events }: { events: readonly Event[] }) {
       </Sheet>
 
       {deleted && (
-        <Toast>
-          <span>{m.eventDeleted()}</span>
-          <button
-            type="button"
-            className="min-h-11 px-2 font-extrabold text-primary"
-            onClick={() => {
-              saveEvent(store, restoreEvent(deleted, Date.now()))
-              setDeleted(null)
-            }}
-          >
-            {m.undo()}
-          </button>
+        <Toast
+          action={
+            <ToastAction
+              onClick={() => {
+                saveEvent(store, restoreEvent(deleted, Date.now()))
+                setDeleted(null)
+              }}
+            >
+              {m.undo()}
+            </ToastAction>
+          }
+        >
+          {m.eventDeleted()}
         </Toast>
       )}
     </section>

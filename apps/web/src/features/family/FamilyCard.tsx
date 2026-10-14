@@ -4,6 +4,8 @@ import { type FormEvent, useCallback, useEffect, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
+import { ConfirmSheet } from '../../components/ui/ConfirmSheet'
+import { FormError } from '../../components/ui/FormError'
 import { Input } from '../../components/ui/Input'
 import { Sheet } from '../../components/ui/Sheet'
 import { m } from '../../paraglide/messages.js'
@@ -211,7 +213,7 @@ function InviteContent({
       <Button size="lg" block disabled={babyIds?.length === 0} onClick={() => void create()}>
         {m.inviteCreate()}
       </Button>
-      {failed && <p className="m-0 font-bold text-danger-text">{m.actionFailed()}</p>}
+      {failed && <FormError>{m.actionFailed()}</FormError>}
     </div>
   )
 }
@@ -295,7 +297,7 @@ function MemberForm({
       >
         {m.memberRemove()}
       </Button>
-      {failed && <p className="m-0 font-bold text-danger-text">{m.actionFailed()}</p>}
+      {failed && <FormError>{m.actionFailed()}</FormError>}
     </div>
   )
 }
@@ -338,7 +340,7 @@ function RenameSheet({
         <Button type="submit" size="lg" block disabled={!name.trim()}>
           {m.actionSave()}
         </Button>
-        {failed && <p className="m-0 font-bold text-danger-text">{m.actionFailed()}</p>}
+        {failed && <FormError>{m.actionFailed()}</FormError>}
       </form>
     </Sheet>
   )
@@ -468,7 +470,7 @@ function FamilyCard({ family, userId }: { family: FamilySummary; userId: string 
           {m.familyLeave()}
         </Button>
       )}
-      {failed && <p className="m-0 font-bold text-danger-text">{m.actionFailed()}</p>}
+      {failed && <FormError>{m.actionFailed()}</FormError>}
 
       <InviteSheet
         family={family}
@@ -490,15 +492,15 @@ function FamilyCard({ family, userId }: { family: FamilySummary; userId: string 
         onClose={() => setEditingId(null)}
         onChanged={refresh}
       />
-      <Sheet open={sheet === 'leave'} onClose={() => setSheet(null)} title={m.familyLeave()}>
-        <p className="m-0">{m.familyLeaveBody({ name: family.name })}</p>
-        <Button tone="danger" size="lg" block onClick={() => void leave()}>
-          {m.familyLeaveConfirm()}
-        </Button>
-        <Button variant="outline" block onClick={() => setSheet(null)}>
-          {m.actionCancel()}
-        </Button>
-      </Sheet>
+      <ConfirmSheet
+        open={sheet === 'leave'}
+        onClose={() => setSheet(null)}
+        title={m.familyLeave()}
+        confirmLabel={m.familyLeaveConfirm()}
+        onConfirm={() => void leave()}
+      >
+        {m.familyLeaveBody({ name: family.name })}
+      </ConfirmSheet>
     </Card>
   )
 }

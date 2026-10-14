@@ -76,15 +76,13 @@ export function BabyForm({ initial, submitLabel, onSubmit, onCancel }: BabyFormP
         error={errors.birthDate}
         onChange={(event) => update('birthDate', event.target.value)}
       />
-      <div className="flex flex-col gap-1.5">
-        <span className="font-bold">{m.babyFormSex()}</span>
-        <SegmentedControl
-          label={m.babyFormSex()}
-          options={sexOptions}
-          value={input.sex}
-          onChange={(sex) => update('sex', sex)}
-        />
-      </div>
+      <SegmentedControl
+        labelStyle="field"
+        label={m.babyFormSex()}
+        options={sexOptions}
+        value={input.sex}
+        onChange={(sex) => update('sex', sex)}
+      />
       <fieldset className="m-0 flex flex-col gap-1.5 border-0 p-0">
         <legend className="mb-1.5 font-bold">{m.babyFormColor()}</legend>
         <div className="grid max-w-80 grid-cols-6 gap-2">

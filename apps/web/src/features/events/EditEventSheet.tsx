@@ -2,6 +2,7 @@ import { type Event, MINUTE, hasOptionalDuration, isRunning, isTimed } from '@bo
 import { type FormEvent, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
+import { FormError } from '../../components/ui/FormError'
 import { Input } from '../../components/ui/Input'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { useLocalStore } from '../../db'
@@ -358,7 +359,7 @@ export function EditEventForm({
           onChange={(e) => setNote(e.target.value)}
         />
       </fieldset>
-      {errors.form && <p className="font-bold text-danger-text">{errors.form}</p>}
+      {errors.form && <FormError>{errors.form}</FormError>}
       {!readOnly && (
         <>
           <Button type="submit" size="lg" block>

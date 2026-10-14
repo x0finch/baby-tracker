@@ -2,6 +2,7 @@ import { type Event, type FeedingEvent, breastSideDurations, isRunning } from '@
 import { clsx } from 'clsx'
 
 import { Button } from '../../components/ui/Button'
+import { Card } from '../../components/ui/Card'
 import { useLocalStore } from '../../db'
 import { m } from '../../paraglide/messages.js'
 import { useAccess } from '../../sync/use-access'
@@ -21,7 +22,7 @@ function BreastTimer({ event, now }: { event: FeedingEvent; now: number }) {
   const other = side === 'left' ? 'right' : 'left'
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border-2 border-b-4 border-feeding/40 bg-feeding-soft p-4">
+    <Card tone="feeding" className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
         <span className="font-extrabold text-feeding-text">
           {m.timerCurrentSide({ side: sideLabel(side) })}
@@ -60,7 +61,7 @@ function BreastTimer({ event, now }: { event: FeedingEvent; now: number }) {
           </Button>
         </div>
       )}
-    </div>
+    </Card>
   )
 }
 
@@ -68,7 +69,7 @@ function SleepTimer({ event, now }: { event: Event; now: number }) {
   const store = useLocalStore()
   const canEdit = useAccess().canEditEvent(event)
   return (
-    <div className="flex items-center gap-4 rounded-xl border-2 border-b-4 border-sleep/40 bg-sleep-soft p-4">
+    <Card tone="sleep" className="flex items-center gap-4">
       <div className="flex flex-1 flex-col">
         <span className="font-extrabold text-sleep-text">{m.timerSleeping()}</span>
         <span className="text-display font-extrabold tabular-nums" role="timer">
@@ -84,7 +85,7 @@ function SleepTimer({ event, now }: { event: Event; now: number }) {
           {m.timerWake()}
         </Button>
       )}
-    </div>
+    </Card>
   )
 }
 

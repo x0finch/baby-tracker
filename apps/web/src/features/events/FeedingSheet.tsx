@@ -157,19 +157,17 @@ export function FeedingSheetContent({
         <form noValidate onSubmit={submit} className="flex flex-col gap-4">
           {kind === 'bottle' && (
             <>
-              <div className="flex flex-col gap-1.5">
-                <span className="font-bold">{m.bottleMilk()}</span>
-                <SegmentedControl<Milk>
-                  label={m.bottleMilk()}
-                  options={[
-                    { value: 'formula', label: m.milkFormula() },
-                    { value: 'breast', label: m.milkBreast() },
-                    { value: 'mixed', label: m.milkMixed() },
-                  ]}
-                  value={milk}
-                  onChange={setMilk}
-                />
-              </div>
+              <SegmentedControl<Milk>
+                labelStyle="field"
+                label={m.bottleMilk()}
+                options={[
+                  { value: 'formula', label: m.milkFormula() },
+                  { value: 'breast', label: m.milkBreast() },
+                  { value: 'mixed', label: m.milkMixed() },
+                ]}
+                value={milk}
+                onChange={setMilk}
+              />
               {milk === 'mixed' ? (
                 <MixedAmounts
                   breast={breastPart}

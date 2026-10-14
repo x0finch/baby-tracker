@@ -17,7 +17,7 @@ export function TabBar() {
   return (
     <nav
       key={hydrated ? 'client' : 'shell'}
-      className="fixed inset-x-0 bottom-0 mx-auto flex h-[calc(var(--spacing-tab-bar)+env(safe-area-inset-bottom))] max-w-app border-t-2 border-border bg-bg px-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]"
+      className="fixed inset-x-0 bottom-0 mx-auto flex h-tab-bar-safe max-w-app border-t-2 border-border bg-bg pr-safe-0 pb-safe-0 pl-safe-0"
     >
       {tabs.map((tab) => (
         <Link

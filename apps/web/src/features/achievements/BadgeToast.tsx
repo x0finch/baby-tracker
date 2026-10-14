@@ -2,7 +2,7 @@ import type { Baby, Event } from '@bobo/shared'
 import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
 
-import { Toast } from '../../components/ui/Toast'
+import { Toast, toastActionClass } from '../../components/ui/Toast'
 import { m } from '../../paraglide/messages.js'
 import { useNow } from '../events/use-events'
 import { computeBadges } from './achievements'
@@ -51,16 +51,19 @@ export function BadgeToast({ baby, events }: { baby: Baby; events: readonly Even
   }
 
   return (
-    <Toast>
-      <span>{m.badgeNew({ title: badgeLabel(badge, baby.name).title })}</span>
-      <Link
-        to="/stats"
-        search={{ view: 'achievements' }}
-        onClick={dismiss}
-        className="flex min-h-11 items-center px-2 font-extrabold text-primary"
-      >
-        {m.badgeView()}
-      </Link>
+    <Toast
+      action={
+        <Link
+          to="/stats"
+          search={{ view: 'achievements' }}
+          onClick={dismiss}
+          className={toastActionClass}
+        >
+          {m.badgeView()}
+        </Link>
+      }
+    >
+      {m.badgeNew({ title: badgeLabel(badge, baby.name).title })}
     </Toast>
   )
 }
