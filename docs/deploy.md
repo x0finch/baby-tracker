@@ -75,3 +75,7 @@ Sign-up and sign-in work without email. "Forgot password" needs it:
 
 - The database ID never goes into git: the workflow looks up `bobo-db` and fills it in.
 - Migrations run before each deploy, so new code always meets the schema it expects.
+- Reminders (#41) are sent by a Cron Trigger every minute (`triggers` in `wrangler.jsonc`).
+  The Web Push (VAPID) key pair is created on first use and kept in the `server_keys` table,
+  so no extra secret is needed. Deleting that row invalidates every device's subscription;
+  users then turn notifications on again in Settings.

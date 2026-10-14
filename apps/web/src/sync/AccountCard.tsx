@@ -17,6 +17,7 @@ import {
 } from './account'
 import { connectIfSignedIn } from './connection'
 import { getAccount } from './local'
+import { disablePush } from './notifications'
 import { requestSync, useSyncState } from './runner'
 import { SignInOptions } from './SignInOptions'
 
@@ -64,12 +65,15 @@ export function AccountCard() {
       setDeleteFailed(true)
       return
     }
+    await disablePush().catch(() => undefined)
     disconnectLocal(store, true)
     setUser(null)
     setDeleting(false)
   }
 
   async function signOut(clearData: boolean) {
+    // Reminders for this account shouldn't keep arriving on this device.
+    await disablePush().catch(() => undefined)
     try {
       await signOutRemote()
     } catch {
