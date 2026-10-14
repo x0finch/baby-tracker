@@ -63,10 +63,10 @@ const TONE: Record<IconKind, string> = {
   diaperWet: 'fill-diaper',
   diaperDirty: 'fill-diaper',
   diaperMixed: 'fill-diaper',
-  pumping: 'fill-avatar-pink',
+  pumping: 'fill-pumping',
   temperature: 'fill-danger',
-  medication: 'fill-avatar-yellow',
-  note: 'fill-fg-muted',
+  medication: 'fill-medication',
+  note: 'fill-note',
   growth: 'fill-primary',
 }
 
