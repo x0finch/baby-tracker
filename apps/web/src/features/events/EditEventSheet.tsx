@@ -9,13 +9,16 @@ import { m } from '../../paraglide/messages.js'
 import { useAccess } from '../../sync/use-access'
 import { useMemberName } from '../family/api'
 import { saveEvent } from './actions'
+import { validCelsius, validPumpingMl } from './OtherEventSheet'
 import { deleteEvent, moveEventStart, setEventNote } from './records'
 import { toDateTimeLocal } from './time'
 import { TimeField } from './TimeField'
 import { useNow } from './use-events'
 import { overlapsSleep, validateTime } from './validation'
 
-type Errors = Partial<Record<'start' | 'end' | 'amount' | 'food' | 'form', string>>
+type Errors = Partial<
+  Record<'start' | 'end' | 'amount' | 'food' | 'celsius' | 'name' | 'note' | 'form', string>
+>
 
 /** Edits any event; changes are applied through the pure helpers in records.ts. */
 export function EditEventForm({
@@ -38,7 +41,21 @@ export function EditEventForm({
   const [end, setEnd] = useState(() => (event.endAt === null ? '' : toDateTimeLocal(event.endAt)))
   const [note, setNote] = useState(event.note ?? '')
   const [amount, setAmount] = useState(() =>
-    event.type === 'feeding' && event.data.kind === 'bottle' ? String(event.data.amountMl) : '',
+    event.type === 'feeding' && event.data.kind === 'bottle'
+      ? String(event.data.amountMl)
+      : event.type === 'pumping'
+        ? String(event.data.amountMl)
+        : '',
+  )
+  const [pumpingSide, setPumpingSide] = useState(() =>
+    event.type === 'pumping' ? event.data.side : 'both',
+  )
+  const [celsius, setCelsius] = useState(() =>
+    event.type === 'temperature' ? String(event.data.celsius) : '',
+  )
+  const [medName, setMedName] = useState(() => (event.type === 'medication' ? event.data.name : ''))
+  const [medDose, setMedDose] = useState(() =>
+    event.type === 'medication' ? (event.data.dose ?? '') : '',
   )
   const [milk, setMilk] = useState(() =>
     event.type === 'feeding' && event.data.kind === 'bottle' ? event.data.milk : 'formula',
@@ -88,6 +105,21 @@ export function EditEventForm({
       else next = { ...next, data: { kind: 'solids', food: food.trim() } }
     }
     if (next.type === 'diaper') next = { ...next, data: { contents } }
+    if (next.type === 'pumping') {
+      const amountMl = Number(amount)
+      if (!validPumpingMl(amountMl)) nextErrors.amount = m.bottleAmountInvalid()
+      else next = { ...next, data: { side: pumpingSide, amountMl } }
+    }
+    if (next.type === 'temperature') {
+      const value = Number(celsius)
+      if (!validCelsius(value)) nextErrors.celsius = m.temperatureInvalid()
+      else next = { ...next, data: { celsius: Math.round(value * 10) / 10 } }
+    }
+    if (next.type === 'medication') {
+      if (!medName.trim()) nextErrors.name = m.medicationNameRequired()
+      else next = { ...next, data: { name: medName.trim(), dose: medDose.trim() || null } }
+    }
+    if (next.type === 'note' && !note.trim()) nextErrors.note = m.noteRequired()
 
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
@@ -152,6 +184,57 @@ export function EditEventForm({
             onChange={setContents}
           />
         )}
+        {event.type === 'pumping' && (
+          <>
+            <SegmentedControl
+              label={m.pumpingSide()}
+              options={[
+                { value: 'left', label: m.sideLeft() },
+                { value: 'right', label: m.sideRight() },
+                { value: 'both', label: m.pumpingBoth() },
+              ]}
+              value={pumpingSide}
+              onChange={setPumpingSide}
+            />
+            <Input
+              label={m.pumpingAmount()}
+              type="number"
+              inputMode="numeric"
+              value={amount}
+              error={errors.amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+          </>
+        )}
+        {event.type === 'temperature' && (
+          <Input
+            label={m.temperatureLabel()}
+            type="number"
+            inputMode="decimal"
+            step="0.1"
+            value={celsius}
+            error={errors.celsius}
+            onChange={(e) => setCelsius(e.target.value)}
+          />
+        )}
+        {event.type === 'medication' && (
+          <>
+            <Input
+              label={m.medicationName()}
+              value={medName}
+              maxLength={100}
+              error={errors.name}
+              onChange={(e) => setMedName(e.target.value)}
+            />
+            <Input
+              label={m.medicationDose()}
+              placeholder={m.medicationDosePlaceholder()}
+              value={medDose}
+              maxLength={50}
+              onChange={(e) => setMedDose(e.target.value)}
+            />
+          </>
+        )}
         {event.type === 'sleep' && (
           <SegmentedControl
             label={m.sleepKindLabel()}
@@ -180,8 +263,9 @@ export function EditEventForm({
           />
         )}
         <Input
-          label={m.eventNote()}
-          placeholder={m.eventNotePlaceholder()}
+          label={event.type === 'note' ? m.noteText() : m.eventNote()}
+          placeholder={event.type === 'note' ? undefined : m.eventNotePlaceholder()}
+          error={errors.note}
           value={note}
           maxLength={500}
           onChange={(e) => setNote(e.target.value)}

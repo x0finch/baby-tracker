@@ -3,7 +3,11 @@ import {
   type DiaperEvent,
   type Event,
   type FeedingEvent,
+  type MedicationEvent,
+  type NoteEvent,
+  type PumpingEvent,
   type SleepEvent,
+  type TemperatureEvent,
   newId,
 } from '@bobo/shared'
 
@@ -99,6 +103,64 @@ export function logDiaper(
   now: number = at,
 ): DiaperEvent {
   return { ...base(babyId, now), type: 'diaper', startAt: at, endAt: null, data: { contents } }
+}
+
+export function logPumping(
+  babyId: string,
+  at: number,
+  side: 'left' | 'right' | 'both',
+  amountMl: number,
+  now: number = at,
+): PumpingEvent {
+  return {
+    ...base(babyId, now),
+    type: 'pumping',
+    startAt: at,
+    endAt: null,
+    data: { side, amountMl },
+  }
+}
+
+export function logTemperature(
+  babyId: string,
+  at: number,
+  celsius: number,
+  now: number = at,
+): TemperatureEvent {
+  return {
+    ...base(babyId, now),
+    type: 'temperature',
+    startAt: at,
+    endAt: null,
+    data: { celsius: Math.round(celsius * 10) / 10 },
+  }
+}
+
+export function logMedication(
+  babyId: string,
+  at: number,
+  name: string,
+  dose: string,
+  now: number = at,
+): MedicationEvent {
+  return {
+    ...base(babyId, now),
+    type: 'medication',
+    startAt: at,
+    endAt: null,
+    data: { name: name.trim(), dose: dose.trim() || null },
+  }
+}
+
+export function logNote(babyId: string, at: number, text: string, now: number = at): NoteEvent {
+  return {
+    ...base(babyId, now),
+    type: 'note',
+    startAt: at,
+    endAt: null,
+    note: text.trim(),
+    data: {},
+  }
 }
 
 /** updatedAt must never move backwards, even if the device clock does. */

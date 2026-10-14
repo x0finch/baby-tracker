@@ -38,6 +38,25 @@ export const diaperDataSchema = z.object({
   contents: z.enum(['wet', 'dirty', 'mixed']),
 })
 
+export const pumpingDataSchema = z.object({
+  side: z.enum(['left', 'right', 'both']),
+  amountMl: z.number().positive().max(1000),
+})
+
+export const temperatureDataSchema = z.object({
+  /** Canonical unit is °C, kept to one decimal. */
+  celsius: z.number().min(30).max(45),
+})
+
+export const medicationDataSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  /** Free text such as "2.5 ml" or "1 片". */
+  dose: z.string().trim().max(50).nullable(),
+})
+
+/** A free-form note; the text lives in the event's `note` field. */
+export const noteDataSchema = z.object({})
+
 const eventBase = {
   id: idSchema,
   babyId: idSchema,
@@ -54,6 +73,10 @@ export const eventSchema = z
     z.object({ ...eventBase, type: z.literal('feeding'), data: feedingDataSchema }),
     z.object({ ...eventBase, type: z.literal('sleep'), data: sleepDataSchema }),
     z.object({ ...eventBase, type: z.literal('diaper'), data: diaperDataSchema }),
+    z.object({ ...eventBase, type: z.literal('pumping'), data: pumpingDataSchema }),
+    z.object({ ...eventBase, type: z.literal('temperature'), data: temperatureDataSchema }),
+    z.object({ ...eventBase, type: z.literal('medication'), data: medicationDataSchema }),
+    z.object({ ...eventBase, type: z.literal('note'), data: noteDataSchema }),
   ])
   .superRefine((event, ctx) => {
     checkTimestamps(event, ctx)
@@ -63,6 +86,9 @@ export const eventSchema = z
     }
     if (!isTimed(event) && event.endAt !== null) {
       ctx.addIssue({ code: 'custom', message: 'Instant events have no endAt', path: ['endAt'] })
+    }
+    if (event.type === 'note' && event.note === null) {
+      ctx.addIssue({ code: 'custom', message: 'Notes need text', path: ['note'] })
     }
     if (event.type === 'feeding' && event.data.kind === 'breast') {
       checkBreastSegments(event.data.segments, event.startAt, event.endAt, ctx)
@@ -74,6 +100,10 @@ export type EventType = Event['type']
 export type FeedingEvent = Extract<Event, { type: 'feeding' }>
 export type SleepEvent = Extract<Event, { type: 'sleep' }>
 export type DiaperEvent = Extract<Event, { type: 'diaper' }>
+export type PumpingEvent = Extract<Event, { type: 'pumping' }>
+export type TemperatureEvent = Extract<Event, { type: 'temperature' }>
+export type MedicationEvent = Extract<Event, { type: 'medication' }>
+export type NoteEvent = Extract<Event, { type: 'note' }>
 export type FeedingData = z.infer<typeof feedingDataSchema>
 export type BreastSide = z.infer<typeof breastSideSchema>
 export type BreastSegment = z.infer<typeof breastSegmentSchema>

@@ -312,6 +312,31 @@ describe('syncOnce', () => {
     expect(getAccount(a)?.familyId).toBe(other.id)
   })
 
+  it('skips records it cannot read without failing the sync', async () => {
+    const a = await device()
+    const baby = createBaby(a, input)
+    const known = logDiaper(baby.id, Date.now(), 'wet')
+    const api: SyncApi = {
+      push: async (request) => ({
+        babies: request.babies.map((b) => ({ id: b.id, status: 'accepted' })),
+        events: [],
+      }),
+      pull: async () => ({
+        babies: [],
+        events: [
+          { ...known, familyId: FAMILY },
+          { ...known, id: newId(), familyId: FAMILY, type: 'future-type' } as unknown as Event,
+        ],
+        access: [OWNER],
+        cursor: '1',
+        hasMore: false,
+      }),
+    }
+    const result = await syncOnce(a, api)
+    expect(result.pulled).toBe(1)
+    expect(a.events.toArray.map((event) => event.id)).toEqual([known.id])
+  })
+
   it('pushes large backlogs in batches and pages through pulls', async () => {
     const server = createFakeServer(200)
     const a = await device()

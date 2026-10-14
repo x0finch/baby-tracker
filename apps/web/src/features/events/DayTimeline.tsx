@@ -3,14 +3,19 @@ import { clsx } from 'clsx'
 
 import { formatTime } from '../../lib/i18n'
 import { m } from '../../paraglide/messages.js'
-import { categoryDot } from './category'
+import { categoryDot, laneOf } from './category'
 import { describeEvent } from './describe'
 
 const HOUR_PX = 40
 const HOUR_MS = 3_600_000
 const MIN_BLOCK_PX = 10
-const LANES = ['feeding', 'sleep', 'diaper'] as const
-const laneTitles = { feeding: m.categoryFeeding, sleep: m.categorySleep, diaper: m.categoryDiaper }
+const LANES = ['feeding', 'sleep', 'diaper', 'other'] as const
+const laneTitles = {
+  feeding: m.categoryFeeding,
+  sleep: m.categorySleep,
+  diaper: m.categoryDiaper,
+  other: m.categoryOther,
+}
 
 /** Vertical 24-hour timeline with one lane per category; tap a block to edit it. */
 export function DayTimeline({
@@ -41,7 +46,7 @@ export function DayTimeline({
       {visible.length === 0 && <p className="text-fg-muted">{m.timelineEmpty()}</p>}
       <div aria-hidden className="flex">
         <div className="w-12 shrink-0" />
-        <div className="grid flex-1 grid-cols-3 gap-2 text-center text-caption font-bold text-fg-muted">
+        <div className="grid flex-1 grid-cols-4 gap-2 text-center text-caption font-bold text-fg-muted">
           {LANES.map((lane) => (
             <span key={lane}>{laneTitles[lane]()}</span>
           ))}
@@ -63,11 +68,11 @@ export function DayTimeline({
             </div>
           ))}
         </div>
-        <div className="relative grid flex-1 grid-cols-3 gap-2">
+        <div className="relative grid flex-1 grid-cols-4 gap-2">
           {LANES.map((lane) => (
             <div key={lane} className="relative rounded-md bg-surface">
               {visible
-                .filter((event) => event.type === lane)
+                .filter((event) => laneOf(event.type) === lane)
                 .map((event) => {
                   const top = toPx(event.startAt)
                   const end = isTimed(event) ? (event.endAt ?? now) : event.startAt

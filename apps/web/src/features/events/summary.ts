@@ -8,6 +8,11 @@ export interface DaySummary {
   naps: number
   longestSleepMs: number
   diapers: { wet: number; dirty: number; mixed: number }
+  pumpingMl: number
+  /** The day's most recent temperature reading, if any. */
+  latestCelsius: number | null
+  medications: number
+  notes: number
 }
 
 /** Part of [startAt, endAt) that falls within the day; running events count up to `now`. */
@@ -38,7 +43,12 @@ export function summarizeDay(
     naps: 0,
     longestSleepMs: 0,
     diapers: { wet: 0, dirty: 0, mixed: 0 },
+    pumpingMl: 0,
+    latestCelsius: null,
+    medications: 0,
+    notes: 0,
   }
+  let latestTemperatureAt = -Infinity
 
   for (const event of events) {
     if (event.deletedAt !== null) continue
@@ -51,9 +61,27 @@ export function summarizeDay(
       continue
     }
     if (!inDay(event.startAt, dayStart, dayEnd)) continue
-    if (event.type === 'diaper') {
-      summary.diapers[event.data.contents] += 1
-      continue
+    switch (event.type) {
+      case 'diaper':
+        summary.diapers[event.data.contents] += 1
+        continue
+      case 'pumping':
+        summary.pumpingMl += event.data.amountMl
+        continue
+      case 'temperature':
+        if (event.startAt > latestTemperatureAt) {
+          latestTemperatureAt = event.startAt
+          summary.latestCelsius = event.data.celsius
+        }
+        continue
+      case 'medication':
+        summary.medications += 1
+        continue
+      case 'note':
+        summary.notes += 1
+        continue
+      case 'feeding':
+        break
     }
     summary.feedings += 1
     if (event.data.kind === 'bottle') summary.bottleMl += event.data.amountMl

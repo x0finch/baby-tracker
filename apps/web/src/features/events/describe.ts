@@ -6,6 +6,25 @@ import { durationLabel } from './duration-label'
 
 export type Category = Event['type']
 
+export const categoryTitle: Record<Category, () => string> = {
+  feeding: m.categoryFeeding,
+  sleep: m.categorySleep,
+  diaper: m.categoryDiaper,
+  pumping: m.categoryPumping,
+  temperature: m.categoryTemperature,
+  medication: m.categoryMedication,
+  note: m.categoryNote,
+}
+
+/** At or above this a temperature is shown as a fever. */
+export const FEVER_CELSIUS = 38
+
+const pumpingSides = { left: m.sideLeft, right: m.sideRight, both: m.pumpingBoth }
+
+export function formatCelsius(celsius: number): string {
+  return formatNumber(celsius, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+}
+
 const milkLabels = { breast: m.milkBreast, formula: m.milkFormula, mixed: m.milkMixed }
 const diaperLabels = { wet: m.diaperWet, dirty: m.diaperDirty, mixed: m.diaperMixed }
 
@@ -43,6 +62,31 @@ export function describeEvent(event: Event, now: number): { title: string; detai
         title: event.data.kind === 'night' ? m.sleepNight() : m.sleepNap(),
         detail: running ? m.inProgress() : durationLabel(eventDurationMs(event, now)),
       }
+    case 'diaper':
+      return { title: m.categoryDiaper(), detail: diaperLabels[event.data.contents]() }
+    case 'pumping':
+      return {
+        title: m.categoryPumping(),
+        detail: m.pumpingDetail({
+          side: pumpingSides[event.data.side](),
+          amount: formatNumber(event.data.amountMl),
+        }),
+      }
+    case 'temperature': {
+      const value = m.temperatureDetail({ value: formatCelsius(event.data.celsius) })
+      return {
+        title: m.categoryTemperature(),
+        detail: event.data.celsius >= FEVER_CELSIUS ? `${value} · ${m.temperatureFever()}` : value,
+      }
+    }
+    case 'medication':
+      return {
+        title: m.categoryMedication(),
+        detail: event.data.dose ? `${event.data.name} · ${event.data.dose}` : event.data.name,
+      }
+    case 'note':
+      return { title: m.categoryNote(), detail: event.note ?? '' }
+    default:
+      return event satisfies never
   }
-  return { title: m.categoryDiaper(), detail: diaperLabels[event.data.contents]() }
 }
