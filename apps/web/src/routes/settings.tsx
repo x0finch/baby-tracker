@@ -6,6 +6,7 @@ import { StorageStatus } from '../components/StorageStatus'
 import { Card } from '../components/ui/Card'
 import { SegmentedControl } from '../components/ui/SegmentedControl'
 import { BabyList } from '../features/babies/BabyList'
+import { ExportCard } from '../features/export/ExportCard'
 import { FamilySection } from '../features/family/FamilyCard'
 import { type Locale, getLocale, localeDisplayName, locales, setLocale } from '../lib/i18n'
 import type { ThemePreference } from '../lib/theme'
@@ -59,6 +60,7 @@ function SettingsPage() {
         <h2 className="text-title font-extrabold">{m.settingsBabies()}</h2>
         <BabyList />
       </Card>
+      <ExportCard />
       <InstallCard />
       <Card className="flex flex-col gap-2">
         <h2 className="text-title font-extrabold">{m.storageTitle()}</h2>
