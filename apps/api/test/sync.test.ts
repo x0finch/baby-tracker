@@ -80,6 +80,21 @@ describe('families and sync', () => {
     expect(changes.babies.map((x) => [x.id, x.name])).toEqual([[b.id, '新名字']])
   })
 
+  it("removes a deleted baby's records and keeps its tombstone", async () => {
+    const b = baby(familyId)
+    const e = diaper(b.id, familyId)
+    await push({ babies: [b], events: [e] })
+    const { cursor } = await pull()
+    const gone = { ...b, deletedAt: T0 + 20, updatedAt: T0 + 20 }
+    expect((await push({ babies: [gone] })).babies[0]?.status).toBe('accepted')
+    const changes = await pull(cursor)
+    expect(changes.babies).toMatchObject([{ id: b.id, deletedAt: T0 + 20 }])
+    const left = await t.env.DB.prepare('select count(*) as n from events where baby_id = ?')
+      .bind(b.id)
+      .first<{ n: number }>()
+    expect(left?.n).toBe(0)
+  })
+
   it('assigns createdBy on the server and keeps it', async () => {
     const b = baby(familyId, { createdBy: 'someone-else' })
     await push({ babies: [b] })

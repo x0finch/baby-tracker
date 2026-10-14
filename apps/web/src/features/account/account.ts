@@ -33,7 +33,7 @@ export const httpAccountApi: AccountApi = {
 }
 
 /** Starts Google sign-in; the browser leaves the app and returns to `returnTo`. */
-export async function signInWithGoogle(returnTo = '/settings') {
+export async function signInWithGoogle(returnTo = '/settings/account') {
   const { url } = await apiFetch<{ url: string }>('/api/auth/sign-in/social', {
     method: 'POST',
     body: JSON.stringify({ provider: 'google', callbackURL: returnTo }),

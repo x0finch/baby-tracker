@@ -24,6 +24,7 @@ import {
 } from '../sync/protocol'
 import {
   bumpSeq,
+  deleteBabyData,
   selectBabiesPage,
   selectEventsPage,
   selectExisting,
@@ -88,12 +89,16 @@ export const syncRoutes = new Hono<AppEnv>()
     )
 
     if (babyPlan.writes.length + eventPlan.writes.length > 0) {
+      // A deleted baby takes its records and reminders with it; devices drop the events
+      // themselves when they pull the baby's tombstone.
+      const deleted = babyPlan.writes.filter((baby) => baby.deletedAt !== null).map((b) => b.id)
       // One transaction: the sequence bump and the upserts commit together, so a pull never
       // sees rows whose seq is ahead of a concurrent push.
       await db.batch([
         bumpSeq(db),
         ...(babyPlan.writes.length > 0 ? [upsertBabies(db, babyPlan.writes)] : []),
         ...(eventPlan.writes.length > 0 ? [upsertEvents(db, eventPlan.writes)] : []),
+        ...(deleted.length > 0 ? deleteBabyData(db, deleted) : []),
       ])
     }
 

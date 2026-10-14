@@ -3,27 +3,34 @@ import { useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
+import { Chevron } from '../../components/ui/Chevron'
 import { Input } from '../../components/ui/Input'
-import { SegmentedControl } from '../../components/ui/SegmentedControl'
+import { Sheet } from '../../components/ui/Sheet'
 import { useNow } from '../../lib/use-now'
 import { m } from '../../paraglide/messages.js'
+import { BabyOptions, OptionButton } from '../babies/BabyOptions'
 import { useBabies } from '../babies/use-babies'
-import { useBabyEvents } from '../events/use-events'
+import { useEventsByBaby } from '../events/use-events'
 import { csvFileName, downloadCsv, eventsToCsv, exportRangeLabel } from './csv'
 
-/** Exports one baby's events in a date range as CSV, entirely on the device. */
+const ALL = 'all'
+
+/** Exports one baby's events, or every baby's, in a date range as CSV, entirely on the device. */
 export function ExportCard() {
   const { active, archived } = useBabies()
   const babies = [...active, ...archived]
   const now = useNow(60_000)
   const today = localDateString(now)
-  const [babyId, setBabyId] = useState<string | null>(null)
-  const baby = babies.find((item) => item.id === babyId) ?? babies[0]
-  const events = useBabyEvents(baby?.id ?? '')
+  const [babyId, setBabyId] = useState<string>(ALL)
+  const [picking, setPicking] = useState(false)
+  const single = babies.find((item) => item.id === babyId)
+  const selected = single ? [single] : babies
+  const eventsByBaby = useEventsByBaby(babies.map((baby) => baby.id))
+  const events = selected.flatMap((baby) => eventsByBaby.get(baby.id) ?? [])
   const [from, setFrom] = useState(() => shiftDay(today, -29))
   const [to, setTo] = useState(today)
 
-  if (!baby) return null
+  if (babies.length === 0) return null
   const start = localMidnight(from)
   // The end date is inclusive.
   const end = localMidnight(to, 1)
@@ -31,18 +38,25 @@ export function ExportCard() {
   const count = valid
     ? events.filter((event) => event.startAt >= start && event.startAt < end).length
     : 0
+  const title = selected.length === 1 ? selected[0]!.name : m.exportAllBabies()
+  const pick = (id: string) => {
+    setBabyId(id)
+    setPicking(false)
+  }
 
   return (
     <Card className="flex flex-col gap-3">
-      <h2 className="text-title font-extrabold">{m.exportTitle()}</h2>
       <p className="m-0 text-fg-muted">{m.exportBody()}</p>
       {babies.length > 1 && (
-        <SegmentedControl<string>
-          label={m.exportBaby()}
-          options={babies.map((item) => ({ value: item.id, label: item.name }))}
-          value={baby.id}
-          onChange={setBabyId}
-        />
+        <button
+          type="button"
+          onClick={() => setPicking(true)}
+          className="flex min-h-touch items-center gap-2 rounded-xl border-2 border-b-4 border-border px-3 py-2 text-left active:translate-y-0.5 active:border-b-2"
+        >
+          <span className="text-fg-muted">{m.exportBaby()}</span>
+          <span className="min-w-0 flex-1 truncate font-extrabold">{title}</span>
+          <Chevron />
+        </button>
       )}
       <div className="grid grid-cols-2 gap-3">
         <Input
@@ -75,13 +89,32 @@ export function ExportCard() {
         disabled={!valid || count === 0}
         onClick={() =>
           downloadCsv(
-            csvFileName(baby.name, start, end),
-            eventsToCsv(baby, events, start, end, Date.now()),
+            csvFileName(title, start, end),
+            eventsToCsv(selected, events, start, end, Date.now()),
           )
         }
       >
         {m.exportButton()}
       </Button>
+
+      <Sheet open={picking} onClose={() => setPicking(false)} title={m.exportPickBaby()}>
+        <OptionButton selected={!single} onClick={() => pick(ALL)}>
+          <span className="flex flex-col">
+            <span className="font-extrabold">{m.exportAllBabies()}</span>
+            <span className="text-caption text-fg-muted">
+              {m.exportAllBabiesHint({ count: babies.length })}
+            </span>
+          </span>
+        </OptionButton>
+        <BabyOptions
+          babies={babies}
+          selectedId={single?.id ?? null}
+          onSelect={pick}
+          badges={
+            new Map(archived.map((baby) => [baby.id, { label: m.archivedBabies(), tone: 'muted' }]))
+          }
+        />
+      </Sheet>
     </Card>
   )
 }

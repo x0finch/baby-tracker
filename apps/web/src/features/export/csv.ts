@@ -47,11 +47,11 @@ function amounts(event: Event): {
 }
 
 /**
- * CSV of a baby's events in [from, to), oldest first. Starts with a UTF-8 byte order mark so
- * spreadsheet apps (Excel in particular) read the Chinese text correctly.
+ * CSV of the babies' events in [from, to), oldest first, one baby name per row. Starts with a
+ * UTF-8 byte order mark so spreadsheet apps (Excel in particular) read the Chinese text.
  */
 export function eventsToCsv(
-  baby: Pick<Baby, 'name'>,
+  babies: readonly Pick<Baby, 'id' | 'name'>[],
   events: readonly Event[],
   from: number,
   to: number,
@@ -72,15 +72,22 @@ export function eventsToCsv(
     m.csvHead(),
     m.csvNote(),
   ]
+  const names = new Map(babies.map((baby) => [baby.id, baby.name]))
   const rows = events
-    .filter((event) => event.deletedAt === null && event.startAt >= from && event.startAt < to)
+    .filter(
+      (event) =>
+        names.has(event.babyId) &&
+        event.deletedAt === null &&
+        event.startAt >= from &&
+        event.startAt < to,
+    )
     .toSorted((a, b) => a.startAt - b.startAt)
     .map((event) => {
       const { title, detail } = describeEvent(event, now)
       const duration = eventDurationMs(event, now)
       const { ml, celsius, growth } = amounts(event)
       return [
-        baby.name,
+        names.get(event.babyId) ?? '',
         localDate(event.startAt),
         localTime(event.startAt),
         event.endAt === null ? null : localTime(event.endAt),

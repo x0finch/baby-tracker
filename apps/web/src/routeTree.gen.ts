@@ -10,20 +10,21 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as StatsRouteImport } from './routes/stats'
 import { Route as UiRouteImport } from './routes/ui'
-import { Route as FamilyFamilyIdRouteImport } from './routes/family.$familyId'
 import { Route as JoinCodeRouteImport } from './routes/join.$code'
+import { Route as SettingsIndexRouteImport } from './routes/settings.index'
+import { Route as SettingsAboutRouteImport } from './routes/settings.about'
+import { Route as SettingsAccountRouteImport } from './routes/settings.account'
+import { Route as SettingsBabiesRouteImport } from './routes/settings.babies'
+import { Route as SettingsDisplayRouteImport } from './routes/settings.display'
+import { Route as SettingsExportRouteImport } from './routes/settings.export'
+import { Route as SettingsRemindersRouteImport } from './routes/settings.reminders'
+import { Route as SettingsFamilyFamilyIdRouteImport } from './routes/settings.family.$familyId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StatsRoute = StatsRouteImport.update({
@@ -36,65 +37,153 @@ const UiRoute = UiRouteImport.update({
   path: '/ui',
   getParentRoute: () => rootRouteImport,
 } as any)
-const FamilyFamilyIdRoute = FamilyFamilyIdRouteImport.update({
-  id: '/family/$familyId',
-  path: '/family/$familyId',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const JoinCodeRoute = JoinCodeRouteImport.update({
   id: '/join/$code',
   path: '/join/$code',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsIndexRoute = SettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsAboutRoute = SettingsAboutRouteImport.update({
+  id: '/settings/about',
+  path: '/settings/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsAccountRoute = SettingsAccountRouteImport.update({
+  id: '/settings/account',
+  path: '/settings/account',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsBabiesRoute = SettingsBabiesRouteImport.update({
+  id: '/settings/babies',
+  path: '/settings/babies',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsDisplayRoute = SettingsDisplayRouteImport.update({
+  id: '/settings/display',
+  path: '/settings/display',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsExportRoute = SettingsExportRouteImport.update({
+  id: '/settings/export',
+  path: '/settings/export',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRemindersRoute = SettingsRemindersRouteImport.update({
+  id: '/settings/reminders',
+  path: '/settings/reminders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsFamilyFamilyIdRoute = SettingsFamilyFamilyIdRouteImport.update({
+  id: '/settings/family/$familyId',
+  path: '/settings/family/$familyId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
   '/ui': typeof UiRoute
-  '/family/$familyId': typeof FamilyFamilyIdRoute
   '/join/$code': typeof JoinCodeRoute
+  '/settings/about': typeof SettingsAboutRoute
+  '/settings/account': typeof SettingsAccountRoute
+  '/settings/babies': typeof SettingsBabiesRoute
+  '/settings/display': typeof SettingsDisplayRoute
+  '/settings/export': typeof SettingsExportRoute
+  '/settings/reminders': typeof SettingsRemindersRoute
+  '/settings/': typeof SettingsIndexRoute
+  '/settings/family/$familyId': typeof SettingsFamilyFamilyIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
   '/ui': typeof UiRoute
-  '/family/$familyId': typeof FamilyFamilyIdRoute
   '/join/$code': typeof JoinCodeRoute
+  '/settings/about': typeof SettingsAboutRoute
+  '/settings/account': typeof SettingsAccountRoute
+  '/settings/babies': typeof SettingsBabiesRoute
+  '/settings/display': typeof SettingsDisplayRoute
+  '/settings/export': typeof SettingsExportRoute
+  '/settings/reminders': typeof SettingsRemindersRoute
+  '/settings': typeof SettingsIndexRoute
+  '/settings/family/$familyId': typeof SettingsFamilyFamilyIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
   '/ui': typeof UiRoute
-  '/family/$familyId': typeof FamilyFamilyIdRoute
   '/join/$code': typeof JoinCodeRoute
+  '/settings/about': typeof SettingsAboutRoute
+  '/settings/account': typeof SettingsAccountRoute
+  '/settings/babies': typeof SettingsBabiesRoute
+  '/settings/display': typeof SettingsDisplayRoute
+  '/settings/export': typeof SettingsExportRoute
+  '/settings/reminders': typeof SettingsRemindersRoute
+  '/settings/': typeof SettingsIndexRoute
+  '/settings/family/$familyId': typeof SettingsFamilyFamilyIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/settings' | '/stats' | '/ui' | '/family/$familyId' | '/join/$code'
+    | '/'
+    | '/stats'
+    | '/ui'
+    | '/join/$code'
+    | '/settings/about'
+    | '/settings/account'
+    | '/settings/babies'
+    | '/settings/display'
+    | '/settings/export'
+    | '/settings/reminders'
+    | '/settings/'
+    | '/settings/family/$familyId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/settings' | '/stats' | '/ui' | '/family/$familyId' | '/join/$code'
+  to:
+    | '/'
+    | '/stats'
+    | '/ui'
+    | '/join/$code'
+    | '/settings/about'
+    | '/settings/account'
+    | '/settings/babies'
+    | '/settings/display'
+    | '/settings/export'
+    | '/settings/reminders'
+    | '/settings'
+    | '/settings/family/$familyId'
   id:
     | '__root__'
     | '/'
-    | '/settings'
     | '/stats'
     | '/ui'
-    | '/family/$familyId'
     | '/join/$code'
+    | '/settings/about'
+    | '/settings/account'
+    | '/settings/babies'
+    | '/settings/display'
+    | '/settings/export'
+    | '/settings/reminders'
+    | '/settings/'
+    | '/settings/family/$familyId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  SettingsRoute: typeof SettingsRoute
   StatsRoute: typeof StatsRoute
   UiRoute: typeof UiRoute
-  FamilyFamilyIdRoute: typeof FamilyFamilyIdRoute
   JoinCodeRoute: typeof JoinCodeRoute
+  SettingsAboutRoute: typeof SettingsAboutRoute
+  SettingsAccountRoute: typeof SettingsAccountRoute
+  SettingsBabiesRoute: typeof SettingsBabiesRoute
+  SettingsDisplayRoute: typeof SettingsDisplayRoute
+  SettingsExportRoute: typeof SettingsExportRoute
+  SettingsRemindersRoute: typeof SettingsRemindersRoute
+  SettingsIndexRoute: typeof SettingsIndexRoute
+  SettingsFamilyFamilyIdRoute: typeof SettingsFamilyFamilyIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -104,13 +193,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/stats': {
@@ -127,13 +209,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UiRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/family/$familyId': {
-      id: '/family/$familyId'
-      path: '/family/$familyId'
-      fullPath: '/family/$familyId'
-      preLoaderRoute: typeof FamilyFamilyIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/join/$code': {
       id: '/join/$code'
       path: '/join/$code'
@@ -141,16 +216,78 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof JoinCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/': {
+      id: '/settings/'
+      path: '/settings'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof SettingsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/about': {
+      id: '/settings/about'
+      path: '/settings/about'
+      fullPath: '/settings/about'
+      preLoaderRoute: typeof SettingsAboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/account': {
+      id: '/settings/account'
+      path: '/settings/account'
+      fullPath: '/settings/account'
+      preLoaderRoute: typeof SettingsAccountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/babies': {
+      id: '/settings/babies'
+      path: '/settings/babies'
+      fullPath: '/settings/babies'
+      preLoaderRoute: typeof SettingsBabiesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/display': {
+      id: '/settings/display'
+      path: '/settings/display'
+      fullPath: '/settings/display'
+      preLoaderRoute: typeof SettingsDisplayRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/export': {
+      id: '/settings/export'
+      path: '/settings/export'
+      fullPath: '/settings/export'
+      preLoaderRoute: typeof SettingsExportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/reminders': {
+      id: '/settings/reminders'
+      path: '/settings/reminders'
+      fullPath: '/settings/reminders'
+      preLoaderRoute: typeof SettingsRemindersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/family/$familyId': {
+      id: '/settings/family/$familyId'
+      path: '/settings/family/$familyId'
+      fullPath: '/settings/family/$familyId'
+      preLoaderRoute: typeof SettingsFamilyFamilyIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  SettingsRoute: SettingsRoute,
   StatsRoute: StatsRoute,
   UiRoute: UiRoute,
-  FamilyFamilyIdRoute: FamilyFamilyIdRoute,
   JoinCodeRoute: JoinCodeRoute,
+  SettingsAboutRoute: SettingsAboutRoute,
+  SettingsAccountRoute: SettingsAccountRoute,
+  SettingsBabiesRoute: SettingsBabiesRoute,
+  SettingsDisplayRoute: SettingsDisplayRoute,
+  SettingsExportRoute: SettingsExportRoute,
+  SettingsRemindersRoute: SettingsRemindersRoute,
+  SettingsIndexRoute: SettingsIndexRoute,
+  SettingsFamilyFamilyIdRoute: SettingsFamilyFamilyIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

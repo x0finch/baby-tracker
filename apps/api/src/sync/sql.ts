@@ -106,3 +106,12 @@ export function selectEventsPage(
     )
     .bind(JSON.stringify(scope.familyIds), JSON.stringify(scope.babyIds), ...after(cursor), limit)
 }
+
+/** Removes the records and reminders of deleted babies (their rows stay as tombstones). */
+export function deleteBabyData(db: D1Database, babyIds: readonly string[]) {
+  const ids = JSON.stringify(babyIds)
+  return [
+    db.prepare('delete from events where baby_id in (select value from json_each(?))').bind(ids),
+    db.prepare('delete from reminders where baby_id in (select value from json_each(?))').bind(ids),
+  ]
+}

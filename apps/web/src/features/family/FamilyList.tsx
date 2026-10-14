@@ -2,6 +2,7 @@ import { type Baby, type FamilySummary, familyDisplayName } from '@bobo/shared'
 import { Link } from '@tanstack/react-router'
 
 import { Card } from '../../components/ui/Card'
+import { Chevron } from '../../components/ui/Chevron'
 import { m } from '../../paraglide/messages.js'
 import { useAccess } from '../../sync/use-access'
 import { useBabies } from '../babies/use-babies'
@@ -35,7 +36,7 @@ export function FamilyList() {
           return (
             <li key={family.id} className="border-b-2 border-border last:border-b-0">
               <Link
-                to="/family/$familyId"
+                to="/settings/family/$familyId"
                 params={{ familyId: family.id }}
                 className="flex min-h-touch items-center gap-3 py-3 active:bg-surface"
               >
@@ -48,16 +49,7 @@ export function FamilyList() {
                   </span>
                   <span className="truncate text-caption text-fg-muted">{details.join(' · ')}</span>
                 </span>
-                <svg aria-hidden viewBox="0 0 24 24" className="size-5 shrink-0 text-fg-muted">
-                  <path
-                    d="M9 5l7 7-7 7"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+                <Chevron />
               </Link>
             </li>
           )

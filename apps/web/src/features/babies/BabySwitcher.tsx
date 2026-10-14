@@ -1,11 +1,9 @@
 import {
   type AvatarColor,
-  type Baby,
   type FamilySummary,
   familyDisplayName,
   localDateString,
 } from '@bobo/shared'
-import { clsx } from 'clsx'
 import { useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
@@ -15,11 +13,11 @@ import { useLocalStore } from '../../db'
 import { m } from '../../paraglide/messages.js'
 import { useAccess } from '../../sync/use-access'
 import { useBabiesWithRunningTimers } from '../events/use-events'
-import { sortFamilies } from '../family/FamilyList'
 import { createBaby } from './actions'
 import { ageLabel } from './age-label'
 import { BabyAvatar } from './BabyAvatar'
 import { BabyForm } from './BabyForm'
+import { BabyOptions } from './BabyOptions'
 import { nextAvatarColor } from './records'
 import { selectBaby, useBabies, useSelectedBaby } from './use-babies'
 
@@ -29,7 +27,6 @@ export function BabySwitcher() {
   const { baby, select } = useSelectedBaby()
   const runningBabies = useBabiesWithRunningTimers()
   const { access, babyFamilies } = useAccess()
-  const groups = groupByFamily(active, access)
   const otherRunning = active.some((b) => b.id !== baby?.id && runningBabies.has(b.id))
   const [sheet, setSheet] = useState<'closed' | 'pick' | 'add'>('closed')
   const close = () => setSheet('closed')
@@ -70,46 +67,19 @@ export function BabySwitcher() {
       </button>
 
       <Sheet open={sheet === 'pick'} onClose={close} title={m.switcherTitle()}>
-        <div className="flex flex-col gap-4">
-          {groups.map((group) => (
-            <section key={group.key} className="flex flex-col gap-2">
-              {groups.length > 1 && (
-                <h3 className="text-caption font-bold text-fg-muted">{group.title}</h3>
-              )}
-              <ul className="m-0 flex list-none flex-col gap-2 p-0">
-                {group.babies.map((option) => (
-                  <li key={option.id}>
-                    <button
-                      type="button"
-                      aria-pressed={option.id === baby.id}
-                      onClick={() => {
-                        select(option.id)
-                        close()
-                      }}
-                      className={clsx(
-                        'flex min-h-touch w-full items-center gap-3 rounded-xl border-2 px-3 py-2 text-left',
-                        option.id === baby.id ? 'border-diaper bg-diaper-soft' : 'border-border',
-                      )}
-                    >
-                      <BabyAvatar name={option.name} color={option.avatarColor} />
-                      <span className="flex flex-col">
-                        <span className="font-extrabold">{option.name}</span>
-                        <span className="text-caption text-fg-muted">
-                          {ageLabel(option.birthDate)}
-                        </span>
-                      </span>
-                      {runningBabies.has(option.id) && (
-                        <span className="ml-auto rounded-full bg-danger-soft px-2 text-caption font-bold text-danger-text">
-                          {m.runningBadge()}
-                        </span>
-                      )}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
-        </div>
+        <BabyOptions
+          babies={active}
+          selectedId={baby.id}
+          onSelect={(id) => {
+            select(id)
+            close()
+          }}
+          badges={
+            new Map(
+              [...runningBabies].map((id) => [id, { label: m.runningBadge(), tone: 'danger' }]),
+            )
+          }
+        />
         <Button variant="soft" tone="primary" block onClick={() => setSheet('add')}>
           {m.addBabyTitle()}
         </Button>
@@ -182,23 +152,4 @@ function AddBaby({
       />
     </div>
   )
-}
-
-interface BabyGroup {
-  key: string
-  title: string
-  babies: Baby[]
-}
-
-/** Babies by family, the user's own families first; babies not yet in a family come last. */
-function groupByFamily(babies: readonly Baby[], access: readonly FamilySummary[] | undefined) {
-  const groups: BabyGroup[] = sortFamilies(access ?? []).map((family) => ({
-    key: family.id,
-    title: familyDisplayName(family),
-    babies: babies.filter((baby) => baby.familyId === family.id),
-  }))
-  const known = new Set(groups.map((group) => group.key))
-  const rest = babies.filter((baby) => baby.familyId === null || !known.has(baby.familyId))
-  groups.push({ key: 'local', title: m.babyGroupLocal(), babies: rest })
-  return groups.filter((group) => group.babies.length > 0)
 }

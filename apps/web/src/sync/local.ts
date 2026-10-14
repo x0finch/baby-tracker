@@ -153,3 +153,10 @@ export function claimLocalData(store: LocalStore, familyId: string, now: number 
     markDirty(store, 'events', { ...event, familyId: babyFamily, updatedAt })
   }
 }
+
+/** Drops a baby's events from this device only; used when the baby is deleted. */
+export function purgeBabyEvents(store: LocalStore, babyId: string) {
+  for (const event of store.events.toArray) {
+    if (event.babyId === babyId) removeLocal(store, 'events', event.id)
+  }
+}
