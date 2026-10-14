@@ -476,5 +476,9 @@
   "feedDurationNone": "不填",
   "feedDurationMinutes": "{minutes} 分钟",
   "feedBackdated": "按「刚喂完」把开始时间往前推了，可以修改",
-  "feedEndFuture": "喂完的时间不能晚于现在，请调整开始时间"
+  "feedEndFuture": "喂完的时间不能晚于现在，请调整开始时间",
+  "yesterdayRecords": "昨天的记录",
+  "dayRecords": "{date}的记录",
+  "dayEmpty": "这一天没有记录",
+  "backToToday": "回到今天"
 }

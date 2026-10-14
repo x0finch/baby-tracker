@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { Sheet } from '../../components/ui/Sheet'
 import { Toast } from '../../components/ui/Toast'
 import { useLocalStore } from '../../db'
-import { formatTime } from '../../lib/i18n'
+import { formatDate, formatTime } from '../../lib/i18n'
 import { m } from '../../paraglide/messages.js'
 import { saveEvent } from './actions'
 import { categoryDot } from './category'
@@ -17,13 +17,46 @@ import { useNow } from './use-events'
 
 const UNDO_MS = 6000
 
-/** Today's events for the selected baby, newest first; tap a row to edit it. */
+/** Local midnight `daysBack` days before the day containing `now` (DST-safe). */
+function dayStartBefore(now: number, daysBack: number): number {
+  const d = new Date(startOfLocalDay(now))
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() - daysBack).getTime()
+}
+
+function Chevron({ direction }: { direction: 'left' | 'right' }) {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" className="size-6">
+      <path
+        d={direction === 'left' ? 'M15 5l-7 7 7 7' : 'M9 5l7 7-7 7'}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+/**
+ * A day's events for the selected baby, newest first; tap a row to edit it. Opens on today,
+ * with arrows to step back to earlier days.
+ */
 export function TodayList({ events }: { events: readonly Event[] }) {
   const store = useLocalStore()
   const now = useNow(60_000)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deleted, setDeleted] = useState<Event | null>(null)
-  const today = events.filter((event) => event.startAt >= startOfLocalDay(now))
+  const [daysBack, setDaysBack] = useState(0)
+  const dayStart = dayStartBefore(now, daysBack)
+  const dayEnd = dayStartBefore(now, daysBack - 1)
+  const today = events.filter((event) => event.startAt >= dayStart && event.startAt < dayEnd)
+  const heading =
+    daysBack === 0
+      ? m.todaySummaryTitle()
+      : daysBack === 1
+        ? m.yesterdayRecords()
+        : m.dayRecords({ date: formatDate(dayStart) })
   const editing = events.find((event) => event.id === editingId)
   const close = () => setEditingId(null)
 
@@ -35,9 +68,39 @@ export function TodayList({ events }: { events: readonly Event[] }) {
 
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-title font-extrabold">{m.todaySummaryTitle()}</h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-title font-extrabold">{heading}</h2>
+        <div className="flex shrink-0 items-center">
+          <button
+            type="button"
+            aria-label={m.dayPrev()}
+            onClick={() => setDaysBack((days) => days + 1)}
+            className="flex size-touch items-center justify-center rounded-full text-fg-muted active:bg-surface"
+          >
+            <Chevron direction="left" />
+          </button>
+          <button
+            type="button"
+            aria-label={m.dayNext()}
+            disabled={daysBack === 0}
+            onClick={() => setDaysBack((days) => Math.max(0, days - 1))}
+            className="flex size-touch items-center justify-center rounded-full text-fg-muted active:bg-surface disabled:opacity-30"
+          >
+            <Chevron direction="right" />
+          </button>
+        </div>
+      </div>
+      {daysBack > 0 && (
+        <button
+          type="button"
+          onClick={() => setDaysBack(0)}
+          className="self-start font-bold text-primary-text"
+        >
+          {m.backToToday()}
+        </button>
+      )}
       {today.length === 0 ? (
-        <p className="text-fg-muted">{m.todayEmpty()}</p>
+        <p className="text-fg-muted">{daysBack === 0 ? m.todayEmpty() : m.dayEmpty()}</p>
       ) : (
         <ul className="m-0 flex list-none flex-col p-0">
           {today.map((event) => {
