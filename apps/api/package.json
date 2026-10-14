@@ -9,18 +9,17 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply bobo-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply bobo-db --remote",
+    "codegen": "wrangler types --env-interface Bindings",
     "typecheck": "tsc && tsc -p test"
   },
   "dependencies": {
-    "@better-auth/passkey": "1.7.7",
+    "@better-auth/passkey": "catalog:",
     "@bobo/shared": "workspace:*",
-    "better-auth": "^1.7.7",
+    "better-auth": "catalog:",
     "drizzle-orm": "^0.45.4",
-    "hono": "^4.13.13",
-    "zod": "^4.6.7"
+    "hono": "^4.13.13"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261012.1",
     "@types/node": "^22.20.5",
     "drizzle-kit": "^0.31.11",
     "miniflare": "^4.20260730.0",
