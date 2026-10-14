@@ -43,8 +43,14 @@ export const poopDetailsSchema = z.object({
   consistency: z.enum(['watery', 'soft', 'hard']),
 })
 
+export const peeDetailsSchema = z.object({
+  amount: z.enum(['small', 'normal', 'large']),
+})
+
 export const diaperDataSchema = z.object({
   contents: z.enum(['wet', 'dirty', 'mixed']),
+  /** Optional details when the diaper is wet. */
+  pee: peeDetailsSchema.optional(),
   /** Optional details when the diaper has poop in it. */
   poop: poopDetailsSchema.optional(),
 })
@@ -116,6 +122,9 @@ export const eventSchema = z
     if (event.type === 'diaper' && event.data.contents === 'wet' && event.data.poop) {
       ctx.addIssue({ code: 'custom', message: 'Wet diapers have no poop details', path: ['data'] })
     }
+    if (event.type === 'diaper' && event.data.contents === 'dirty' && event.data.pee) {
+      ctx.addIssue({ code: 'custom', message: 'Dirty diapers have no pee details', path: ['data'] })
+    }
     if (event.type === 'note' && event.note === null) {
       ctx.addIssue({ code: 'custom', message: 'Notes need text', path: ['note'] })
     }
@@ -138,6 +147,7 @@ export type FeedingData = z.infer<typeof feedingDataSchema>
 export type BreastSide = z.infer<typeof breastSideSchema>
 export type BreastSegment = z.infer<typeof breastSegmentSchema>
 export type PoopDetails = z.infer<typeof poopDetailsSchema>
+export type PeeDetails = z.infer<typeof peeDetailsSchema>
 
 /** A split is only for mixed bottles, needs both parts, and must add up to the total. */
 function checkMilkSplit(

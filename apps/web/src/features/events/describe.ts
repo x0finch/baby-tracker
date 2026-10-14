@@ -2,7 +2,7 @@ import { type Event, breastSideDurations, eventDurationMs, isRunning } from '@bo
 
 import { formatNumber } from '../../lib/i18n'
 import { m } from '../../paraglide/messages.js'
-import { poopAmountLabel, poopColorLabel, poopConsistencyLabel } from './diaper-labels'
+import { amountLabel, poopColorLabel, poopConsistencyLabel } from './diaper-labels'
 import { durationLabel } from './duration-label'
 
 export type Category = Event['type']
@@ -90,13 +90,14 @@ export function describeEvent(event: Event, now: number): { title: string; detai
         detail: running ? m.inProgress() : durationLabel(eventDurationMs(event, now)),
       }
     case 'diaper': {
-      const { contents, poop } = event.data
+      const { contents, pee, poop } = event.data
       const parts: string[] = [diaperLabels[contents]()]
+      if (pee) parts.push(m.peeAmountDetail({ amount: amountLabel[pee.amount]() }))
       if (poop) {
         parts.push(
           poopColorLabel[poop.color](),
           poopConsistencyLabel[poop.consistency](),
-          m.poopAmountDetail({ amount: poopAmountLabel[poop.amount]() }),
+          m.poopAmountDetail({ amount: amountLabel[poop.amount]() }),
         )
       }
       return { title: m.categoryDiaper(), detail: parts.join(' · ') }

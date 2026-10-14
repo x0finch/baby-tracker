@@ -1,15 +1,16 @@
-import type { DiaperEvent, PoopDetails } from '@bobo/shared'
+import type { DiaperEvent, PeeDetails, PoopDetails } from '@bobo/shared'
 import { clsx } from 'clsx'
 import type { ReactNode } from 'react'
 
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { m } from '../../paraglide/messages.js'
-import { poopAmountLabel, poopColorLabel, poopConsistencyLabel } from './diaper-labels'
+import { amountLabel, poopColorLabel, poopConsistencyLabel } from './diaper-labels'
 import { DiaperIcon } from './DiaperIcon'
 
 export type DiaperData = DiaperEvent['data']
 type Contents = DiaperData['contents']
 
+export const DEFAULT_PEE: PeeDetails = { amount: 'normal' }
 export const DEFAULT_POOP: PoopDetails = { amount: 'normal', color: 'yellow', consistency: 'soft' }
 
 /** Colors worth a doctor's look when they keep appearing. */
@@ -78,10 +79,20 @@ export function DiaperFields({
   value: DiaperData
   onChange: (value: DiaperData) => void
 }) {
+  const pee = value.pee ?? DEFAULT_PEE
   const poop = value.poop ?? DEFAULT_POOP
+  const hasPee = value.contents !== 'dirty'
   const hasPoop = value.contents !== 'wet'
+  // Each kind of contents carries only the details that apply to it.
   const setContents = (contents: Contents) =>
-    onChange(contents === 'wet' ? { contents } : { contents, poop })
+    onChange(
+      contents === 'wet'
+        ? { contents, pee }
+        : contents === 'dirty'
+          ? { contents, poop }
+          : { contents, pee, poop },
+    )
+  const setPee = (patch: Partial<PeeDetails>) => onChange({ ...value, pee: { ...pee, ...patch } })
   const setPoop = (patch: Partial<PoopDetails>) =>
     onChange({ ...value, poop: { ...poop, ...patch } })
 
@@ -107,6 +118,24 @@ export function DiaperFields({
         </div>
       </section>
 
+      {hasPee && (
+        <section className="flex flex-col gap-4">
+          <SectionLabel>{m.peeSection()}</SectionLabel>
+          <div className="flex flex-col gap-2">
+            <span className="text-caption font-bold text-fg-muted">{m.peeAmount()}</span>
+            <SegmentedControl<PeeDetails['amount']>
+              label={m.peeAmount()}
+              options={(['small', 'normal', 'large'] as const).map((amount) => ({
+                value: amount,
+                label: amountLabel[amount](),
+              }))}
+              value={pee.amount}
+              onChange={(amount) => setPee({ amount })}
+            />
+          </div>
+        </section>
+      )}
+
       {hasPoop && (
         <section className="flex flex-col gap-4">
           <SectionLabel>{m.poopSection()}</SectionLabel>
@@ -116,7 +145,7 @@ export function DiaperFields({
               label={m.poopAmount()}
               options={(['small', 'normal', 'large'] as const).map((amount) => ({
                 value: amount,
-                label: poopAmountLabel[amount](),
+                label: amountLabel[amount](),
               }))}
               value={poop.amount}
               onChange={(amount) => setPoop({ amount })}

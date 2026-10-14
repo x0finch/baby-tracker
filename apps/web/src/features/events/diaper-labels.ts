@@ -11,7 +11,8 @@ export const poopColorLabel: Record<PoopDetails['color'], () => string> = {
   white: m.poopWhite,
 }
 
-export const poopAmountLabel: Record<PoopDetails['amount'], () => string> = {
+/** 少 / 正常 / 多, for both pee and poop. */
+export const amountLabel: Record<PoopDetails['amount'], () => string> = {
   small: m.poopAmountSmall,
   normal: m.poopAmountNormal,
   large: m.poopAmountLarge,
