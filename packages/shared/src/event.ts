@@ -41,6 +41,8 @@ export const poopDetailsSchema = z.object({
   amount: z.enum(['small', 'normal', 'large']),
   color: z.enum(['yellow', 'brown', 'green', 'black', 'red', 'white']),
   consistency: z.enum(['watery', 'soft', 'hard']),
+  /** Undigested milk curds (奶瓣); absent on records logged before it was asked. */
+  curds: z.boolean().optional(),
 })
 
 export const peeDetailsSchema = z.object({

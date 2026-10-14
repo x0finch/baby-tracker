@@ -12,9 +12,10 @@ import { addEvent } from './actions'
 import { type Milk, parseBottle } from './bottle-input'
 import { FeedDurationField } from './FeedDurationField'
 import { MixedAmounts } from './MixedAmounts'
-import { QuickTimeField } from './QuickTimeField'
+import { AgoChips } from './QuickTimeField'
 import { logBottle, logSolids, startBreastFeed, suggestedBreastSide } from './records'
 import { toDateTimeLocal } from './time'
+import { TimeField } from './TimeField'
 import { useNow } from './use-events'
 import { validateTime } from './validation'
 
@@ -48,10 +49,10 @@ export function FeedingSheetContent({
   const [breastPart, setBreastPart] = useState('')
   const [formulaPart, setFormulaPart] = useState('')
   const [food, setFood] = useState('')
+  // The start is worked out from when the feed ended and how long it took, until it is edited
+  // by hand (endedAgo null).
+  const [endedAgo, setEndedAgo] = useState<number | null>(0)
   const [duration, setDuration] = useState<number | null>(null)
-  // While the time is "刚刚", picking a duration means "just finished" and moves the start back
-  // by that much; choosing another time keeps it.
-  const [timeEdited, setTimeEdited] = useState(false)
   const [errors, setErrors] = useState<{ time?: string; amount?: string; food?: string }>({})
 
   const feeds = events.filter((event): event is FeedingEvent => event.type === 'feeding')
@@ -66,9 +67,19 @@ export function FeedingSheetContent({
     onDone()
   }
 
+  function deriveStart(ended: number, took: number | null) {
+    setTime(toDateTimeLocal(Date.now() - (ended + (took ?? 0)) * MINUTE))
+  }
+
+  function chooseEnded(minutes: number) {
+    setEndedAgo(minutes)
+    deriveStart(minutes, duration)
+  }
+
   function chooseDuration(minutes: number | null) {
     setDuration(minutes)
-    if (!timeEdited) setTime(toDateTimeLocal(Date.now() - (minutes ?? 0) * MINUTE))
+    // A start set by hand stays; otherwise it follows from the end time.
+    if (endedAgo !== null) deriveStart(endedAgo, minutes)
   }
 
   function submit(event: FormEvent) {
@@ -206,22 +217,28 @@ export function FeedingSheetContent({
               onChange={(event) => setFood(event.target.value)}
             />
           )}
-          <FeedDurationField
-            value={duration}
-            onChange={chooseDuration}
-            hint={duration !== null && !timeEdited ? m.feedBackdated() : undefined}
+          <AgoChips
+            legend={m.feedEndedWhen()}
+            showLegend
+            selected={endedAgo}
+            onSelect={chooseEnded}
           />
-          <QuickTimeField
-            label={m.eventStart()}
-            value={time}
-            onChange={(value, minutesAgo) => {
-              setTime(value)
-              // "刚刚" still means "just finished"; any other choice sets the start itself.
-              setTimeEdited(minutesAgo !== 0)
-            }}
-            error={errors.time}
-            now={now}
-          />
+          <FeedDurationField value={duration} onChange={chooseDuration} />
+          <div className="flex flex-col gap-1.5">
+            <TimeField
+              label={m.eventStart()}
+              value={time}
+              onChange={(value) => {
+                setTime(value)
+                setEndedAgo(null)
+              }}
+              error={errors.time}
+              now={now}
+            />
+            {endedAgo !== null && (
+              <p className="m-0 text-caption text-fg-muted">{m.feedStartDerived()}</p>
+            )}
+          </div>
           <Button type="submit" tone="feeding" size="lg" block>
             {m.actionSave()}
           </Button>

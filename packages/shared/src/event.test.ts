@@ -96,6 +96,8 @@ describe('eventSchema', () => {
     expect(instant('diaper', { contents: 'dirty', pee, poop })).toBe(false)
     expect(instant('diaper', { contents: 'wet', pee: { amount: 'huge' } })).toBe(false)
     expect(instant('diaper', { contents: 'dirty', poop: { ...poop, color: 'blue' } })).toBe(false)
+    expect(instant('diaper', { contents: 'dirty', poop: { ...poop, curds: true } })).toBe(true)
+    expect(instant('diaper', { contents: 'dirty', poop: { ...poop, curds: 'yes' } })).toBe(false)
   })
 
   it('rejects data that does not match the type', () => {

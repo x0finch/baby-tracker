@@ -475,7 +475,6 @@
   "feedDuration": "喂了多久（可选）",
   "feedDurationNone": "不填",
   "feedDurationMinutes": "{minutes} 分钟",
-  "feedBackdated": "按「刚喂完」把开始时间往前推了，可以修改",
   "feedEndFuture": "喂完的时间不能晚于现在，请调整开始时间",
   "yesterdayRecords": "昨天的记录",
   "dayRecords": "{date}的记录",
@@ -484,5 +483,11 @@
   "timeJustNow": "刚刚",
   "timeMinutesAgo": "{minutes} 分钟前",
   "timeHoursAgo": "{hours} 小时前",
-  "timeShortcuts": "快速选择时间"
+  "timeShortcuts": "快速选择时间",
+  "feedEndedWhen": "什么时候喂完的",
+  "feedStartDerived": "按喂完时间和喂了多久自动算出，可以修改",
+  "poopCurds": "奶瓣",
+  "poopCurdsNo": "无",
+  "poopCurdsYes": "有",
+  "poopCurdsDetail": "有奶瓣"
 }

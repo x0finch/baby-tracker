@@ -17,10 +17,43 @@ const agoLabel = (minutes: number) =>
       ? m.timeMinutesAgo({ minutes })
       : m.timeHoursAgo({ hours: minutes / 60 })
 
-/**
- * A time field with "刚刚 / 5 分钟前 / …" shortcuts for logging after the fact. `onChange` also
- * reports which shortcut set the time, or null once the time is edited by hand.
- */
+/** "刚刚 / 5 分钟前 / …" choices; `selected` is null when none applies. */
+export function AgoChips({
+  legend,
+  showLegend = false,
+  selected,
+  onSelect,
+}: {
+  legend: string
+  showLegend?: boolean
+  selected: number | null
+  onSelect: (minutes: number) => void
+}) {
+  return (
+    <fieldset className="m-0 grid grid-cols-3 gap-2 border-0 p-0">
+      <legend className={showLegend ? 'mb-1.5 p-0 font-bold' : 'sr-only'}>{legend}</legend>
+      {AGO.map((minutes) => (
+        <button
+          key={minutes}
+          type="button"
+          aria-pressed={selected === minutes}
+          onClick={() => onSelect(minutes)}
+          className={clsx(
+            'min-h-11 rounded-lg border-2 border-b-4 font-bold',
+            'transition-[transform,border-width] duration-75 active:translate-y-0.5 active:border-b-2',
+            selected === minutes
+              ? 'border-primary bg-primary-soft text-primary-text'
+              : 'border-border bg-surface text-fg-muted',
+          )}
+        >
+          {agoLabel(minutes)}
+        </button>
+      ))}
+    </fieldset>
+  )
+}
+
+/** A time field with "刚刚 / 5 分钟前 / …" shortcuts for logging after the fact. */
 export function QuickTimeField({
   label,
   value,
@@ -30,7 +63,7 @@ export function QuickTimeField({
 }: {
   label: string
   value: string
-  onChange: (value: string, minutesAgo: number | null) => void
+  onChange: (value: string) => void
   error?: string
   now: number
 }) {
@@ -42,34 +75,19 @@ export function QuickTimeField({
         value={value}
         onChange={(next) => {
           setSelected(null)
-          onChange(next, null)
+          onChange(next)
         }}
         error={error}
         now={now}
       />
-      <fieldset className="m-0 grid grid-cols-3 gap-2 border-0 p-0">
-        <legend className="sr-only">{m.timeShortcuts()}</legend>
-        {AGO.map((minutes) => (
-          <button
-            key={minutes}
-            type="button"
-            aria-pressed={selected === minutes}
-            onClick={() => {
-              setSelected(minutes)
-              onChange(toDateTimeLocal(Date.now() - minutes * MINUTE), minutes)
-            }}
-            className={clsx(
-              'min-h-11 rounded-lg border-2 border-b-4 font-bold',
-              'transition-[transform,border-width] duration-75 active:translate-y-0.5 active:border-b-2',
-              selected === minutes
-                ? 'border-primary bg-primary-soft text-primary-text'
-                : 'border-border bg-surface text-fg-muted',
-            )}
-          >
-            {agoLabel(minutes)}
-          </button>
-        ))}
-      </fieldset>
+      <AgoChips
+        legend={m.timeShortcuts()}
+        selected={selected}
+        onSelect={(minutes) => {
+          setSelected(minutes)
+          onChange(toDateTimeLocal(Date.now() - minutes * MINUTE))
+        }}
+      />
     </div>
   )
 }

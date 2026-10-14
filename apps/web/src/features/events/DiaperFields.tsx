@@ -11,7 +11,12 @@ export type DiaperData = DiaperEvent['data']
 type Contents = DiaperData['contents']
 
 export const DEFAULT_PEE: PeeDetails = { amount: 'normal' }
-export const DEFAULT_POOP: PoopDetails = { amount: 'normal', color: 'yellow', consistency: 'soft' }
+export const DEFAULT_POOP: PoopDetails = {
+  amount: 'normal',
+  color: 'yellow',
+  consistency: 'soft',
+  curds: false,
+}
 
 /** Colors worth a doctor's look when they keep appearing. */
 const WARNING_COLORS: ReadonlySet<PoopDetails['color']> = new Set(['black', 'red', 'white'])
@@ -179,6 +184,18 @@ export function DiaperFields({
               }))}
               value={poop.consistency}
               onChange={(consistency) => setPoop({ consistency })}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <span className="text-caption font-bold text-fg-muted">{m.poopCurds()}</span>
+            <SegmentedControl<'no' | 'yes'>
+              label={m.poopCurds()}
+              options={[
+                { value: 'no', label: m.poopCurdsNo() },
+                { value: 'yes', label: m.poopCurdsYes() },
+              ]}
+              value={poop.curds ? 'yes' : 'no'}
+              onChange={(curds) => setPoop({ curds: curds === 'yes' })}
             />
           </div>
         </section>

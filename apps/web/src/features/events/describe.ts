@@ -115,6 +115,7 @@ export function describeEvent(event: Event, now: number): { title: string; detai
         parts.push(
           poopColorLabel[poop.color](),
           poopConsistencyLabel[poop.consistency](),
+          ...(poop.curds ? [m.poopCurdsDetail()] : []),
           m.poopAmountDetail({ amount: amountLabel[poop.amount]() }),
         )
       }
