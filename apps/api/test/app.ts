@@ -39,6 +39,13 @@ export async function createTestApp(overrides: Partial<Env> = {}) {
       helpers.createUser({ name, email: `${crypto.randomUUID()}@example.com` }),
     )
     const headers = await helpers.getAuthHeaders({ userId: user.id })
+    // Like a real client, keep the cookie cache the first authenticated response sets.
+    const res = await app.request(new URL('/api/me', TEST_ORIGIN).toString(), { headers }, env)
+    const cache = res.headers
+      .getSetCookie()
+      .map((cookie) => cookie.split(';')[0])
+      .find((cookie) => cookie?.includes('session_data'))
+    if (cache) headers.set('cookie', `${headers.get('cookie')}; ${cache}`)
     return { user, headers }
   }
 

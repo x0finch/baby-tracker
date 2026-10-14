@@ -27,19 +27,12 @@ describe('auth', () => {
   })
 
   it('validates repeat requests from the signed cookie cache without querying D1', async () => {
+    // signIn() keeps the cache cookie set by the first authenticated response.
     const { headers } = await t.signIn()
-    const first = await t.request('/api/me', { headers })
-    const cacheCookie = first.headers
-      .getSetCookie()
-      .map((cookie) => cookie.split(';')[0])
-      .find((cookie) => cookie?.includes('session_data'))
-    expect(cacheCookie).toBeDefined()
-
-    const withCache = new Headers(headers)
-    withCache.set('cookie', `${headers.get('cookie')}; ${cacheCookie}`)
+    expect(headers.get('cookie')).toContain('session_data')
     const before = t.queries.count
-    const second = await t.request('/api/me', { headers: withCache })
-    expect(second.status).toBe(200)
+    const res = await t.request('/api/me', { headers })
+    expect(res.status).toBe(200)
     expect(t.queries.count - before).toBe(0)
   })
 
