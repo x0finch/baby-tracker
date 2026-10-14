@@ -71,6 +71,7 @@ function createFakeServer(pageSize = 1000) {
       return {
         babies: babies.filter((row) => row.seq <= last).map((row) => structuredClone(row.record)),
         events: events.filter((row) => row.seq <= last).map((row) => structuredClone(row.record)),
+        access: [],
         cursor: String(last),
         hasMore: seqs.some((s) => s > last),
       }
@@ -192,6 +193,7 @@ describe('syncOnce', () => {
       pull: async () => ({
         babies: [{ ...baby, name: '旧的远端' }],
         events: [],
+        access: [],
         cursor: '1',
         hasMore: false,
       }),

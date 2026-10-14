@@ -46,11 +46,13 @@ export function decodeCursor(value: string | undefined): SyncCursor {
   return { babies: START, events: START }
 }
 
-interface ExistingRow {
+export interface ExistingRow {
   id: string
   familyId: string | null
   updatedAt: number
   createdBy: string | null
+  /** Only for events. */
+  babyId?: string
 }
 
 export interface PlannedWrite<T> {
@@ -60,35 +62,31 @@ export interface PlannedWrite<T> {
 }
 
 /**
- * Decides per item whether it can be stored. Last write wins by updatedAt; records may not
- * move between families; createdBy is assigned by the server on first write and immutable.
+ * Decides per item whether it can be stored: schema validation, then the permission check,
+ * then last write wins by updatedAt. createdBy is assigned by the server on first write and
+ * immutable, so ownership checks for caregivers cannot be spoofed.
  */
 export function planWrites<T extends Baby | Event>(
   items: readonly unknown[],
   parse: (item: unknown) => T | undefined,
   existing: ReadonlyMap<string, ExistingRow>,
-  writableFamilies: ReadonlySet<string>,
+  check: (record: T, existing: ExistingRow | undefined) => PushRejectReason | null,
   userId: string,
 ): PlannedWrite<T> {
   const results: PushItemResult[] = []
   const writes: T[] = []
-  const reject = (id: string, reason: PushRejectReason) =>
-    results.push({ id, status: 'rejected', reason })
 
   for (const item of items) {
     const record = parse(item)
     if (!record) {
       const id = typeof item === 'object' && item !== null && 'id' in item ? String(item.id) : ''
-      reject(id, 'invalid')
-      continue
-    }
-    if (record.familyId === null || !writableFamilies.has(record.familyId)) {
-      reject(record.id, 'forbidden')
+      results.push({ id, status: 'rejected', reason: 'invalid' })
       continue
     }
     const current = existing.get(record.id)
-    if (current && current.familyId !== record.familyId) {
-      reject(record.id, 'family_mismatch')
+    const reason = check(record, current)
+    if (reason) {
+      results.push({ id: record.id, status: 'rejected', reason })
       continue
     }
     if (current && current.updatedAt > record.updatedAt) {

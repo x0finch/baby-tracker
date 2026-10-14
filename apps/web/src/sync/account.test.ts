@@ -38,7 +38,7 @@ function fakeApi(existing: FamilySummary[] = [], signedIn = true) {
     me: async () => (signedIn ? user : null),
     families: async () => [...existing, ...created],
     createFamily: async (name) => {
-      const family: FamilySummary = { id: newId(), name, role: 'owner' }
+      const family: FamilySummary = { id: newId(), name, role: 'owner', babyIds: null }
       created.push(family)
       return family
     },
@@ -83,7 +83,7 @@ describe('connectAccount', () => {
 
   it('joins the existing family on a device without local records', async () => {
     const store = await device()
-    const family: FamilySummary = { id: newId(), name: '我们家', role: 'owner' }
+    const family: FamilySummary = { id: newId(), name: '我们家', role: 'owner', babyIds: null }
     const { api, created } = fakeApi([family])
     expect(await connectAccount(store, api, '我的家庭')).toEqual({ status: 'connected', family })
     expect(created).toEqual([])
@@ -93,7 +93,7 @@ describe('connectAccount', () => {
   it('asks the user when both the account and the device have data', async () => {
     const store = await device()
     createBaby(store, input)
-    const family: FamilySummary = { id: newId(), name: '我们家', role: 'owner' }
+    const family: FamilySummary = { id: newId(), name: '我们家', role: 'owner', babyIds: null }
     const result = await connectAccount(store, fakeApi([family]).api, '我的家庭')
     expect(result).toMatchObject({ status: 'choose', families: [family] })
     expect(getAccount(store)).toBeUndefined()

@@ -76,7 +76,9 @@ describe('families and sync', () => {
 
   it('lists the families the user belongs to', async () => {
     const res = await t.request('/api/families', { headers })
-    expect(await res.json()).toEqual([{ id: familyId, name: '我们家', role: 'owner' }])
+    expect(await res.json()).toEqual([
+      { id: familyId, name: '我们家', role: 'owner', babyIds: null },
+    ])
   })
 
   it('requires a session', async () => {

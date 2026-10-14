@@ -24,12 +24,22 @@ export const accountRoutes = new Hono<AppEnv>().delete('/', async (c) => {
     // Shared families the user owned: promote the longest-standing other member.
     db
       .prepare(
-        `update memberships set role = 'owner'
+        `update memberships set role = 'owner', baby_scope = 'all'
          where (family_id, user_id) in (
            select o.family_id, (select o2.user_id from memberships o2
                where o2.family_id = o.family_id and o2.user_id <> ?1
                order by o2.created_at, o2.user_id limit 1)
            from memberships o where o.user_id = ?1 and o.role = 'owner'
+         )`,
+      )
+      .bind(userId),
+    // Owners see every baby, so a promoted member's baby list no longer applies.
+    db
+      .prepare(
+        `delete from membership_babies where user_id = ?1 or (family_id, user_id) in (
+           select o.family_id, o.user_id from memberships o
+           where o.role = 'owner' and o.user_id <> ?1
+             and o.family_id in (select family_id from memberships where user_id = ?1)
          )`,
       )
       .bind(userId),

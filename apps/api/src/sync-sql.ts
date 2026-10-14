@@ -13,9 +13,10 @@ export function bumpSeq(db: D1Database) {
 }
 
 export function selectExisting(db: D1Database, table: 'babies' | 'events', ids: string[]) {
+  const babyColumn = table === 'events' ? ', baby_id as babyId' : ''
   return db
     .prepare(
-      `select id, family_id as familyId, updated_at as updatedAt, created_by as createdBy
+      `select id, family_id as familyId, updated_at as updatedAt, created_by as createdBy${babyColumn}
        from ${table} where id in (select value from json_each(?))`,
     )
     .bind(JSON.stringify(ids))
@@ -70,7 +71,7 @@ function after(cursor: TableCursor): [number, number, string] {
 
 export function selectBabiesPage(
   db: D1Database,
-  familyIds: string[],
+  scope: { familyIds: string[]; babyIds: string[] },
   cursor: TableCursor,
   limit: number,
 ) {
@@ -80,15 +81,16 @@ export function selectBabiesPage(
          avatar_color as avatarColor, archived_at as archivedAt, created_at as createdAt,
          updated_at as updatedAt, deleted_at as deletedAt, created_by as createdBy, seq
        from babies
-       where family_id in (select value from json_each(?)) and (seq > ? or (seq = ? and id > ?))
+       where (family_id in (select value from json_each(?)) or id in (select value from json_each(?)))
+         and (seq > ? or (seq = ? and id > ?))
        order by seq, id limit ?`,
     )
-    .bind(JSON.stringify(familyIds), ...after(cursor), limit)
+    .bind(JSON.stringify(scope.familyIds), JSON.stringify(scope.babyIds), ...after(cursor), limit)
 }
 
 export function selectEventsPage(
   db: D1Database,
-  familyIds: string[],
+  scope: { familyIds: string[]; babyIds: string[] },
   cursor: TableCursor,
   limit: number,
 ) {
@@ -98,8 +100,9 @@ export function selectEventsPage(
          end_at as endAt, data, note, created_at as createdAt, updated_at as updatedAt,
          deleted_at as deletedAt, created_by as createdBy, seq
        from events
-       where family_id in (select value from json_each(?)) and (seq > ? or (seq = ? and id > ?))
+       where (family_id in (select value from json_each(?)) or baby_id in (select value from json_each(?)))
+         and (seq > ? or (seq = ? and id > ?))
        order by seq, id limit ?`,
     )
-    .bind(JSON.stringify(familyIds), ...after(cursor), limit)
+    .bind(JSON.stringify(scope.familyIds), JSON.stringify(scope.babyIds), ...after(cursor), limit)
 }

@@ -36,6 +36,8 @@ export interface PushResponse {
 export interface PullResponse {
   babies: Baby[]
   events: Event[]
+  /** What the user can access now; clients drop data they lost access to (#31). */
+  access: FamilySummary[]
   /** Opaque cursor to send with the next pull. */
   cursor: string
   hasMore: boolean
@@ -48,8 +50,34 @@ export interface FamilySummary {
   id: string
   name: string
   role: FamilyRole
+  /** Babies this member may see; null means every baby of the family. */
+  babyIds: string[] | null
 }
+
+/** Roles that may change records at all (caregivers only their own events). */
+export const WRITE_ROLES: readonly FamilyRole[] = ['owner', 'admin', 'caregiver']
+/** Roles that may manage babies, members and invites. */
+export const MANAGE_ROLES: readonly FamilyRole[] = ['owner', 'admin']
 
 export const createFamilyRequestSchema = z.object({
   name: z.string().trim().min(1).max(40),
 })
+
+export interface FamilyMember {
+  userId: string
+  name: string
+  image: string | null
+  role: FamilyRole
+  babyIds: string[] | null
+}
+
+export const updateMemberRequestSchema = z
+  .object({
+    role: familyRoleSchema.exclude(['owner']).optional(),
+    /** null: every baby; otherwise only these babies of the family. */
+    babyIds: z.array(z.string()).max(50).nullable().optional(),
+  })
+  .refine((body) => body.role !== undefined || body.babyIds !== undefined)
+
+export const renameFamilyRequestSchema = createFamilyRequestSchema
+export const transferOwnershipRequestSchema = z.object({ userId: z.string().min(1) })
