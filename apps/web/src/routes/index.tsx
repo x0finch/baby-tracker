@@ -4,6 +4,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Card } from '../components/ui/Card'
 import { RequireBaby } from '../features/babies/RequireBaby'
 import { useSelectedBaby } from '../features/babies/use-babies'
+import { NapPrediction } from '../features/events/NapPrediction'
 import { QuickActions } from '../features/events/QuickActions'
 import { RunningTimers } from '../features/events/RunningTimers'
 import { SinceLast } from '../features/events/SinceLast'
@@ -37,6 +38,7 @@ function BabyToday({ baby }: { baby: Baby }) {
     <div className="flex flex-col gap-6">
       <SinceLast events={events} />
       <RunningTimers events={events} />
+      <NapPrediction baby={baby} events={events} />
       {canLog ? (
         <QuickActions baby={baby} events={events} />
       ) : (
