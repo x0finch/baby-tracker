@@ -2,6 +2,7 @@ import { type Event, breastSideDurations, eventDurationMs, isRunning } from '@bo
 
 import { formatNumber } from '../../lib/i18n'
 import { m } from '../../paraglide/messages.js'
+import { poopAmountLabel, poopColorLabel, poopConsistencyLabel } from './diaper-labels'
 import { durationLabel } from './duration-label'
 
 export type Category = Event['type']
@@ -68,10 +69,17 @@ export function describeEvent(event: Event, now: number): { title: string; detai
       if (data.kind === 'bottle') {
         return {
           title: m.feedingBottle(),
-          detail: m.bottleDetail({
-            amount: formatNumber(data.amountMl),
-            milk: milkLabels[data.milk](),
-          }),
+          detail:
+            data.breastMl !== undefined && data.formulaMl !== undefined
+              ? m.bottleSplitDetail({
+                  amount: formatNumber(data.amountMl),
+                  breast: formatNumber(data.breastMl),
+                  formula: formatNumber(data.formulaMl),
+                })
+              : m.bottleDetail({
+                  amount: formatNumber(data.amountMl),
+                  milk: milkLabels[data.milk](),
+                }),
         }
       }
       return { title: m.feedingSolids(), detail: data.food }
@@ -81,8 +89,18 @@ export function describeEvent(event: Event, now: number): { title: string; detai
         title: event.data.kind === 'night' ? m.sleepNight() : m.sleepNap(),
         detail: running ? m.inProgress() : durationLabel(eventDurationMs(event, now)),
       }
-    case 'diaper':
-      return { title: m.categoryDiaper(), detail: diaperLabels[event.data.contents]() }
+    case 'diaper': {
+      const { contents, poop } = event.data
+      const parts: string[] = [diaperLabels[contents]()]
+      if (poop) {
+        parts.push(
+          poopColorLabel[poop.color](),
+          poopConsistencyLabel[poop.consistency](),
+          m.poopAmountDetail({ amount: poopAmountLabel[poop.amount]() }),
+        )
+      }
+      return { title: m.categoryDiaper(), detail: parts.join(' · ') }
+    }
     case 'pumping':
       return {
         title: m.categoryPumping(),

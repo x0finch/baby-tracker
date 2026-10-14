@@ -23,6 +23,9 @@ export const feedingDataSchema = z.discriminatedUnion('kind', [
     /** Canonical unit is ml; other units are converted on display. */
     amountMl: z.number().positive().max(1000),
     milk: z.enum(['breast', 'formula', 'mixed']),
+    /** For mixed bottles: how much of the total was breast milk and formula. */
+    breastMl: z.number().min(0).max(1000).optional(),
+    formulaMl: z.number().min(0).max(1000).optional(),
   }),
   z.object({
     kind: z.literal('solids'),
@@ -34,8 +37,16 @@ export const sleepDataSchema = z.object({
   kind: z.enum(['nap', 'night']),
 })
 
+export const poopDetailsSchema = z.object({
+  amount: z.enum(['small', 'normal', 'large']),
+  color: z.enum(['yellow', 'brown', 'green', 'black', 'red', 'white']),
+  consistency: z.enum(['watery', 'soft', 'hard']),
+})
+
 export const diaperDataSchema = z.object({
   contents: z.enum(['wet', 'dirty', 'mixed']),
+  /** Optional details when the diaper has poop in it. */
+  poop: poopDetailsSchema.optional(),
 })
 
 export const pumpingDataSchema = z.object({
@@ -99,6 +110,12 @@ export const eventSchema = z
     if (!isTimed(event) && event.endAt !== null) {
       ctx.addIssue({ code: 'custom', message: 'Instant events have no endAt', path: ['endAt'] })
     }
+    if (event.type === 'feeding' && event.data.kind === 'bottle') {
+      checkMilkSplit(event.data, ctx)
+    }
+    if (event.type === 'diaper' && event.data.contents === 'wet' && event.data.poop) {
+      ctx.addIssue({ code: 'custom', message: 'Wet diapers have no poop details', path: ['data'] })
+    }
     if (event.type === 'note' && event.note === null) {
       ctx.addIssue({ code: 'custom', message: 'Notes need text', path: ['note'] })
     }
@@ -120,6 +137,22 @@ export type GrowthEvent = Extract<Event, { type: 'growth' }>
 export type FeedingData = z.infer<typeof feedingDataSchema>
 export type BreastSide = z.infer<typeof breastSideSchema>
 export type BreastSegment = z.infer<typeof breastSegmentSchema>
+export type PoopDetails = z.infer<typeof poopDetailsSchema>
+
+/** A split is only for mixed bottles, needs both parts, and must add up to the total. */
+function checkMilkSplit(
+  data: { amountMl: number; milk: string; breastMl?: number; formulaMl?: number },
+  ctx: z.RefinementCtx,
+) {
+  const { breastMl, formulaMl } = data
+  if (breastMl === undefined && formulaMl === undefined) return
+  const issue = (message: string) => ctx.addIssue({ code: 'custom', message, path: ['data'] })
+  if (data.milk !== 'mixed') issue('Only mixed bottles are split')
+  else if (breastMl === undefined || formulaMl === undefined) issue('A split needs both parts')
+  else if (Math.abs(breastMl + formulaMl - data.amountMl) > 0.5) {
+    issue('Breast milk and formula must add up to the amount')
+  }
+}
 
 /**
  * Segments must be in order without gaps or overlaps, start with the event, and only the

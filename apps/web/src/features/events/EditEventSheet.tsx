@@ -10,6 +10,9 @@ import { useAccess } from '../../sync/use-access'
 import { useMemberName } from '../family/api'
 import { type GrowthErrors, growthFieldValue, parseGrowth } from '../growth/growth-input'
 import { saveEvent } from './actions'
+import { parseBottle } from './bottle-input'
+import { type DiaperData, DiaperFields } from './DiaperFields'
+import { MixedAmounts } from './MixedAmounts'
 import { validCelsius, validPumpingMl } from './OtherEventSheet'
 import { deleteEvent, moveEventStart, setEventNote } from './records'
 import { toDateTimeLocal } from './time'
@@ -74,8 +77,18 @@ export function EditEventForm({
   const [food, setFood] = useState(() =>
     event.type === 'feeding' && event.data.kind === 'solids' ? event.data.food : '',
   )
-  const [contents, setContents] = useState(() =>
-    event.type === 'diaper' ? event.data.contents : 'wet',
+  const [diaper, setDiaper] = useState<DiaperData>(() =>
+    event.type === 'diaper' ? event.data : { contents: 'wet' },
+  )
+  const [breastPart, setBreastPart] = useState(() =>
+    event.type === 'feeding' && event.data.kind === 'bottle' && event.data.breastMl !== undefined
+      ? String(event.data.breastMl)
+      : '',
+  )
+  const [formulaPart, setFormulaPart] = useState(() =>
+    event.type === 'feeding' && event.data.kind === 'bottle' && event.data.formulaMl !== undefined
+      ? String(event.data.formulaMl)
+      : '',
   )
   const [sleepKind, setSleepKind] = useState(() =>
     event.type === 'sleep' ? event.data.kind : 'nap',
@@ -107,15 +120,23 @@ export function EditEventForm({
       }
     }
     if (next.type === 'feeding' && next.data.kind === 'bottle') {
-      const amountMl = Number(amount)
-      if (!(amountMl > 0 && amountMl <= 1000)) nextErrors.amount = m.bottleAmountInvalid()
-      else next = { ...next, data: { kind: 'bottle', amountMl, milk } }
+      // Mixed bottles logged before the split existed keep their total until parts are entered.
+      const unsplit = milk === 'mixed' && !breastPart.trim() && !formulaPart.trim()
+      const bottle = unsplit
+        ? parseBottle({ milk: 'formula', amount, breast: '', formula: '' })
+        : parseBottle({ milk, amount, breast: breastPart, formula: formulaPart })
+      if ('error' in bottle) nextErrors.amount = bottle.error
+      else
+        next = {
+          ...next,
+          data: { kind: 'bottle', amountMl: bottle.amountMl, milk, ...bottle.split },
+        }
     }
     if (next.type === 'feeding' && next.data.kind === 'solids') {
       if (!food.trim()) nextErrors.food = m.solidsFoodRequired()
       else next = { ...next, data: { kind: 'solids', food: food.trim() } }
     }
-    if (next.type === 'diaper') next = { ...next, data: { contents } }
+    if (next.type === 'diaper') next = { ...next, data: diaper }
     if (next.type === 'pumping') {
       const amountMl = Number(amount)
       if (!validPumpingMl(amountMl)) nextErrors.amount = m.bottleAmountInvalid()
@@ -159,14 +180,6 @@ export function EditEventForm({
       <fieldset disabled={readOnly} className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
         {event.type === 'feeding' && event.data.kind === 'bottle' && (
           <>
-            <Input
-              label={m.bottleAmount()}
-              type="number"
-              inputMode="numeric"
-              value={amount}
-              error={errors.amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
             <SegmentedControl
               label={m.bottleMilk()}
               options={[
@@ -177,6 +190,38 @@ export function EditEventForm({
               value={milk}
               onChange={setMilk}
             />
+            {milk === 'mixed' && (breastPart || formulaPart || !amount) ? (
+              <MixedAmounts
+                breast={breastPart}
+                formula={formulaPart}
+                error={errors.amount}
+                onBreast={setBreastPart}
+                onFormula={setFormulaPart}
+              />
+            ) : (
+              <>
+                <Input
+                  label={m.bottleAmount()}
+                  type="number"
+                  inputMode="numeric"
+                  value={amount}
+                  error={errors.amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+                {milk === 'mixed' && (
+                  <Button
+                    variant="ghost"
+                    tone="feeding"
+                    onClick={() => {
+                      setBreastPart('0')
+                      setFormulaPart(amount)
+                    }}
+                  >
+                    {m.mixedSplitAction()}
+                  </Button>
+                )}
+              </>
+            )}
           </>
         )}
         {event.type === 'feeding' && event.data.kind === 'solids' && (
@@ -188,18 +233,7 @@ export function EditEventForm({
             onChange={(e) => setFood(e.target.value)}
           />
         )}
-        {event.type === 'diaper' && (
-          <SegmentedControl
-            label={m.diaperContents()}
-            options={[
-              { value: 'wet', label: m.diaperWet() },
-              { value: 'dirty', label: m.diaperDirty() },
-              { value: 'mixed', label: m.diaperMixed() },
-            ]}
-            value={contents}
-            onChange={setContents}
-          />
-        )}
+        {event.type === 'diaper' && <DiaperFields value={diaper} onChange={setDiaper} />}
         {event.type === 'pumping' && (
           <>
             <SegmentedControl

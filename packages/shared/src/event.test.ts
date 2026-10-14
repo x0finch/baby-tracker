@@ -25,6 +25,9 @@ const breast = (
 const instant = (type: string, data: unknown, note: string | null = null) =>
   eventSchema.safeParse({ ...baseEvent(), type, startAt: T0, endAt: null, note, data }).success
 
+const mixedBottle = (data: object) =>
+  instant('feeding', { kind: 'bottle', amountMl: 120, milk: 'mixed', ...data })
+
 describe('eventSchema', () => {
   it('accepts each event type', () => {
     expect(eventSchema.safeParse(sleep(T0 + 30 * MINUTE)).success).toBe(true)
@@ -62,6 +65,23 @@ describe('eventSchema', () => {
     expect(instant('growth', { weightKg: 5.2, lengthCm: null, headCm: 38 })).toBe(true)
     expect(instant('growth', { weightKg: null, lengthCm: null, headCm: null })).toBe(false)
     expect(instant('growth', { weightKg: 500, lengthCm: null, headCm: null })).toBe(false)
+  })
+
+  it('accepts mixed bottles split into breast milk and formula that add up', () => {
+    expect(mixedBottle({})).toBe(true)
+    expect(mixedBottle({ breastMl: 70, formulaMl: 50 })).toBe(true)
+    expect(mixedBottle({ breastMl: 70, formulaMl: 60 })).toBe(false)
+    expect(mixedBottle({ breastMl: 70 })).toBe(false)
+    expect(mixedBottle({ milk: 'formula', breastMl: 70, formulaMl: 50 })).toBe(false)
+  })
+
+  it('accepts poop details only for diapers with poop', () => {
+    const poop = { amount: 'normal', color: 'yellow', consistency: 'soft' }
+    expect(instant('diaper', { contents: 'dirty', poop })).toBe(true)
+    expect(instant('diaper', { contents: 'mixed', poop })).toBe(true)
+    expect(instant('diaper', { contents: 'dirty' })).toBe(true)
+    expect(instant('diaper', { contents: 'wet', poop })).toBe(false)
+    expect(instant('diaper', { contents: 'dirty', poop: { ...poop, color: 'blue' } })).toBe(false)
   })
 
   it('rejects data that does not match the type', () => {

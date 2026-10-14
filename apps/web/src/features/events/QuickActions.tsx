@@ -44,7 +44,7 @@ export function QuickActions({ babyId, events }: { babyId: string; events: reado
           key={category}
           open={open === category}
           onClose={close}
-          title={categoryTitle[category]()}
+          title={category === 'diaper' ? m.diaperSheetTitle() : categoryTitle[category]()}
         >
           {open === category && category === 'feeding' && (
             <FeedingSheetContent babyId={babyId} events={events} onDone={close} />

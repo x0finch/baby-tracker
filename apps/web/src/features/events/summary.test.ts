@@ -43,6 +43,8 @@ describe('summarizeDay', () => {
     expect(summarizeDay(events, DAY_START, DAY_END, at(23))).toEqual({
       feedings: 3,
       bottleMl: 210,
+      bottleBreastMl: 120,
+      bottleFormulaMl: 90,
       breastMs: 15 * MIN,
       sleepMs: 135 * MIN,
       naps: 2,
@@ -52,6 +54,20 @@ describe('summarizeDay', () => {
       latestCelsius: null,
       medications: 0,
       notes: 0,
+    })
+  })
+
+  it('splits bottle volume into breast milk and formula', () => {
+    const events = [
+      logBottle(BABY, at(8), 100, 'breast'),
+      logBottle(BABY, at(11), 120, 'mixed', at(11), { breastMl: 70, formulaMl: 50 }),
+      // Mixed without a split counts toward the total only.
+      logBottle(BABY, at(14), 90, 'mixed'),
+    ]
+    expect(summarizeDay(events, DAY_START, DAY_END, at(23))).toMatchObject({
+      bottleMl: 310,
+      bottleBreastMl: 170,
+      bottleFormulaMl: 50,
     })
   })
 

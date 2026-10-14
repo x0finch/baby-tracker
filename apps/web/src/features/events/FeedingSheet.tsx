@@ -8,6 +8,8 @@ import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { useLocalStore } from '../../db'
 import { m } from '../../paraglide/messages.js'
 import { addEvent } from './actions'
+import { type Milk, parseBottle } from './bottle-input'
+import { MixedAmounts } from './MixedAmounts'
 import { logBottle, logSolids, startBreastFeed, suggestedBreastSide } from './records'
 import { toDateTimeLocal } from './time'
 import { TimeField } from './TimeField'
@@ -15,7 +17,6 @@ import { useNow } from './use-events'
 import { validateTime } from './validation'
 
 type Kind = 'breast' | 'bottle' | 'solids'
-type Milk = 'breast' | 'formula' | 'mixed'
 
 const QUICK_AMOUNTS = [60, 90, 120, 150] as const
 
@@ -35,6 +36,8 @@ export function FeedingSheetContent({
   const [time, setTime] = useState(() => toDateTimeLocal(now))
   const [amount, setAmount] = useState('')
   const [milk, setMilk] = useState<Milk>('formula')
+  const [breastPart, setBreastPart] = useState('')
+  const [formulaPart, setFormulaPart] = useState('')
   const [food, setFood] = useState('')
   const [errors, setErrors] = useState<{ time?: string; amount?: string; food?: string }>({})
 
@@ -56,18 +59,16 @@ export function FeedingSheetContent({
     const timeResult = validateTime(time, current)
     const nextErrors: typeof errors = {}
     if ('error' in timeResult) nextErrors.time = timeResult.error
-    const amountMl = Number(amount)
-    if (kind === 'bottle' && !(amountMl > 0 && amountMl <= 1000)) {
-      nextErrors.amount = m.bottleAmountInvalid()
-    }
+    const bottle = parseBottle({ milk, amount, breast: breastPart, formula: formulaPart })
+    if (kind === 'bottle' && 'error' in bottle) nextErrors.amount = bottle.error
     if (kind === 'solids' && !food.trim()) nextErrors.food = m.solidsFoodRequired()
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0 || !('at' in timeResult)) return
 
     addEvent(
       store,
-      kind === 'bottle'
-        ? logBottle(babyId, timeResult.at, amountMl, milk, current)
+      kind === 'bottle' && 'amountMl' in bottle
+        ? logBottle(babyId, timeResult.at, bottle.amountMl, milk, current, bottle.split)
         : logSolids(babyId, timeResult.at, food, current),
     )
     onDone()
@@ -117,29 +118,6 @@ export function FeedingSheetContent({
         <form noValidate onSubmit={submit} className="flex flex-col gap-4">
           {kind === 'bottle' && (
             <>
-              <Input
-                label={m.bottleAmount()}
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={1000}
-                value={amount}
-                error={errors.amount}
-                onChange={(event) => setAmount(event.target.value)}
-              />
-              <div className="grid grid-cols-4 gap-2">
-                {QUICK_AMOUNTS.map((value) => (
-                  <Button
-                    key={value}
-                    variant={amount === String(value) ? 'solid' : 'soft'}
-                    tone="feeding"
-                    aria-pressed={amount === String(value)}
-                    onClick={() => setAmount(String(value))}
-                  >
-                    {value}
-                  </Button>
-                ))}
-              </div>
               <div className="flex flex-col gap-1.5">
                 <span className="font-bold">{m.bottleMilk()}</span>
                 <SegmentedControl<Milk>
@@ -153,6 +131,41 @@ export function FeedingSheetContent({
                   onChange={setMilk}
                 />
               </div>
+              {milk === 'mixed' ? (
+                <MixedAmounts
+                  breast={breastPart}
+                  formula={formulaPart}
+                  error={errors.amount}
+                  onBreast={setBreastPart}
+                  onFormula={setFormulaPart}
+                />
+              ) : (
+                <>
+                  <Input
+                    label={m.bottleAmount()}
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={1000}
+                    value={amount}
+                    error={errors.amount}
+                    onChange={(event) => setAmount(event.target.value)}
+                  />
+                  <div className="grid grid-cols-4 gap-2">
+                    {QUICK_AMOUNTS.map((value) => (
+                      <Button
+                        key={value}
+                        variant={amount === String(value) ? 'solid' : 'soft'}
+                        tone="feeding"
+                        aria-pressed={amount === String(value)}
+                        onClick={() => setAmount(String(value))}
+                      >
+                        {value}
+                      </Button>
+                    ))}
+                  </div>
+                </>
+              )}
             </>
           )}
           {kind === 'solids' && (
