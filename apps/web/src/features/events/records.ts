@@ -46,13 +46,14 @@ export function logBottle(
   amountMl: number,
   milk: 'breast' | 'formula' | 'mixed',
   now: number = at,
+  split?: { breastMl: number; formulaMl: number },
 ): FeedingEvent {
   return {
     ...base(babyId, now),
     type: 'feeding',
     startAt: at,
     endAt: null,
-    data: { kind: 'bottle', amountMl, milk },
+    data: { kind: 'bottle', amountMl, milk, ...(milk === 'mixed' && split) },
   }
 }
 
@@ -100,10 +101,11 @@ export function logSleep(babyId: string, startAt: number, endAt: number, now: nu
 export function logDiaper(
   babyId: string,
   at: number,
-  contents: 'wet' | 'dirty' | 'mixed',
+  diaper: DiaperEvent['data'] | DiaperEvent['data']['contents'],
   now: number = at,
 ): DiaperEvent {
-  return { ...base(babyId, now), type: 'diaper', startAt: at, endAt: null, data: { contents } }
+  const data = typeof diaper === 'string' ? { contents: diaper } : diaper
+  return { ...base(babyId, now), type: 'diaper', startAt: at, endAt: null, data }
 }
 
 export function logPumping(

@@ -3,6 +3,9 @@ import { type Event, breastSideDurations, eventDurationMs, isTimed } from '@bobo
 export interface DaySummary {
   feedings: number
   bottleMl: number
+  /** Bottle volume by milk, where known (mixed bottles count only when split). */
+  bottleBreastMl: number
+  bottleFormulaMl: number
   breastMs: number
   sleepMs: number
   naps: number
@@ -38,6 +41,8 @@ export function summarizeDay(
   const summary: DaySummary = {
     feedings: 0,
     bottleMl: 0,
+    bottleBreastMl: 0,
+    bottleFormulaMl: 0,
     breastMs: 0,
     sleepMs: 0,
     naps: 0,
@@ -87,7 +92,16 @@ export function summarizeDay(
         break
     }
     summary.feedings += 1
-    if (event.data.kind === 'bottle') summary.bottleMl += event.data.amountMl
+    if (event.data.kind === 'bottle') {
+      const { amountMl, milk, breastMl, formulaMl } = event.data
+      summary.bottleMl += amountMl
+      if (milk === 'breast') summary.bottleBreastMl += amountMl
+      if (milk === 'formula') summary.bottleFormulaMl += amountMl
+      if (milk === 'mixed') {
+        summary.bottleBreastMl += breastMl ?? 0
+        summary.bottleFormulaMl += formulaMl ?? 0
+      }
+    }
     if (event.data.kind === 'breast') {
       const sides = breastSideDurations(event.data.segments, now)
       summary.breastMs += sides.left + sides.right

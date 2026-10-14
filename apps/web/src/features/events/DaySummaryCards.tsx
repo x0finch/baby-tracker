@@ -25,6 +25,14 @@ export function DaySummaryCards({
       value: m.summaryFeedCount({ count: s.feedings }),
       details: [
         m.summaryBottle({ amount: formatNumber(s.bottleMl) }),
+        ...(s.bottleBreastMl > 0 && s.bottleFormulaMl > 0
+          ? [
+              m.summaryBottleSplit({
+                breast: formatNumber(s.bottleBreastMl),
+                formula: formatNumber(s.bottleFormulaMl),
+              }),
+            ]
+          : []),
         m.summaryBreast({ duration: durationLabel(s.breastMs) }),
       ],
       accent: 'border-feeding/40 bg-feeding-soft text-feeding-text',
