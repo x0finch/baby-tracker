@@ -5,6 +5,7 @@ import { getAuth, trustedOrigins } from './auth'
 import { requireUser } from './middleware'
 import { accountRoutes } from './routes/account'
 import { familyRoutes } from './routes/families'
+import { familyInviteRoutes, inviteAcceptRoutes, invitePreviewRoutes } from './routes/invites'
 import { syncRoutes } from './routes/sync'
 import type { AppEnv, AuthFor } from './types'
 
@@ -48,7 +49,11 @@ export function createApp(options: AppOptions = {}) {
   app.route('/account', accountRoutes)
   app.use('/families', auth)
   app.use('/families/*', auth)
+  app.route('/families/:familyId/invites', familyInviteRoutes)
   app.route('/families', familyRoutes)
+  app.route('/invites', invitePreviewRoutes)
+  app.use('/invites/:code/accept', auth)
+  app.route('/invites', inviteAcceptRoutes)
   app.use('/sync/*', auth)
   app.route('/sync', syncRoutes)
 
