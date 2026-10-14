@@ -4,7 +4,7 @@ import { Button } from '../../components/ui/Button'
 import { useLocalStore } from '../../db'
 import { m } from '../../paraglide/messages.js'
 import { addEvent } from './actions'
-import { type DiaperData, DiaperFields } from './DiaperFields'
+import { DEFAULT_PEE, type DiaperData, DiaperFields } from './DiaperFields'
 import { logDiaper } from './records'
 import { toDateTimeLocal } from './time'
 import { TimeField } from './TimeField'
@@ -16,7 +16,7 @@ export function DiaperSheetContent({ babyId, onDone }: { babyId: string; onDone:
   // Time the sheet opened; the form defaults and the max selectable time derive from it.
   const now = useNow(60_000)
   const [time, setTime] = useState(() => toDateTimeLocal(now))
-  const [diaper, setDiaper] = useState<DiaperData>({ contents: 'wet' })
+  const [diaper, setDiaper] = useState<DiaperData>({ contents: 'wet', pee: DEFAULT_PEE })
   const [error, setError] = useState<string>()
 
   function submit(formEvent: FormEvent) {

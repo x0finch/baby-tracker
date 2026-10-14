@@ -75,12 +75,17 @@ describe('eventSchema', () => {
     expect(mixedBottle({ milk: 'formula', breastMl: 70, formulaMl: 50 })).toBe(false)
   })
 
-  it('accepts poop details only for diapers with poop', () => {
+  it('accepts pee and poop details only for diapers that have them', () => {
     const poop = { amount: 'normal', color: 'yellow', consistency: 'soft' }
     expect(instant('diaper', { contents: 'dirty', poop })).toBe(true)
     expect(instant('diaper', { contents: 'mixed', poop })).toBe(true)
     expect(instant('diaper', { contents: 'dirty' })).toBe(true)
     expect(instant('diaper', { contents: 'wet', poop })).toBe(false)
+    const pee = { amount: 'large' }
+    expect(instant('diaper', { contents: 'wet', pee })).toBe(true)
+    expect(instant('diaper', { contents: 'mixed', pee, poop })).toBe(true)
+    expect(instant('diaper', { contents: 'dirty', pee, poop })).toBe(false)
+    expect(instant('diaper', { contents: 'wet', pee: { amount: 'huge' } })).toBe(false)
     expect(instant('diaper', { contents: 'dirty', poop: { ...poop, color: 'blue' } })).toBe(false)
   })
 

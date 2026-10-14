@@ -374,12 +374,15 @@
   "poopSoft": "软便",
   "poopHard": "偏硬",
   "poopColorWarning": "红色、黑色或白色的便便可能需要就医，如果反复出现请咨询医生。",
-  "poopAmountDetail": "量{amount}",
+  "poopAmountDetail": "便量{amount}",
   "mixedBreastMl": "母乳（毫升）",
   "mixedFormulaMl": "奶粉（毫升）",
   "mixedTotal": "合计 {amount} 毫升",
   "mixedInvalid": "请填写母乳和奶粉的量，合计 1–1000 毫升",
   "bottleSplitDetail": "{amount} 毫升 · 母乳 {breast} + 奶粉 {formula}",
   "summaryBottleSplit": "其中母乳 {breast} 毫升 · 奶粉 {formula} 毫升",
-  "mixedSplitAction": "分开填写母乳和奶粉"
+  "mixedSplitAction": "分开填写母乳和奶粉",
+  "peeSection": "尿尿",
+  "peeAmount": "尿量",
+  "peeAmountDetail": "尿量{amount}"
 }
