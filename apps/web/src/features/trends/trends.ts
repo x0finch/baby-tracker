@@ -1,4 +1,4 @@
-import { type Event, localDateString } from '@bobo/shared'
+import { type Event, HOUR, localDateString, startOfLocalDay } from '@bobo/shared'
 
 import { summarizeDay } from '../events/summary'
 
@@ -18,17 +18,14 @@ export interface DayTrend {
 
 /** Local midnights of the `days` days ending with the day containing `now` (DST-safe). */
 export function dayStarts(days: number, now: number): number[] {
-  const today = new Date(now)
-  return Array.from({ length: days }, (_, i) =>
-    new Date(today.getFullYear(), today.getMonth(), today.getDate() - (days - 1 - i)).getTime(),
-  )
+  return Array.from({ length: days }, (_, i) => startOfLocalDay(now, i - (days - 1)))
 }
 
 const average = (values: number[]) =>
   values.length === 0 ? null : values.reduce((sum, value) => sum + value, 0) / values.length
 
 /** Gaps longer than this are missing data (e.g. a day without logging), not real intervals. */
-const MAX_GAP_MS = 12 * 3_600_000
+const MAX_GAP_MS = 12 * HOUR
 
 const within = (gaps: { at: number; ms: number }[], start: number, end: number) =>
   gaps

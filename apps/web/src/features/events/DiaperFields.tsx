@@ -11,7 +11,7 @@ export type DiaperData = DiaperEvent['data']
 type Contents = DiaperData['contents']
 
 export const DEFAULT_PEE: PeeDetails = { amount: 'normal' }
-export const DEFAULT_POOP: PoopDetails = {
+const DEFAULT_POOP: PoopDetails = {
   amount: 'normal',
   color: 'yellow',
   consistency: 'soft',

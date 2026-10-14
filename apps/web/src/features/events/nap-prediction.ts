@@ -1,9 +1,6 @@
-import { type Event, isRunning } from '@bobo/shared'
+import { DAY, type Event, MINUTE, isRunning } from '@bobo/shared'
 
 import { ageInMonths } from '../growth/growth'
-
-const MINUTE = 60_000
-const DAY = 24 * 60 * MINUTE
 
 /**
  * Typical awake time between sleeps by age, in minutes: [from month, shortest, longest].
@@ -52,6 +49,9 @@ const median = (values: number[]) => {
   return sorted.length % 2 ? (sorted[mid] ?? 0) : ((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0)) / 2
 }
 
+/** Rounds to the nearest 5 minutes, so suggestions read as plain clock times. */
+const round = (time: number) => Math.round(time / (5 * MINUTE)) * 5 * MINUTE
+
 /**
  * Suggests when the baby is likely ready to sleep again: the age-typical wake window after the
  * last wake-up, centered on the baby's own recent wake windows when there are enough of them.
@@ -86,7 +86,6 @@ export function predictNextSleep(
     ? Math.min(Math.max(median(samples), age.min * 0.75), age.max * 1.25)
     : ageMid
   const halfWidth = Math.max(15 * MINUTE, (age.max - age.min) / 4)
-  const round = (time: number) => Math.round(time / (5 * MINUTE)) * 5 * MINUTE
   // Long past the window the last wake-up is probably a missed log; don't guess.
   if (now > last.endAt + center + halfWidth + age.max) return { status: 'unknown' }
   return {

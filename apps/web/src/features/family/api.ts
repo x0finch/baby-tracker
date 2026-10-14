@@ -54,7 +54,7 @@ export function inviteUrl(code: string): string {
 // Member names rarely change; one fetch per family per app session is enough.
 const memberCache = new Map<string, Promise<FamilyMember[]>>()
 
-export function loadMembers(familyId: string, refresh = false): Promise<FamilyMember[]> {
+function loadMembers(familyId: string, refresh = false): Promise<FamilyMember[]> {
   let members = memberCache.get(familyId)
   if (!members || refresh) {
     members = familyApi.members(familyId)

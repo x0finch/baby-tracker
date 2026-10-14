@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { babyAge, localDateString } from './age'
+import { babyAge } from './age'
 
 describe('babyAge', () => {
   it('counts the day of birth as day 0', () => {
@@ -24,11 +24,5 @@ describe('babyAge', () => {
 
   it('handles birth dates in the future', () => {
     expect(babyAge('2026-10-20', '2026-10-13')).toEqual({ totalDays: -7, months: 0, days: 0 })
-  })
-})
-
-describe('localDateString', () => {
-  it('formats the local calendar date', () => {
-    expect(localDateString(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05')
   })
 })

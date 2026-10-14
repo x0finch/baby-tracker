@@ -1,11 +1,10 @@
+import { MINUTE } from '@bobo/shared'
 import { clsx } from 'clsx'
 import { useState } from 'react'
 
 import { m } from '../../paraglide/messages.js'
 import { toDateTimeLocal } from './time'
 import { TimeField } from './TimeField'
-
-const MINUTE = 60_000
 
 /** One-tap "how long ago" choices, in minutes; 0 is "just now". */
 const AGO = [0, 5, 15, 30, 60, 120] as const

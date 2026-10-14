@@ -19,7 +19,7 @@ export interface DaySummary {
 }
 
 /** Part of [startAt, endAt) that falls within the day; running events count up to `now`. */
-export function overlapMs(event: Event, dayStart: number, dayEnd: number, now: number): number {
+function overlapMs(event: Event, dayStart: number, dayEnd: number, now: number): number {
   const end = Math.min(event.endAt ?? now, dayEnd)
   return Math.max(0, end - Math.max(event.startAt, dayStart))
 }

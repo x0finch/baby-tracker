@@ -5,7 +5,6 @@ import { Sheet } from '../components/ui/Sheet'
 import { Toast } from '../components/ui/Toast'
 import { useLocalStore } from '../db'
 import { m } from '../paraglide/messages.js'
-import { unclaimedCount } from './account'
 import { connectIfSignedIn, resolveClaimChoice, useClaimChoice } from './connection'
 import { startSync, useSyncState } from './runner'
 
@@ -37,7 +36,7 @@ export function SyncRunner() {
     const stop = startSync(store)
     // The join page links the account itself, after the invite is accepted.
     if (!window.location.pathname.startsWith('/join/')) {
-      void connectIfSignedIn(store, () => unclaimedCount(store))
+      void connectIfSignedIn(store)
     }
     return stop
   }, [store])

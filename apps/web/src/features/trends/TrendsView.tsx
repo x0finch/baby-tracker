@@ -1,4 +1,4 @@
-import type { Event } from '@bobo/shared'
+import { type Event, HOUR } from '@bobo/shared'
 import { useState } from 'react'
 
 import { Card } from '../../components/ui/Card'
@@ -24,7 +24,6 @@ interface Metric {
   unit: number
 }
 
-const HOUR = 3_600_000
 const count = (value: number) => m.trendCount({ count: Math.round(value) })
 const hours = (value: number) => m.trendHours({ value: formatNumber(value / HOUR) })
 

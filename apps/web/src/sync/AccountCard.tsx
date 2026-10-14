@@ -9,7 +9,6 @@ import { formatTime } from '../lib/i18n'
 import { m } from '../paraglide/messages.js'
 import {
   type SessionUser,
-  unclaimedCount,
   deleteAccountRemote,
   disconnectLocal,
   httpAccountApi,
@@ -139,7 +138,7 @@ export function AccountCard() {
       ) : (
         <>
           <p className="m-0 text-fg-muted">{m.accountSignedOutBody()}</p>
-          <SignInOptions onSignedIn={() => connectIfSignedIn(store, () => unclaimedCount(store))} />
+          <SignInOptions onSignedIn={() => connectIfSignedIn(store)} />
         </>
       )}
     </Card>

@@ -3,6 +3,7 @@
  * Native apps will deliver through APNs / FCM instead; reminder scheduling doesn't depend on
  * this module.
  */
+import { base64UrlDecode, base64UrlEncode } from '@bobo/shared'
 
 export interface PushTarget {
   endpoint: string
@@ -21,19 +22,6 @@ export interface VapidKeys {
 
 const encoder = new TextEncoder()
 const encode = (text: string) => new Uint8Array(encoder.encode(text))
-
-export function base64UrlEncode(bytes: ArrayBuffer | Uint8Array): string {
-  const view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)
-  let binary = ''
-  for (const byte of view) binary += String.fromCharCode(byte)
-  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '')
-}
-
-export function base64UrlDecode(value: string): Uint8Array<ArrayBuffer> {
-  const base64 = value.replaceAll('-', '+').replaceAll('_', '/')
-  const binary = atob(base64 + '='.repeat((4 - (base64.length % 4)) % 4))
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0))
-}
 
 function concat(...parts: Uint8Array[]): Uint8Array<ArrayBuffer> {
   const out = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0))

@@ -19,11 +19,11 @@ export const categoryTitle: Record<Category, () => string> = {
 }
 
 /** At or above this a temperature is shown as a fever. */
-export const FEVER_CELSIUS = 38
+const FEVER_CELSIUS = 38
 
 const pumpingSides = { left: m.sideLeft, right: m.sideRight, both: m.pumpingBoth }
 
-export function growthDetail(data: {
+function growthDetail(data: {
   weightKg: number | null
   lengthCm: number | null
   headCm: number | null
@@ -50,7 +50,7 @@ export function growthDetail(data: {
 }
 
 /** A temperature in the preferred unit, e.g. "37.5 °C". */
-export function temperatureText(celsius: number): string {
+function temperatureText(celsius: number): string {
   return m.temperatureDetail({
     value: formatQuantity('temperature', celsius),
     unit: unitLabel('temperature'),

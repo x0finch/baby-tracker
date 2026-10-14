@@ -1,4 +1,4 @@
-import type { PushMessage, ReminderKind } from '@bobo/shared'
+import { MINUTE, type PushMessage, type ReminderKind } from '@bobo/shared'
 
 import type { Env } from './env'
 import {
@@ -9,7 +9,6 @@ import {
   sendPush,
 } from './web-push'
 
-const MINUTE = 60_000
 /** Reminders not sent within this long after they were due are skipped (e.g. after an outage). */
 const LATE_LIMIT = 3 * 60 * MINUTE
 /** Bounded so one cron run stays well within the free plan's CPU limit. */

@@ -9,7 +9,7 @@ import { useLocalStore } from '../db'
 import { familyApi } from '../features/family/api'
 import { roleLabel } from '../features/family/FamilyCard'
 import { m } from '../paraglide/messages.js'
-import { httpAccountApi, signInWithGoogle, unclaimedCount } from '../sync/account'
+import { httpAccountApi, signInWithGoogle } from '../sync/account'
 import { HttpError } from '../sync/api'
 import { connectIfSignedIn } from '../sync/connection'
 import { getAccount } from '../sync/local'
@@ -80,7 +80,7 @@ function JoinPage() {
       // A first sign-in on this device links the account now (the family is already joined);
       // otherwise the next pull sees the new family and fetches its records.
       if (getAccount(store)) await requestSync()
-      else await connectIfSignedIn(store, () => unclaimedCount(store))
+      else await connectIfSignedIn(store)
     } catch {
       setPhase({ name: 'failed', preview })
     }

@@ -10,7 +10,7 @@ import {
 } from '@bobo/shared'
 import { Hono } from 'hono'
 
-import { loadAccess, toSummaries } from '../access'
+import { loadAccess, parseStringList, toSummaries } from '../access'
 import { babiesInFamily, canManageMember, roleOf } from '../members'
 import type { AppEnv } from '../types'
 
@@ -66,7 +66,7 @@ export const familyRoutes = new Hono<AppEnv>()
       name: row.name,
       image: row.image,
       role: row.role,
-      babyIds: row.babyScope === 'all' ? null : parseIds(row.babyIds),
+      babyIds: row.babyScope === 'all' ? null : parseStringList(row.babyIds),
     }))
     return c.json(members)
   })
@@ -179,8 +179,3 @@ export const familyRoutes = new Hono<AppEnv>()
     ])
     return c.body(null, 204)
   })
-
-function parseIds(json: string): string[] {
-  const value: unknown = JSON.parse(json)
-  return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : []
-}

@@ -7,7 +7,7 @@ export type { LocalStore, StorageMode } from './local-store'
 let store: Promise<LocalStore> | undefined
 
 /** The app-wide store, opened once on first use (never during shell prerendering). */
-export function getLocalStore(): Promise<LocalStore> {
+function getLocalStore(): Promise<LocalStore> {
   store ??= openLocalStore()
   return store
 }

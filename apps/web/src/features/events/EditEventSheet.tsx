@@ -1,4 +1,4 @@
-import { type Event, hasOptionalDuration, isRunning, isTimed } from '@bobo/shared'
+import { type Event, MINUTE, hasOptionalDuration, isRunning, isTimed } from '@bobo/shared'
 import { type FormEvent, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
@@ -28,7 +28,6 @@ type Errors = Partial<
   GrowthErrors
 
 /** Edits any event; changes are applied through the pure helpers in records.ts. */
-const MINUTE = 60_000
 
 export function EditEventForm({
   event,

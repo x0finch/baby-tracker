@@ -19,9 +19,3 @@ export function formatClock(ms: number): string {
   const seconds = total % 60
   return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`
 }
-
-/** Start of the local day containing `at`. */
-export function startOfLocalDay(at: number): number {
-  const d = new Date(at)
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
-}

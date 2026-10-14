@@ -1,4 +1,4 @@
-import { type Event, isTimed } from '@bobo/shared'
+import { type Event, HOUR, isTimed } from '@bobo/shared'
 import { clsx } from 'clsx'
 
 import { formatTime } from '../../lib/i18n'
@@ -7,7 +7,6 @@ import { categoryDot, laneOf } from './category'
 import { describeEvent } from './describe'
 
 const HOUR_PX = 40
-const HOUR_MS = 3_600_000
 const MIN_BLOCK_PX = 10
 const LANES = ['feeding', 'sleep', 'diaper', 'other'] as const
 const laneTitles = {
@@ -35,9 +34,9 @@ export function DayTimeline({
     (event) =>
       event.startAt < dayEnd && (event.endAt ?? (isTimed(event) ? now : event.startAt)) >= dayStart,
   )
-  const hours = Math.round((dayEnd - dayStart) / HOUR_MS)
+  const hours = Math.round((dayEnd - dayStart) / HOUR)
   const toPx = (at: number) =>
-    ((Math.min(Math.max(at, dayStart), dayEnd) - dayStart) / HOUR_MS) * HOUR_PX
+    ((Math.min(Math.max(at, dayStart), dayEnd) - dayStart) / HOUR) * HOUR_PX
   const showNow = now >= dayStart && now < dayEnd
 
   return (
