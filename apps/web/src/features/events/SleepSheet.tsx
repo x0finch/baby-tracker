@@ -3,6 +3,7 @@ import { isRunning } from '@bobo/shared'
 import { type FormEvent, type ReactNode, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
+import { FormError } from '../../components/ui/FormError'
 import { useLocalStore } from '../../db'
 import { m } from '../../paraglide/messages.js'
 import { addEvent } from './actions'
@@ -111,7 +112,7 @@ export function SleepSheetContent({
           error={errors.end}
           now={now}
         />
-        {errors.form && <p className="font-bold text-danger-text">{errors.form}</p>}
+        {errors.form && <FormError>{errors.form}</FormError>}
         <Button type="submit" variant="soft" tone="sleep" block>
           {m.actionSave()}
         </Button>

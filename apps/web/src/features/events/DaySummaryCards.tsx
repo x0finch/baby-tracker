@@ -1,10 +1,19 @@
 import type { Event } from '@bobo/shared'
+import { clsx } from 'clsx'
 
+import { Card } from '../../components/ui/Card'
 import { formatQuantity, unitLabel } from '../../lib/units'
 import { m } from '../../paraglide/messages.js'
 import { durationLabel } from './duration-label'
 import { EventIcon, type IconKind } from './EventIcon'
 import { summarizeDay } from './summary'
+
+const TEXT = {
+  feeding: 'text-feeding-text',
+  sleep: 'text-sleep-text',
+  diaper: 'text-diaper-text',
+  primary: 'text-primary-text',
+} as const
 
 export function DaySummaryCards({
   events,
@@ -25,7 +34,7 @@ export function DaySummaryCards({
     icon?: IconKind
     value: string
     details: string[]
-    accent: string
+    tone: 'feeding' | 'sleep' | 'diaper' | 'primary'
   }[] = [
     {
       title: m.categoryFeeding(),
@@ -44,7 +53,7 @@ export function DaySummaryCards({
           : []),
         m.summaryBreast({ duration: durationLabel(s.breastMs) }),
       ],
-      accent: 'border-feeding/40 bg-feeding-soft text-feeding-text',
+      tone: 'feeding',
     },
     {
       title: m.categorySleep(),
@@ -54,14 +63,14 @@ export function DaySummaryCards({
         m.summaryNaps({ count: s.naps }),
         m.summaryLongest({ duration: durationLabel(s.longestSleepMs) }),
       ],
-      accent: 'border-sleep/40 bg-sleep-soft text-sleep-text',
+      tone: 'sleep',
     },
     {
       title: m.categoryDiaper(),
       icon: 'diaper',
       value: m.summaryDiaperCount({ count: diaperCount }),
       details: [m.summaryDiaperDetail(s.diapers)],
-      accent: 'border-diaper/40 bg-diaper-soft text-diaper-text',
+      tone: 'diaper',
     },
   ]
   const other = [
@@ -81,16 +90,18 @@ export function DaySummaryCards({
       title: m.categoryOther(),
       value: '',
       details: other,
-      accent: 'border-primary/40 bg-primary-soft text-primary-text',
+      tone: 'primary',
     })
   }
 
   return (
     <div className="flex flex-col gap-3">
       {cards.map((card) => (
-        <section
+        <Card
+          as="section"
           key={card.title}
-          className={`flex flex-col gap-1 rounded-xl border-2 border-b-4 p-4 ${card.accent}`}
+          tone={card.tone}
+          className={clsx('flex flex-col gap-1', TEXT[card.tone])}
         >
           <div className="flex items-center justify-between">
             <h2 className="flex items-center gap-2 text-title font-extrabold">
@@ -104,7 +115,7 @@ export function DaySummaryCards({
               {detail}
             </p>
           ))}
-        </section>
+        </Card>
       ))}
     </div>
   )

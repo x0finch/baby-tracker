@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
+import { ConfirmSheet } from '../components/ui/ConfirmSheet'
 import { Sheet } from '../components/ui/Sheet'
 import { useLocalStore } from '../db'
 import { formatTime } from '../lib/i18n'
@@ -122,18 +123,16 @@ export function AccountCard() {
           <Button variant="ghost" tone="danger" onClick={() => setDeleting(true)}>
             {m.deleteAccount()}
           </Button>
-          <Sheet open={deleting} onClose={() => setDeleting(false)} title={m.deleteAccount()}>
-            <p className="m-0">{m.deleteAccountBody()}</p>
-            <Button tone="danger" size="lg" block onClick={() => void deleteAccount()}>
-              {m.deleteAccountConfirm()}
-            </Button>
-            <Button variant="outline" block onClick={() => setDeleting(false)}>
-              {m.actionCancel()}
-            </Button>
-            {deleteFailed && (
-              <p className="m-0 font-bold text-danger-text">{m.deleteAccountFailed()}</p>
-            )}
-          </Sheet>
+          <ConfirmSheet
+            open={deleting}
+            onClose={() => setDeleting(false)}
+            title={m.deleteAccount()}
+            confirmLabel={m.deleteAccountConfirm()}
+            onConfirm={() => void deleteAccount()}
+            error={deleteFailed ? m.deleteAccountFailed() : undefined}
+          >
+            {m.deleteAccountBody()}
+          </ConfirmSheet>
         </>
       ) : (
         <>

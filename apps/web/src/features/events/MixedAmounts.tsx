@@ -1,3 +1,4 @@
+import { FormError } from '../../components/ui/FormError'
 import { Input } from '../../components/ui/Input'
 import { formatQuantity, quantityInputProps, unitLabel } from '../../lib/units'
 import { m } from '../../paraglide/messages.js'
@@ -42,7 +43,7 @@ export function MixedAmounts({
           unit,
         })}
       </p>
-      {error && <p className="m-0 text-caption font-bold text-danger-text">{error}</p>}
+      {error && <FormError size="caption">{error}</FormError>}
     </div>
   )
 }

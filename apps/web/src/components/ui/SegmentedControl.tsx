@@ -11,7 +11,15 @@ export interface SegmentedControlProps<T extends string> {
   options: readonly SegmentedOption<T>[]
   value: T
   onChange: (value: T) => void
+  /** How the label shows above the control: as a form field label, a caption, or not at all. */
+  labelStyle?: 'hidden' | 'field' | 'caption'
 }
+
+const legendClass = {
+  hidden: 'sr-only',
+  field: 'mb-1.5 p-0 font-bold',
+  caption: 'mb-2 p-0 text-caption font-bold text-fg-muted',
+} as const
 
 /**
  * Single-choice toggle (e.g. left/right breast, nap/night). Built on native radio
@@ -22,32 +30,35 @@ export function SegmentedControl<T extends string>({
   options,
   value,
   onChange,
+  labelStyle = 'hidden',
 }: SegmentedControlProps<T>) {
   const name = useId()
 
   return (
-    <fieldset className="m-0 flex min-w-0 gap-1 rounded-lg border-2 border-border bg-surface p-1">
-      <legend className="sr-only">{label}</legend>
-      {options.map((option) => (
-        <label
-          key={option.value}
-          className={clsx(
-            'flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-md font-extrabold transition-colors',
-            'has-checked:bg-bg has-checked:text-diaper-text has-checked:shadow-[0_2px_0_var(--bobo-border)]',
-            'text-fg-muted has-focus-visible:outline-3 has-focus-visible:outline-diaper',
-          )}
-        >
-          <input
-            type="radio"
-            name={name}
-            value={option.value}
-            checked={option.value === value}
-            onChange={() => onChange(option.value)}
-            className="sr-only"
-          />
-          {option.label}
-        </label>
-      ))}
+    <fieldset className="m-0 min-w-0 border-0 p-0">
+      <legend className={legendClass[labelStyle]}>{label}</legend>
+      <div className="flex gap-1 rounded-lg border-2 border-border bg-surface p-1">
+        {options.map((option) => (
+          <label
+            key={option.value}
+            className={clsx(
+              'flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-md font-extrabold transition-colors',
+              'has-checked:bg-bg has-checked:text-diaper-text has-checked:shadow-segment',
+              'text-fg-muted has-focus-visible:outline-3 has-focus-visible:outline-diaper',
+            )}
+          >
+            <input
+              type="radio"
+              name={name}
+              value={option.value}
+              checked={option.value === value}
+              onChange={() => onChange(option.value)}
+              className="sr-only"
+            />
+            {option.label}
+          </label>
+        ))}
+      </div>
     </fieldset>
   )
 }

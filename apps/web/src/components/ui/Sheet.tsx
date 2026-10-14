@@ -52,7 +52,7 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
         'backdrop:bg-black/40',
       )}
     >
-      <div className="flex flex-col gap-4 px-4 pt-3 pb-[calc(16px+env(safe-area-inset-bottom))]">
+      <div className="flex flex-col gap-4 px-4 pt-3 pb-safe-4">
         <div aria-hidden className="mx-auto h-1.5 w-10 rounded-full bg-border" />
         <h2 className="text-title font-extrabold">{title}</h2>
         {children}

@@ -1,5 +1,6 @@
 import type { Baby, Event } from '@bobo/shared'
 
+import { Card } from '../../components/ui/Card'
 import { formatTime } from '../../lib/i18n'
 import { m } from '../../paraglide/messages.js'
 import { durationLabel } from './duration-label'
@@ -13,9 +14,11 @@ export function NapPrediction({ baby, events }: { baby: Baby; events: readonly E
   if (next.status === 'sleeping') return null
 
   return (
-    <section
+    <Card
+      as="section"
+      tone="sleep"
       aria-labelledby="nap-title"
-      className="flex flex-col gap-1 rounded-xl border-2 border-sleep/40 bg-sleep-soft px-4 py-3"
+      className="flex flex-col gap-1 py-3"
     >
       <h2 id="nap-title" className="m-0 text-caption font-bold text-sleep-text">
         {m.napTitle()}
@@ -41,6 +44,6 @@ export function NapPrediction({ baby, events }: { baby: Baby; events: readonly E
           </p>
         </>
       )}
-    </section>
+    </Card>
   )
 }

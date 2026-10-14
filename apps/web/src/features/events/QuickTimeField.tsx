@@ -1,7 +1,7 @@
 import { MINUTE } from '@bobo/shared'
-import { clsx } from 'clsx'
 import { useState } from 'react'
 
+import { ChipGroup } from '../../components/ui/ToggleChip'
 import { m } from '../../paraglide/messages.js'
 import { toDateTimeLocal } from './time'
 import { TimeField } from './TimeField'
@@ -29,26 +29,14 @@ export function AgoChips({
   onSelect: (minutes: number) => void
 }) {
   return (
-    <fieldset className="m-0 grid grid-cols-3 gap-2 border-0 p-0">
-      <legend className={showLegend ? 'mb-1.5 p-0 font-bold' : 'sr-only'}>{legend}</legend>
-      {AGO.map((minutes) => (
-        <button
-          key={minutes}
-          type="button"
-          aria-pressed={selected === minutes}
-          onClick={() => onSelect(minutes)}
-          className={clsx(
-            'min-h-11 rounded-lg border-2 border-b-4 font-bold',
-            'transition-[transform,border-width] duration-75 active:translate-y-0.5 active:border-b-2',
-            selected === minutes
-              ? 'border-primary bg-primary-soft text-primary-text'
-              : 'border-border bg-surface text-fg-muted',
-          )}
-        >
-          {agoLabel(minutes)}
-        </button>
-      ))}
-    </fieldset>
+    <ChipGroup<number>
+      legend={legend}
+      showLegend={showLegend}
+      options={AGO}
+      value={selected}
+      onChange={onSelect}
+      optionLabel={agoLabel}
+    />
   )
 }
 

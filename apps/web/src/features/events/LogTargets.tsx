@@ -1,6 +1,7 @@
 import type { Baby } from '@bobo/shared'
 import { clsx } from 'clsx'
 
+import { ToggleChip } from '../../components/ui/ToggleChip'
 import { m } from '../../paraglide/messages.js'
 import { BabyAvatar } from '../babies/BabyAvatar'
 
@@ -24,25 +25,19 @@ export function LogTargets({
           const isCurrent = baby.id === current.id
           const on = isCurrent || selected.has(baby.id)
           return (
-            <button
+            <ToggleChip
               key={baby.id}
-              type="button"
-              aria-pressed={on}
+              pressed={on}
+              tintText={on}
               disabled={isCurrent}
               onClick={() => onToggle(baby.id)}
-              className={clsx(
-                'flex min-h-touch items-center gap-2 rounded-full border-2 border-b-4 py-1 pr-4 pl-1 font-extrabold',
-                'transition-[transform,border-width] duration-75 active:translate-y-0.5 active:border-b-2',
-                on
-                  ? 'border-primary bg-primary-soft text-primary-text'
-                  : 'border-border bg-surface',
-              )}
+              className="flex min-h-touch items-center gap-2 rounded-full py-1 pr-4 pl-1 font-extrabold"
             >
               <span className={clsx(!on && 'opacity-50')}>
                 <BabyAvatar name={baby.name} color={baby.avatarColor} size="sm" />
               </span>
               {baby.name}
-            </button>
+            </ToggleChip>
           )
         })}
       </div>

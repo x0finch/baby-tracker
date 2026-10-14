@@ -20,11 +20,7 @@ function RejectedToast() {
     return () => clearTimeout(id)
   }, [rejected])
   if (!rejected || hiddenAt === rejected.at) return null
-  return (
-    <Toast>
-      <span>{m.syncRejected({ count: rejected.count })}</span>
-    </Toast>
-  )
+  return <Toast>{m.syncRejected({ count: rejected.count })}</Toast>
 }
 
 /** Mounts background sync and links a fresh sign-in to this device. */

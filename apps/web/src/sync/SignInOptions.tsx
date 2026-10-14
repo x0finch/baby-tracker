@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useState } from 'react'
 
 import { Button } from '../components/ui/Button'
+import { FormError } from '../components/ui/FormError'
 import { Input } from '../components/ui/Input'
 import { m } from '../paraglide/messages.js'
 import {
@@ -232,11 +233,7 @@ export function SignInOptions({
           {submitLabel}
         </Button>
       </form>
-      {error && (
-        <p role="alert" className="m-0 font-bold text-danger-text">
-          {error}
-        </p>
-      )}
+      {error && <FormError>{error}</FormError>}
       <div className="flex flex-wrap justify-between gap-2">
         {mode === 'sign-in' && (
           <>

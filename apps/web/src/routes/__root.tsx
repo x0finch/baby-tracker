@@ -67,7 +67,7 @@ function RootLayout() {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-app flex-col">
-      <main className="flex-1 px-[calc(16px+env(safe-area-inset-right))] pt-[calc(16px+env(safe-area-inset-top))] pb-[calc(var(--spacing-tab-bar)+16px+env(safe-area-inset-bottom))] pl-[calc(16px+env(safe-area-inset-left))]">
+      <main className="flex-1 pt-safe-4 pr-safe-4 pb-above-tab-bar pl-safe-4">
         {/* Pages suspend while the local store opens (a few ms on startup). */}
         {hydrated && (
           <Suspense>
