@@ -8,10 +8,9 @@ import { useNow } from '../../lib/use-now'
 import { m } from '../../paraglide/messages.js'
 import { useAccess } from '../../sync/use-access'
 import { saveEvent } from './actions'
+import { sideLabel } from './labels'
 import { currentBreastSide, stopEvent, switchBreastSide } from './records'
 import { formatClock } from './time'
-
-const sideLabel = (side: 'left' | 'right') => (side === 'left' ? m.sideLeft() : m.sideRight())
 
 function BreastTimer({ event, now }: { event: FeedingEvent; now: number }) {
   const store = useLocalStore()
@@ -25,7 +24,7 @@ function BreastTimer({ event, now }: { event: FeedingEvent; now: number }) {
     <Card tone="feeding" className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
         <span className="font-extrabold text-feeding-text">
-          {m.timerCurrentSide({ side: sideLabel(side) })}
+          {m.timerCurrentSide({ side: sideLabel[side]() })}
         </span>
         <span className="text-display font-extrabold tabular-nums" role="timer">
           {formatClock(now - event.startAt)}
@@ -42,7 +41,7 @@ function BreastTimer({ event, now }: { event: FeedingEvent; now: number }) {
                 : 'border-transparent text-fg-muted',
             )}
           >
-            <div className="text-caption">{sideLabel(s)}</div>
+            <div className="text-caption">{sideLabel[s]()}</div>
             <div className="tabular-nums">{formatClock(totals[s])}</div>
           </div>
         ))}
@@ -54,7 +53,7 @@ function BreastTimer({ event, now }: { event: FeedingEvent; now: number }) {
             tone="feeding"
             onClick={() => saveEvent(store, switchBreastSide(event, Date.now()))}
           >
-            {m.timerSwitchSide({ side: sideLabel(other) })}
+            {m.timerSwitchSide({ side: sideLabel[other]() })}
           </Button>
           <Button tone="feeding" onClick={() => saveEvent(store, stopEvent(event, Date.now()))}>
             {m.timerStop()}

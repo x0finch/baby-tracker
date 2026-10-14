@@ -6,18 +6,42 @@ import { FormError } from '../../components/ui/FormError'
 import { Input } from '../../components/ui/Input'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { useLocalStore } from '../../db'
-import { inputValue, quantityInputProps, unitLabel } from '../../lib/units'
+import { inputValue } from '../../lib/units'
 import { useNow } from '../../lib/use-now'
 import { m } from '../../paraglide/messages.js'
 import { useAccess } from '../../sync/use-access'
 import { useMemberName } from '../family/api'
-import { type GrowthErrors, growthFieldValue, parseGrowth } from '../growth/growth-input'
+import {
+  type GrowthErrors,
+  draftFromGrowth,
+  emptyGrowth,
+  parseGrowth,
+} from '../growth/growth-input'
 import { saveEvent } from './actions'
-import { parseBottle } from './bottle-input'
 import { type DiaperData, DiaperFields } from './DiaperFields'
+import {
+  draftFromBottle,
+  draftFromMedication,
+  draftFromPumping,
+  emptyBottle,
+  emptyMedication,
+  emptyPumping,
+  parseBottleDraft,
+  parseCelsius,
+  parseMedication,
+  parsePumping,
+  parseSolids,
+} from './event-draft'
+import {
+  BottleFields,
+  GrowthFields,
+  MedicationFields,
+  PumpingFields,
+  SolidsField,
+  TemperatureField,
+} from './EventFields'
 import { FeedDurationField } from './FeedDurationField'
-import { parseTemperature, parseVolume } from './measure-input'
-import { MixedAmounts } from './MixedAmounts'
+import { optionsOf, sleepKindLabel } from './labels'
 import { deleteEvent, moveEventStart, setEventNote } from './records'
 import { toDateTimeLocal } from './time'
 import { TimeField } from './TimeField'
@@ -48,50 +72,28 @@ export function EditEventForm({
   const [start, setStart] = useState(() => toDateTimeLocal(event.startAt))
   const [end, setEnd] = useState(() => (event.endAt === null ? '' : toDateTimeLocal(event.endAt)))
   const [note, setNote] = useState(event.note ?? '')
-  const [amount, setAmount] = useState(() =>
+  const [bottle, setBottle] = useState(() =>
     event.type === 'feeding' && event.data.kind === 'bottle'
-      ? inputValue('volume', event.data.amountMl)
-      : event.type === 'pumping'
-        ? inputValue('volume', event.data.amountMl)
-        : '',
-  )
-  const [pumpingSide, setPumpingSide] = useState(() =>
-    event.type === 'pumping' ? event.data.side : 'both',
-  )
-  const [celsius, setCelsius] = useState(() =>
-    event.type === 'temperature' ? inputValue('temperature', event.data.celsius) : '',
-  )
-  const [medName, setMedName] = useState(() => (event.type === 'medication' ? event.data.name : ''))
-  const [weight, setWeight] = useState(() =>
-    event.type === 'growth' ? growthFieldValue('weight', event.data.weightKg) : '',
-  )
-  const [length, setLength] = useState(() =>
-    event.type === 'growth' ? growthFieldValue('length', event.data.lengthCm) : '',
-  )
-  const [head, setHead] = useState(() =>
-    event.type === 'growth' ? growthFieldValue('length', event.data.headCm) : '',
-  )
-  const [medDose, setMedDose] = useState(() =>
-    event.type === 'medication' ? (event.data.dose ?? '') : '',
-  )
-  const [milk, setMilk] = useState(() =>
-    event.type === 'feeding' && event.data.kind === 'bottle' ? event.data.milk : 'formula',
+      ? draftFromBottle(event.data)
+      : emptyBottle,
   )
   const [food, setFood] = useState(() =>
     event.type === 'feeding' && event.data.kind === 'solids' ? event.data.food : '',
   )
+  const [pumping, setPumping] = useState(() =>
+    event.type === 'pumping' ? draftFromPumping(event.data) : emptyPumping,
+  )
+  const [celsius, setCelsius] = useState(() =>
+    event.type === 'temperature' ? inputValue('temperature', event.data.celsius) : '',
+  )
+  const [medication, setMedication] = useState(() =>
+    event.type === 'medication' ? draftFromMedication(event.data) : emptyMedication,
+  )
+  const [growth, setGrowth] = useState(() =>
+    event.type === 'growth' ? draftFromGrowth(event.data) : emptyGrowth,
+  )
   const [diaper, setDiaper] = useState<DiaperData>(() =>
     event.type === 'diaper' ? event.data : { contents: 'wet' },
-  )
-  const [breastPart, setBreastPart] = useState(() =>
-    event.type === 'feeding' && event.data.kind === 'bottle' && event.data.breastMl !== undefined
-      ? inputValue('volume', event.data.breastMl)
-      : '',
-  )
-  const [formulaPart, setFormulaPart] = useState(() =>
-    event.type === 'feeding' && event.data.kind === 'bottle' && event.data.formulaMl !== undefined
-      ? inputValue('volume', event.data.formulaMl)
-      : '',
   )
   const [duration, setDuration] = useState<number | null>(() =>
     hasOptionalDuration(event) && event.endAt !== null
@@ -104,6 +106,34 @@ export function EditEventForm({
   const [errors, setErrors] = useState<Errors>({})
   // Only finished sleeps have an editable end; breastfeed ends follow their segments.
   const editableEnd = event.type === 'sleep' && !running
+
+  /** The edited record with this form's values, or the field errors. */
+  function parseData(current: Event): { event: Event } | { errors: Errors } {
+    const result = <D,>(parsed: { data: D } | { errors: Errors }, apply: (data: D) => Event) =>
+      'errors' in parsed ? parsed : { event: apply(parsed.data) }
+    switch (current.type) {
+      case 'feeding':
+        if (current.data.kind === 'bottle') {
+          return result(parseBottleDraft(bottle, true), (data) => ({ ...current, data }))
+        }
+        if (current.data.kind === 'solids') {
+          return result(parseSolids(food), (data) => ({ ...current, data }))
+        }
+        return { event: current }
+      case 'diaper':
+        return { event: { ...current, data: diaper } }
+      case 'pumping':
+        return result(parsePumping(pumping), (data) => ({ ...current, data }))
+      case 'temperature':
+        return result(parseCelsius(celsius), (data) => ({ ...current, data }))
+      case 'medication':
+        return result(parseMedication(medication), (data) => ({ ...current, data }))
+      case 'growth':
+        return result(parseGrowth(growth), (data) => ({ ...current, data }))
+      default:
+        return { event: current }
+    }
+  }
 
   function submit(formEvent: FormEvent) {
     formEvent.preventDefault()
@@ -127,49 +157,15 @@ export function EditEventForm({
         nextErrors.form = m.sleepOverlap()
       }
     }
-    if (next.type === 'feeding' && next.data.kind === 'bottle') {
-      // Mixed bottles logged before the split existed keep their total until parts are entered.
-      const unsplit = milk === 'mixed' && !breastPart.trim() && !formulaPart.trim()
-      const bottle = unsplit
-        ? parseBottle({ milk: 'formula', amount, breast: '', formula: '' })
-        : parseBottle({ milk, amount, breast: breastPart, formula: formulaPart })
-      if ('error' in bottle) nextErrors.amount = bottle.error
-      else
-        next = {
-          ...next,
-          data: { kind: 'bottle', amountMl: bottle.amountMl, milk, ...bottle.split },
-        }
-    }
-    if (next.type === 'feeding' && next.data.kind === 'solids') {
-      if (!food.trim()) nextErrors.food = m.solidsFoodRequired()
-      else next = { ...next, data: { kind: 'solids', food: food.trim() } }
-    }
+    const parsed = parseData(next)
+    if ('errors' in parsed) Object.assign(nextErrors, parsed.errors)
+    else next = parsed.event
     if (hasOptionalDuration(next)) {
       const endAt = duration === null ? null : next.startAt + duration * MINUTE
       if (endAt !== null && endAt > current + MINUTE) nextErrors.start = m.feedEndFuture()
       else next = { ...next, endAt }
     }
-    if (next.type === 'diaper') next = { ...next, data: diaper }
-    if (next.type === 'pumping') {
-      const pumping = parseVolume(amount)
-      if ('error' in pumping) nextErrors.amount = pumping.error
-      else next = { ...next, data: { side: pumpingSide, amountMl: pumping.amountMl } }
-    }
-    if (next.type === 'temperature') {
-      const temperature = parseTemperature(celsius)
-      if ('error' in temperature) nextErrors.celsius = temperature.error
-      else next = { ...next, data: { celsius: temperature.celsius } }
-    }
-    if (next.type === 'medication') {
-      if (!medName.trim()) nextErrors.name = m.medicationNameRequired()
-      else next = { ...next, data: { name: medName.trim(), dose: medDose.trim() || null } }
-    }
     if (next.type === 'note' && !note.trim()) nextErrors.note = m.noteRequired()
-    if (next.type === 'growth') {
-      const growth = parseGrowth({ weight, length, head })
-      if ('errors' in growth) Object.assign(nextErrors, growth.errors)
-      else next = { ...next, data: growth.data }
-    }
 
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
@@ -192,140 +188,28 @@ export function EditEventForm({
       {readOnly && <p className="m-0 font-bold text-fg-muted">{m.eventReadOnly()}</p>}
       <fieldset disabled={readOnly} className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
         {event.type === 'feeding' && event.data.kind === 'bottle' && (
-          <>
-            <SegmentedControl
-              label={m.bottleMilk()}
-              options={[
-                { value: 'formula', label: m.milkFormula() },
-                { value: 'breast', label: m.milkBreast() },
-                { value: 'mixed', label: m.milkMixed() },
-              ]}
-              value={milk}
-              onChange={setMilk}
-            />
-            {milk === 'mixed' && (breastPart || formulaPart || !amount) ? (
-              <MixedAmounts
-                breast={breastPart}
-                formula={formulaPart}
-                error={errors.amount}
-                onBreast={setBreastPart}
-                onFormula={setFormulaPart}
-              />
-            ) : (
-              <>
-                <Input
-                  label={m.bottleAmount({ unit: unitLabel('volume') })}
-                  {...quantityInputProps('volume')}
-                  value={amount}
-                  error={errors.amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-                {milk === 'mixed' && (
-                  <Button
-                    variant="ghost"
-                    tone="feeding"
-                    onClick={() => {
-                      setBreastPart('0')
-                      setFormulaPart(amount)
-                    }}
-                  >
-                    {m.mixedSplitAction()}
-                  </Button>
-                )}
-              </>
-            )}
-          </>
+          <BottleFields value={bottle} onChange={setBottle} error={errors.amount} editing />
         )}
         {event.type === 'feeding' && event.data.kind === 'solids' && (
-          <Input
-            label={m.solidsFood()}
-            value={food}
-            maxLength={100}
-            error={errors.food}
-            onChange={(e) => setFood(e.target.value)}
-          />
+          <SolidsField value={food} onChange={setFood} error={errors.food} />
         )}
         {event.type === 'diaper' && <DiaperFields value={diaper} onChange={setDiaper} />}
         {event.type === 'pumping' && (
-          <>
-            <SegmentedControl
-              label={m.pumpingSide()}
-              options={[
-                { value: 'left', label: m.sideLeft() },
-                { value: 'right', label: m.sideRight() },
-                { value: 'both', label: m.pumpingBoth() },
-              ]}
-              value={pumpingSide}
-              onChange={setPumpingSide}
-            />
-            <Input
-              label={m.pumpingAmount({ unit: unitLabel('volume') })}
-              {...quantityInputProps('volume')}
-              value={amount}
-              error={errors.amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-          </>
+          <PumpingFields value={pumping} onChange={setPumping} error={errors.amount} />
         )}
         {event.type === 'growth' && (
-          <>
-            <Input
-              label={m.growthWeight({ unit: unitLabel('weight') })}
-              {...quantityInputProps('weight')}
-              value={weight}
-              error={errors.weight}
-              onChange={(e) => setWeight(e.target.value)}
-            />
-            <Input
-              label={m.growthLength({ unit: unitLabel('length') })}
-              {...quantityInputProps('length')}
-              value={length}
-              error={errors.length}
-              onChange={(e) => setLength(e.target.value)}
-            />
-            <Input
-              label={m.growthHead({ unit: unitLabel('length') })}
-              {...quantityInputProps('length')}
-              value={head}
-              error={errors.head}
-              onChange={(e) => setHead(e.target.value)}
-            />
-          </>
+          <GrowthFields value={growth} onChange={setGrowth} errors={errors} />
         )}
         {event.type === 'temperature' && (
-          <Input
-            label={m.temperatureLabel({ unit: unitLabel('temperature') })}
-            {...quantityInputProps('temperature')}
-            value={celsius}
-            error={errors.celsius}
-            onChange={(e) => setCelsius(e.target.value)}
-          />
+          <TemperatureField value={celsius} onChange={setCelsius} error={errors.celsius} />
         )}
         {event.type === 'medication' && (
-          <>
-            <Input
-              label={m.medicationName()}
-              value={medName}
-              maxLength={100}
-              error={errors.name}
-              onChange={(e) => setMedName(e.target.value)}
-            />
-            <Input
-              label={m.medicationDose()}
-              placeholder={m.medicationDosePlaceholder()}
-              value={medDose}
-              maxLength={50}
-              onChange={(e) => setMedDose(e.target.value)}
-            />
-          </>
+          <MedicationFields value={medication} onChange={setMedication} error={errors.name} />
         )}
         {event.type === 'sleep' && (
           <SegmentedControl
             label={m.sleepKindLabel()}
-            options={[
-              { value: 'nap', label: m.sleepNap() },
-              { value: 'night', label: m.sleepNight() },
-            ]}
+            options={optionsOf(sleepKindLabel, ['nap', 'night'])}
             value={sleepKind}
             onChange={setSleepKind}
           />
