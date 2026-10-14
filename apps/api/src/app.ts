@@ -11,8 +11,6 @@ import { pushRoutes, reminderRoutes } from './routes/notifications'
 import { syncRoutes } from './routes/sync'
 import type { AppEnv, AuthFor } from './types'
 
-export type { AppEnv, AuthLike } from './types'
-
 export interface AppOptions {
   auth?: AuthFor
 }

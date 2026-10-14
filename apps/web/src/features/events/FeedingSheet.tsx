@@ -1,5 +1,5 @@
 import type { BreastSide, Event, FeedingEvent } from '@bobo/shared'
-import { isRunning } from '@bobo/shared'
+import { MINUTE, isRunning } from '@bobo/shared'
 import { type FormEvent, type ReactNode, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
@@ -20,8 +20,6 @@ import { useNow } from './use-events'
 import { validateTime } from './validation'
 
 type Kind = 'breast' | 'bottle' | 'solids'
-
-const MINUTE = 60_000
 
 /** One-tap bottle amounts in display units. */
 const QUICK_AMOUNTS = { ml: [60, 90, 120, 150], oz: [2, 3, 4, 5] } as const

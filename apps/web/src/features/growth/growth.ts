@@ -1,10 +1,12 @@
+import { DAY, localMidnight } from '@bobo/shared'
+
 import { WHO_LMS } from './who-data'
 
 export type GrowthMeasure = keyof typeof WHO_LMS
 export type GrowthSex = 'male' | 'female'
 
 /** Average month length used by the WHO standards. */
-export const DAYS_PER_MONTH = 30.4375
+const DAYS_PER_MONTH = 30.4375
 export const MAX_MONTHS = WHO_LMS.weight.male.length - 1
 
 interface Lms {
@@ -66,7 +68,5 @@ export const REFERENCE_CURVES = [
 
 /** Age in months between a birth date ("YYYY-MM-DD", local) and a timestamp. */
 export function ageInMonths(birthDate: string, at: number): number {
-  const [y = 0, mo = 1, d = 1] = birthDate.split('-').map(Number)
-  const born = new Date(y, mo - 1, d).getTime()
-  return (at - born) / 86_400_000 / DAYS_PER_MONTH
+  return (at - localMidnight(birthDate)) / DAY / DAYS_PER_MONTH
 }

@@ -1,5 +1,5 @@
 /** OWASP's recommendation for PBKDF2-HMAC-SHA256. */
-export const PASSWORD_ITERATIONS = 600_000
+const PASSWORD_ITERATIONS = 600_000
 export const MIN_PASSWORD_LENGTH = 8
 
 export const normalizeEmail = (email: string) => email.trim().toLowerCase()

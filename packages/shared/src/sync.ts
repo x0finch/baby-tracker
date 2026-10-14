@@ -54,8 +54,6 @@ export interface FamilySummary {
   babyIds: string[] | null
 }
 
-/** Roles that may change records at all (caregivers only their own events). */
-export const WRITE_ROLES: readonly FamilyRole[] = ['owner', 'admin', 'caregiver']
 /** Roles that may manage babies, members and invites. */
 export const MANAGE_ROLES: readonly FamilyRole[] = ['owner', 'admin']
 

@@ -6,6 +6,7 @@ import { TabBar } from '../components/TabBar'
 import { UpdatePrompt } from '../components/UpdatePrompt'
 import { getLocale } from '../lib/i18n'
 import { THEME_COLORS, themeInitScript } from '../lib/theme'
+import { watchSystemTheme } from '../lib/use-theme'
 import { SyncRunner } from '../sync/SyncRunner'
 
 import appCss from '../styles/app.css?url'
@@ -62,6 +63,7 @@ function RootLayout() {
   useEffect(() => {
     document.documentElement.lang = getLocale()
   }, [])
+  useEffect(watchSystemTheme, [])
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-app flex-col">

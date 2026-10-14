@@ -8,7 +8,7 @@ export const MAX_ML = 1000
 const MIN_CELSIUS = 34
 const MAX_CELSIUS = 43
 
-export const volumeInvalid = () => m.bottleAmountInvalid(rangeParams('volume', 0, MAX_ML))
+const volumeInvalid = () => m.bottleAmountInvalid(rangeParams('volume', 0, MAX_ML))
 
 /** An amount entered in display units, in milliliters. */
 export function parseVolume(input: string): { amountMl: number } | { error: string } {

@@ -1,4 +1,4 @@
-import type { PushSubscriptionInput, Reminder } from '@bobo/shared'
+import { type PushSubscriptionInput, type Reminder, base64UrlDecode } from '@bobo/shared'
 
 import { isIos, isStandalone } from '../lib/pwa'
 import { apiFetch } from './api'
@@ -29,12 +29,6 @@ export async function getPushState(): Promise<PushState> {
   return (await currentSubscription()) ? 'on' : 'off'
 }
 
-function decodeKey(base64Url: string): Uint8Array<ArrayBuffer> {
-  const base64 = base64Url.replaceAll('-', '+').replaceAll('_', '/')
-  const binary = atob(base64 + '='.repeat((4 - (base64.length % 4)) % 4))
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0))
-}
-
 function toInput(subscription: PushSubscription): PushSubscriptionInput {
   const json = subscription.toJSON()
   return {
@@ -54,7 +48,7 @@ export async function enablePush(): Promise<PushState> {
     (await registration.pushManager.getSubscription()) ??
     (await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: decodeKey(publicKey),
+      applicationServerKey: base64UrlDecode(publicKey),
     }))
   await apiFetch<void>('/api/push/subscription', {
     method: 'PUT',

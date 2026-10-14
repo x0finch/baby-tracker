@@ -35,7 +35,7 @@ const CATEGORY_KIND: Record<Category, IconKind> = {
   growth: 'growth',
 }
 
-export function iconKindOf(event: Event): IconKind {
+function iconKindOf(event: Event): IconKind {
   if (event.type === 'feeding') return event.data.kind
   if (event.type === 'sleep') return event.data.kind === 'nap' ? 'nap' : 'sleep'
   if (event.type === 'diaper') return DIAPER_KIND[event.data.contents]

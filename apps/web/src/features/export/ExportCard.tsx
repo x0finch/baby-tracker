@@ -1,4 +1,4 @@
-import { localDateString } from '@bobo/shared'
+import { localDateString, localMidnight, shiftDay } from '@bobo/shared'
 import { useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
@@ -10,12 +10,6 @@ import { useBabies } from '../babies/use-babies'
 import { useBabyEvents, useNow } from '../events/use-events'
 import { csvFileName, downloadCsv, eventsToCsv, exportRangeLabel } from './csv'
 
-/** Local midnight of a "YYYY-MM-DD" day, plus `days` days. */
-function midnight(day: string, days = 0): number {
-  const [y = 0, mo = 1, d = 1] = day.split('-').map(Number)
-  return new Date(y, mo - 1, d + days).getTime()
-}
-
 /** Exports one baby's events in a date range as CSV, entirely on the device. */
 export function ExportCard() {
   const { active, archived } = useBabies()
@@ -25,13 +19,13 @@ export function ExportCard() {
   const [babyId, setBabyId] = useState<string | null>(null)
   const baby = babies.find((item) => item.id === babyId) ?? babies[0]
   const events = useBabyEvents(baby?.id ?? '')
-  const [from, setFrom] = useState(() => localDateString(midnight(today, -29)))
+  const [from, setFrom] = useState(() => shiftDay(today, -29))
   const [to, setTo] = useState(today)
 
   if (!baby) return null
-  const start = midnight(from)
+  const start = localMidnight(from)
   // The end date is inclusive.
-  const end = midnight(to, 1)
+  const end = localMidnight(to, 1)
   const valid = from !== '' && to !== '' && start < end
   const count = valid
     ? events.filter((event) => event.startAt >= start && event.startAt < end).length

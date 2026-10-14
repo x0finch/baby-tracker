@@ -1,4 +1,4 @@
-import type { Event } from '@bobo/shared'
+import { type Event, startOfLocalDay } from '@bobo/shared'
 import { useEffect, useState } from 'react'
 
 import { Sheet } from '../../components/ui/Sheet'
@@ -11,16 +11,9 @@ import { describeEvent } from './describe'
 import { EditEventForm } from './EditEventSheet'
 import { EventIcon, eventIconProps } from './EventIcon'
 import { restoreEvent } from './records'
-import { startOfLocalDay } from './time'
 import { useNow } from './use-events'
 
 const UNDO_MS = 6000
-
-/** Local midnight `daysBack` days before the day containing `now` (DST-safe). */
-function dayStartBefore(now: number, daysBack: number): number {
-  const d = new Date(startOfLocalDay(now))
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate() - daysBack).getTime()
-}
 
 function Chevron({ direction }: { direction: 'left' | 'right' }) {
   return (
@@ -47,8 +40,8 @@ export function TodayList({ events }: { events: readonly Event[] }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deleted, setDeleted] = useState<Event | null>(null)
   const [daysBack, setDaysBack] = useState(0)
-  const dayStart = dayStartBefore(now, daysBack)
-  const dayEnd = dayStartBefore(now, daysBack - 1)
+  const dayStart = startOfLocalDay(now, -daysBack)
+  const dayEnd = startOfLocalDay(now, 1 - daysBack)
   const today = events.filter((event) => event.startAt >= dayStart && event.startAt < dayEnd)
   const heading =
     daysBack === 0

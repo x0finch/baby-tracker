@@ -16,7 +16,7 @@ export interface UnitPreferences {
 
 export type Quantity = keyof UnitPreferences
 
-export const UNITS_STORAGE_KEY = 'bobo.units'
+const UNITS_STORAGE_KEY = 'bobo.units'
 
 export const DEFAULT_UNITS: UnitPreferences = {
   volume: 'ml',

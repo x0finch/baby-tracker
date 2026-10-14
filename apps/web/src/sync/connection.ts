@@ -3,7 +3,13 @@ import { useSyncExternalStore } from 'react'
 
 import type { LocalStore } from '../db'
 import { m } from '../paraglide/messages.js'
-import { type SessionUser, completeConnect, connectAccount, httpAccountApi } from './account'
+import {
+  type SessionUser,
+  completeConnect,
+  connectAccount,
+  httpAccountApi,
+  unclaimedCount,
+} from './account'
 import { getAccount } from './local'
 import { requestSync } from './runner'
 
@@ -32,13 +38,13 @@ export function useClaimChoice(): ClaimChoice | null {
 }
 
 /** Links the session to this device if signed in and not linked yet (e.g. after OAuth). */
-export async function connectIfSignedIn(store: LocalStore, unclaimed: () => number) {
+export async function connectIfSignedIn(store: LocalStore) {
   if (getAccount(store)) return
   try {
     const result = await connectAccount(store, httpAccountApi, m.defaultFamilyName())
     if (result.status === 'connected') await requestSync()
     if (result.status === 'choose') {
-      choice = { user: result.user, families: result.families, unclaimed: unclaimed() }
+      choice = { user: result.user, families: result.families, unclaimed: unclaimedCount(store) }
       emit()
     }
   } catch (error) {

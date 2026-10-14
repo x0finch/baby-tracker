@@ -18,7 +18,8 @@ interface AccessRow {
   babyIds: string
 }
 
-function parseIdList(json: string): string[] {
+/** Parses a JSON array of strings from SQLite (e.g. `json_group_array`), skipping non-strings. */
+export function parseStringList(json: string): string[] {
   const value: unknown = JSON.parse(json)
   return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : []
 }
@@ -42,7 +43,7 @@ export async function loadAccess(db: D1Database, userId: string): Promise<Access
         id: row.id,
         name: row.name,
         role: row.role,
-        babyIds: row.babyScope === 'all' ? null : new Set(parseIdList(row.babyIds)),
+        babyIds: row.babyScope === 'all' ? null : new Set(parseStringList(row.babyIds)),
       },
     ]),
   )

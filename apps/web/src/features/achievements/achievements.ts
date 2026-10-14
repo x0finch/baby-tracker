@@ -1,4 +1,4 @@
-import { type Baby, type Event, localDateString } from '@bobo/shared'
+import { type Baby, type Event, babyAge, localDateString, shiftDay } from '@bobo/shared'
 
 export type BadgeGroup = 'records' | 'streak' | 'night' | 'firsts' | 'age' | 'family'
 
@@ -15,13 +15,6 @@ export interface Streak {
   current: number
   best: number
   loggedToday: boolean
-}
-
-const DAY = 86_400_000
-
-function shiftDay(day: string, delta: number): string {
-  const [y = 0, mo = 1, d = 1] = day.split('-').map(Number)
-  return localDateString(new Date(y, mo - 1, d + delta))
 }
 
 export function computeStreak(events: readonly Event[], now: number): Streak {
@@ -47,15 +40,6 @@ export function computeStreak(events: readonly Event[], now: number): Streak {
   return { current, best, loggedToday }
 }
 
-/** Days since birth, counting the birth day as day 0. */
-function ageInDays(birthDate: string, now: number): number {
-  const [y = 0, mo = 1, d = 1] = birthDate.split('-').map(Number)
-  const born = new Date(y, mo - 1, d)
-  const today = new Date(now)
-  const midnight = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  return Math.round((midnight.getTime() - born.getTime()) / DAY)
-}
-
 const counted = (id: string, group: BadgeGroup, current: number, target: number): Badge => ({
   id,
   group,
@@ -74,7 +58,7 @@ const isNight = (event: Event) => new Date(event.startAt).getHours() < 5
  */
 export function computeBadges(baby: Baby, events: readonly Event[], now: number): Badge[] {
   const { best } = computeStreak(events, now)
-  const age = ageInDays(baby.birthDate, now)
+  const age = babyAge(baby.birthDate, localDateString(now)).totalDays
   const authors = new Set(events.map((event) => event.createdBy).filter((id) => id !== null))
   const has = (predicate: (event: Event) => boolean) => events.some(predicate)
   return [

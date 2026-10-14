@@ -4,6 +4,8 @@ import {
   type PushItemResult,
   type PushRejectReason,
   babySchema,
+  base64UrlDecode,
+  base64UrlEncode,
   eventSchema,
 } from '@bobo/shared'
 
@@ -17,10 +19,7 @@ export interface SyncCursor {
 const START: TableCursor = [0, '']
 
 export function encodeCursor(cursor: SyncCursor): string {
-  return btoa(JSON.stringify([cursor.babies, cursor.events]))
-    .replaceAll('+', '-')
-    .replaceAll('/', '_')
-    .replace(/=+$/, '')
+  return base64UrlEncode(new TextEncoder().encode(JSON.stringify([cursor.babies, cursor.events])))
 }
 
 function isTableCursor(value: unknown): value is TableCursor {
@@ -36,7 +35,7 @@ function isTableCursor(value: unknown): value is TableCursor {
 export function decodeCursor(value: string | undefined): SyncCursor {
   if (!value) return { babies: START, events: START }
   try {
-    const parsed: unknown = JSON.parse(atob(value.replaceAll('-', '+').replaceAll('_', '/')))
+    const parsed: unknown = JSON.parse(new TextDecoder().decode(base64UrlDecode(value)))
     if (Array.isArray(parsed) && isTableCursor(parsed[0]) && isTableCursor(parsed[1])) {
       return { babies: parsed[0], events: parsed[1] }
     }

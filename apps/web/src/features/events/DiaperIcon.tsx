@@ -1,7 +1,7 @@
 import type { PoopDetails } from '@bobo/shared'
 
 /** Fill colors for the stain on the diaper illustration. */
-export const POOP_FILL: Record<PoopDetails['color'], string> = {
+const POOP_FILL: Record<PoopDetails['color'], string> = {
   yellow: '#d9a400',
   brown: '#8b5a2b',
   green: '#6f7f3a',

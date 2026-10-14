@@ -3,17 +3,15 @@ import { clsx } from 'clsx'
 import { m } from '../../paraglide/messages.js'
 
 /** Quick choices for how long a bottle or solids feed took, in minutes. */
-export const FEED_DURATIONS = [5, 10, 15, 20, 30] as const
+const FEED_DURATIONS = [5, 10, 15, 20, 30] as const
 
 /** Optional duration chips; `null` means not recorded. */
 export function FeedDurationField({
   value,
   onChange,
-  hint,
 }: {
   value: number | null
   onChange: (minutes: number | null) => void
-  hint?: string
 }) {
   // An edited record may carry a duration that isn't one of the quick choices.
   const choices: (number | null)[] = [null, ...FEED_DURATIONS]
@@ -43,7 +41,6 @@ export function FeedDurationField({
           )
         })}
       </div>
-      {hint && <p className="m-0 text-caption text-fg-muted">{hint}</p>}
     </fieldset>
   )
 }

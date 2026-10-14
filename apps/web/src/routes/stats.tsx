@@ -1,4 +1,4 @@
-import { localDateString } from '@bobo/shared'
+import { localDateString, localMidnight, shiftDay } from '@bobo/shared'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { z } from 'zod'
@@ -83,17 +83,6 @@ function Growth() {
   return baby ? <GrowthView key={baby.id} baby={baby} events={events} /> : null
 }
 
-/** Local midnight of a "YYYY-MM-DD" day and of the next day (DST-safe). */
-function dayBounds(day: string): [number, number] {
-  const [y = 0, mo = 1, d = 1] = day.split('-').map(Number)
-  return [new Date(y, mo - 1, d).getTime(), new Date(y, mo - 1, d + 1).getTime()]
-}
-
-function shiftDay(day: string, delta: number): string {
-  const [y = 0, mo = 1, d = 1] = day.split('-').map(Number)
-  return localDateString(new Date(y, mo - 1, d + delta))
-}
-
 function DayView() {
   const { baby } = useSelectedBaby()
   const events = useBabyEvents(baby?.id ?? '')
@@ -103,7 +92,8 @@ function DayView() {
   const navigate = useNavigate({ from: Route.fullPath })
   const [editingId, setEditingId] = useState<string | null>(null)
   const editing = events.find((event) => event.id === editingId)
-  const [dayStart, dayEnd] = dayBounds(day)
+  const dayStart = localMidnight(day)
+  const dayEnd = localMidnight(day, 1)
   const isToday = day >= today
   const goTo = (next: string) =>
     void navigate({

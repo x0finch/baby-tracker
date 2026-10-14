@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 import {
   THEME_COLORS,
@@ -24,17 +24,20 @@ function applyTheme(preference: ThemePreference) {
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLORS[theme])
 }
 
+const onSystemThemeChange = () => applyTheme(readStoredPreference())
+
+/**
+ * Follows the system color scheme on every page while the preference is "system".
+ * Returns the unsubscribe function; mount once at the app root.
+ */
+export function watchSystemTheme(): () => void {
+  const query = matchMedia(DARK_QUERY)
+  query.addEventListener('change', onSystemThemeChange)
+  return () => query.removeEventListener('change', onSystemThemeChange)
+}
+
 export function useTheme() {
   const [preference, setPreferenceState] = useState<ThemePreference>(readStoredPreference)
-
-  useEffect(() => {
-    applyTheme(preference)
-    if (preference !== 'system') return undefined
-    const query = matchMedia(DARK_QUERY)
-    const onChange = () => applyTheme('system')
-    query.addEventListener('change', onChange)
-    return () => query.removeEventListener('change', onChange)
-  }, [preference])
 
   const setPreference = useCallback((next: ThemePreference) => {
     try {
@@ -43,6 +46,7 @@ export function useTheme() {
     } catch {
       // Storage can be unavailable (private mode); the choice then lasts for this session.
     }
+    applyTheme(next)
     setPreferenceState(next)
   }, [])
 

@@ -4,10 +4,12 @@ import {
   type Invite,
   type InvitePreview,
   type InviteStatus,
+  base64UrlEncode,
   createInviteRequestSchema,
 } from '@bobo/shared'
 import { Hono } from 'hono'
 
+import { parseStringList } from '../access'
 import { babiesInFamily, canManageMember, roleOf } from '../members'
 import type { AppEnv } from '../types'
 
@@ -30,17 +32,7 @@ const INVITE_COLUMNS = `i.code, i.family_id as familyId, i.role, i.baby_ids as b
 
 /** 128 random bits, URL-safe: the code is the only secret an invite link carries. */
 function newInviteCode(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(16))
-  return btoa(String.fromCodePoint(...bytes))
-    .replaceAll('+', '-')
-    .replaceAll('/', '_')
-    .replace(/=+$/, '')
-}
-
-function parseIds(json: string | null): string[] | null {
-  if (json === null) return null
-  const value: unknown = JSON.parse(json)
-  return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : []
+  return base64UrlEncode(crypto.getRandomValues(new Uint8Array(16)))
 }
 
 function statusOf(row: InviteRow, now: number): InviteStatus {
@@ -54,7 +46,7 @@ function toInvite(row: InviteRow): Invite {
     code: row.code,
     familyId: row.familyId,
     role: row.role,
-    babyIds: parseIds(row.babyIds),
+    babyIds: row.babyIds === null ? null : parseStringList(row.babyIds),
     createdAt: row.createdAt,
     expiresAt: row.expiresAt,
   }
@@ -152,7 +144,7 @@ export const invitePreviewRoutes = new Hono<AppEnv>().get('/:code', async (c) =>
     familyName: row.familyName,
     inviterName: row.inviterName,
     role: row.role,
-    babyNames: row.babyIds === null ? null : parseIds(row.babyNames),
+    babyNames: row.babyIds === null ? null : parseStringList(row.babyNames),
     status: statusOf(row, Date.now()),
   }
   return c.json(preview)
