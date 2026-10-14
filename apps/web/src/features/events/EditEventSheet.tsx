@@ -1,4 +1,4 @@
-import { type Event, isRunning, isTimed } from '@bobo/shared'
+import { type Event, hasOptionalDuration, isRunning, isTimed } from '@bobo/shared'
 import { type FormEvent, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
@@ -13,6 +13,7 @@ import { type GrowthErrors, growthFieldValue, parseGrowth } from '../growth/grow
 import { saveEvent } from './actions'
 import { parseBottle } from './bottle-input'
 import { type DiaperData, DiaperFields } from './DiaperFields'
+import { FeedDurationField } from './FeedDurationField'
 import { parseTemperature, parseVolume } from './measure-input'
 import { MixedAmounts } from './MixedAmounts'
 import { deleteEvent, moveEventStart, setEventNote } from './records'
@@ -27,6 +28,8 @@ type Errors = Partial<
   GrowthErrors
 
 /** Edits any event; changes are applied through the pure helpers in records.ts. */
+const MINUTE = 60_000
+
 export function EditEventForm({
   event,
   events,
@@ -91,6 +94,11 @@ export function EditEventForm({
       ? inputValue('volume', event.data.formulaMl)
       : '',
   )
+  const [duration, setDuration] = useState<number | null>(() =>
+    hasOptionalDuration(event) && event.endAt !== null
+      ? Math.round((event.endAt - event.startAt) / MINUTE)
+      : null,
+  )
   const [sleepKind, setSleepKind] = useState(() =>
     event.type === 'sleep' ? event.data.kind : 'nap',
   )
@@ -136,6 +144,11 @@ export function EditEventForm({
     if (next.type === 'feeding' && next.data.kind === 'solids') {
       if (!food.trim()) nextErrors.food = m.solidsFoodRequired()
       else next = { ...next, data: { kind: 'solids', food: food.trim() } }
+    }
+    if (hasOptionalDuration(next)) {
+      const endAt = duration === null ? null : next.startAt + duration * MINUTE
+      if (endAt !== null && endAt > current + MINUTE) nextErrors.start = m.feedEndFuture()
+      else next = { ...next, endAt }
     }
     if (next.type === 'diaper') next = { ...next, data: diaper }
     if (next.type === 'pumping') {
@@ -318,8 +331,11 @@ export function EditEventForm({
             onChange={setSleepKind}
           />
         )}
+        {hasOptionalDuration(event) && (
+          <FeedDurationField value={duration} onChange={setDuration} />
+        )}
         <TimeField
-          label={isTimed(event) ? m.eventStart() : m.eventTime()}
+          label={isTimed(event) || hasOptionalDuration(event) ? m.eventStart() : m.eventTime()}
           value={start}
           onChange={setStart}
           error={errors.start}

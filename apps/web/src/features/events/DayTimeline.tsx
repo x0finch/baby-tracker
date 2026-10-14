@@ -75,7 +75,7 @@ export function DayTimeline({
                 .filter((event) => laneOf(event.type) === lane)
                 .map((event) => {
                   const top = toPx(event.startAt)
-                  const end = isTimed(event) ? (event.endAt ?? now) : event.startAt
+                  const end = event.endAt ?? (isTimed(event) ? now : event.startAt)
                   const height = Math.max(toPx(end) - top, MIN_BLOCK_PX)
                   const { title, detail } = describeEvent(event, now)
                   return (

@@ -78,10 +78,12 @@ export function describeEvent(event: Event, now: number): { title: string; detai
               }),
         }
       }
+      // A bottle or solids feed may record how long it took.
+      const took = event.endAt === null ? [] : [durationLabel(event.endAt - event.startAt)]
       if (data.kind === 'bottle') {
         return {
           title: m.feedingBottle(),
-          detail:
+          detail: [
             data.breastMl !== undefined && data.formulaMl !== undefined
               ? m.bottleSplitDetail({
                   amount: formatQuantity('volume', data.amountMl),
@@ -94,9 +96,11 @@ export function describeEvent(event: Event, now: number): { title: string; detai
                   unit: unitLabel('volume'),
                   milk: milkLabels[data.milk](),
                 }),
+            ...took,
+          ].join(' · '),
         }
       }
-      return { title: m.feedingSolids(), detail: data.food }
+      return { title: m.feedingSolids(), detail: [data.food, ...took].join(' · ') }
     }
     case 'sleep':
       return {
