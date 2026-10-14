@@ -384,5 +384,7 @@
   "mixedSplitAction": "分开填写母乳和奶粉",
   "peeSection": "尿尿",
   "peeAmount": "尿量",
-  "peeAmountDetail": "尿量{amount}"
+  "peeAmountDetail": "尿量{amount}",
+  "logFor": "记录给",
+  "sleepOverlapFor": "{name} 这段时间已有睡眠记录"
 }

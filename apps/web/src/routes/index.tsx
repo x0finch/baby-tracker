@@ -38,7 +38,7 @@ function BabyToday({ baby }: { baby: Baby }) {
       <SinceLast events={events} />
       <RunningTimers events={events} />
       {canLog ? (
-        <QuickActions babyId={baby.id} events={events} />
+        <QuickActions baby={baby} events={events} />
       ) : (
         <Card>
           <p className="m-0 text-fg-muted">{m.viewerNotice()}</p>
