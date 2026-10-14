@@ -23,11 +23,11 @@ type Errors = Partial<Record<'time' | 'amount' | 'celsius' | 'name' | 'text', st
 /** Form for the less frequent event types (pumping, temperature, medication, notes). */
 export function OtherEventForm({
   category,
-  babyId,
+  babyIds,
   onDone,
 }: {
   category: OtherCategory
-  babyId: string
+  babyIds: readonly string[]
   onDone: () => void
 }) {
   const store = useLocalStore()
@@ -62,7 +62,7 @@ export function OtherEventForm({
     if (Object.keys(next).length > 0 || !('at' in timeResult)) return
 
     const at = timeResult.at
-    const event =
+    const record = (babyId: string) =>
       growth && 'data' in growth
         ? logGrowth(babyId, at, growth.data, current)
         : pumping && 'amountMl' in pumping
@@ -72,7 +72,7 @@ export function OtherEventForm({
             : category === 'medication'
               ? logMedication(babyId, at, name, dose, current)
               : logNote(babyId, at, text, current)
-    addEvent(store, event)
+    for (const babyId of babyIds) addEvent(store, record(babyId))
     onDone()
   }
 

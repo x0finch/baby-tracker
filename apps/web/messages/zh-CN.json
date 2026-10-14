@@ -385,6 +385,8 @@
   "peeSection": "尿尿",
   "peeAmount": "尿量",
   "peeAmountDetail": "尿量{amount}",
+  "logFor": "记录给",
+  "sleepOverlapFor": "{name} 这段时间已有睡眠记录",
   "unitMl": "毫升",
   "unitOz": "盎司",
   "unitKg": "千克",
