@@ -23,7 +23,8 @@ export function TabBar() {
         <Link
           key={tab.to}
           to={tab.to}
-          activeOptions={{ exact: true }}
+          // Sub-pages keep their section's tab active.
+          activeOptions={{ exact: tab.to === '/' }}
           className="flex min-h-touch flex-1 items-center justify-center font-extrabold text-fg-muted aria-[current=page]:text-primary-text"
         >
           {tab.label()}

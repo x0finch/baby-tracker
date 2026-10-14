@@ -17,21 +17,24 @@ import { connectIfSignedIn } from './connection'
 import { PasskeySection } from './PasskeySection'
 import { SignInOptions } from './SignInOptions'
 
-function SyncStatusLine() {
+/** One line describing the sync state, for the account page and its settings row. */
+export function useSyncStatusText() {
   const { phase, lastSyncedAt } = useSyncState()
-  const text =
-    phase === 'syncing'
-      ? m.syncStatusSyncing()
-      : phase === 'offline'
-        ? m.syncStatusOffline()
-        : phase === 'error'
-          ? m.syncStatusError()
-          : phase === 'unauthorized'
-            ? m.syncStatusUnauthorized()
-            : lastSyncedAt
-              ? m.syncStatusIdle({ time: formatTime(lastSyncedAt) })
-              : m.syncStatusNever()
-  return <p className="m-0 text-fg-muted">{text}</p>
+  return phase === 'syncing'
+    ? m.syncStatusSyncing()
+    : phase === 'offline'
+      ? m.syncStatusOffline()
+      : phase === 'error'
+        ? m.syncStatusError()
+        : phase === 'unauthorized'
+          ? m.syncStatusUnauthorized()
+          : lastSyncedAt
+            ? m.syncStatusIdle({ time: formatTime(lastSyncedAt) })
+            : m.syncStatusNever()
+}
+
+function SyncStatusLine() {
+  return <p className="m-0 text-fg-muted">{useSyncStatusText()}</p>
 }
 
 /** Sign-in, sync status and sign-out in settings. */
@@ -79,7 +82,6 @@ export function AccountCard() {
 
   return (
     <Card className="flex flex-col gap-3">
-      <h2 className="text-title font-extrabold">{m.accountTitle()}</h2>
       {account ? (
         <>
           {user && (

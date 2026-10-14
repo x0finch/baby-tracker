@@ -43,10 +43,19 @@ const pushHint: Partial<Record<PushState, () => string>> = {
   denied: m.pushDenied,
 }
 
+/** Whether this device can and does receive notifications. */
+export const usePushState = () => useQuery({ queryKey: PUSH_STATE_KEY, queryFn: getPushState }).data
+
 /** Device notifications and per-baby "it's been a while" reminders; signed-in users only. */
 export function RemindersCard() {
   const { userId } = useAccess()
-  if (!userId) return null
+  if (!userId) {
+    return (
+      <Card>
+        <p className="m-0 text-fg-muted">{m.remindersSignedOut()}</p>
+      </Card>
+    )
+  }
   return <Reminders key={userId} />
 }
 
@@ -55,7 +64,7 @@ function Reminders() {
   // Reminders run on the server, so only babies that have synced to a family can have them.
   const babies = active.filter((baby) => baby.familyId !== null)
   const queryClient = useQueryClient()
-  const { data: push } = useQuery({ queryKey: PUSH_STATE_KEY, queryFn: getPushState })
+  const push = usePushState()
   const { data: reminders = [] } = useQuery({ queryKey: REMINDERS_KEY, queryFn: reminderApi.list })
   const [message, setMessage] = useState<string>()
 
@@ -115,7 +124,6 @@ function Reminders() {
 
   return (
     <Card className="flex flex-col gap-4">
-      <h2 className="text-title font-extrabold">{m.remindersTitle()}</h2>
       <p className="m-0 text-fg-muted">{m.remindersIntro()}</p>
 
       {hint ? (

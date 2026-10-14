@@ -11,7 +11,15 @@ import {
 
 import type { LocalStore } from '../db'
 import { applyAccess } from './access'
-import { type SyncTable, clearDirty, getCursor, isDirty, removeLocal, setCursor } from './local'
+import {
+  clearDirty,
+  getCursor,
+  isDirty,
+  purgeBabyEvents,
+  removeLocal,
+  setCursor,
+  type SyncTable,
+} from './local'
 
 export interface SyncApi {
   push: (request: PushRequest) => Promise<PushResponse>
@@ -102,6 +110,8 @@ function applyRemoteBaby(store: LocalStore, remote: Baby): boolean {
   else store.babies.insert(remote)
   // The server copy is at least as new, so any pending local change is obsolete.
   clearDirty(store, 'babies', remote.id, remote.updatedAt)
+  // The server already removed a deleted baby's records; do the same here.
+  if (remote.deletedAt !== null) purgeBabyEvents(store, remote.id)
   return true
 }
 

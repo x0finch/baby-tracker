@@ -10,6 +10,7 @@ import { setBabyArchived, updateBaby } from './actions'
 import { ageLabel } from './age-label'
 import { BabyAvatar } from './BabyAvatar'
 import { BabyForm } from './BabyForm'
+import { DeleteBabySheet } from './DeleteBabySheet'
 import { useBabies } from './use-babies'
 
 function BabyRow({ baby, onClick }: { baby: Baby; onClick?: () => void }) {
@@ -36,6 +37,7 @@ export function BabyList() {
   const access = useAccess()
   const manageable = (baby: Baby) => access.forBaby(baby).canManageBaby
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const editing = [...active, ...archived].find((baby) => baby.id === editingId)
   const close = () => setEditingId(null)
 
@@ -87,24 +89,40 @@ export function BabyList() {
                 close()
               }}
             />
-            {editing.archivedAt === null && (
-              <div className="flex flex-col gap-1 border-t-2 border-border pt-4">
-                <Button
-                  variant="ghost"
-                  tone="danger"
-                  onClick={() => {
-                    setBabyArchived(store, editing.id, true)
-                    close()
-                  }}
-                >
-                  {m.babyArchive()}
-                </Button>
-                <p className="text-center text-caption text-fg-muted">{m.babyArchiveHint()}</p>
-              </div>
-            )}
+            <div className="flex flex-col gap-1 border-t-2 border-border pt-4">
+              {editing.archivedAt === null && (
+                <>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setBabyArchived(store, editing.id, true)
+                      close()
+                    }}
+                  >
+                    {m.babyArchive()}
+                  </Button>
+                  <p className="text-center text-caption text-fg-muted">{m.babyArchiveHint()}</p>
+                </>
+              )}
+              <Button
+                variant="ghost"
+                tone="danger"
+                onClick={() => {
+                  setDeletingId(editing.id)
+                  close()
+                }}
+              >
+                {m.babyDelete()}
+              </Button>
+              <p className="text-center text-caption text-fg-muted">{m.babyDeleteHint()}</p>
+            </div>
           </>
         )}
       </Sheet>
+      <DeleteBabySheet
+        baby={[...active, ...archived].find((baby) => baby.id === deletingId)}
+        onClose={() => setDeletingId(null)}
+      />
     </div>
   )
 }

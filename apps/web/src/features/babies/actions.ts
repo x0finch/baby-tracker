@@ -1,5 +1,5 @@
 import type { LocalStore } from '../../db'
-import { currentFamilyId, markDirty } from '../../sync/local'
+import { currentFamilyId, markDirty, purgeBabyEvents } from '../../sync/local'
 import { type BabyInput, buildBaby } from './records'
 
 /** Adds a baby to `familyId`; null keeps it local until it is claimed (see claimLocalData). */
@@ -37,4 +37,14 @@ export function setBabyArchived(store: LocalStore, id: string, archived: boolean
     Object.assign(draft, { archivedAt: archived ? now : null })
     draft.updatedAt = now
   })
+}
+
+/** Deletes a baby for everyone; its records go too (on the server when the deletion syncs). */
+export function deleteBaby(store: LocalStore, id: string) {
+  const now = Date.now()
+  updateAndMark(store, id, (draft) => {
+    Object.assign(draft, { deletedAt: now })
+    draft.updatedAt = now
+  })
+  purgeBabyEvents(store, id)
 }

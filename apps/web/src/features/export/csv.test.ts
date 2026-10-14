@@ -21,6 +21,17 @@ describe('csvField', () => {
 })
 
 describe('eventsToCsv', () => {
+  it("names each row's baby when exporting several", () => {
+    const other = newId()
+    const events = [logBottle(BABY, at(13, 9), 120, 'formula'), logNote(other, at(13, 8), '翻身')]
+    const babies = [
+      { id: BABY, name: '老大' },
+      { id: other, name: '老二' },
+    ]
+    const lines = eventsToCsv(babies, events, at(13, 0), at(14, 0), at(14, 0)).trim().split('\r\n')
+    expect(lines.slice(1).map((line) => line.split(',')[0])).toEqual(['老二', '老大'])
+  })
+
   it('writes a BOM, a header and the range oldest first', () => {
     const events = [
       logBottle(BABY, at(13, 9), 120, 'formula'),
@@ -30,7 +41,13 @@ describe('eventsToCsv', () => {
       deleteEvent(logBottle(BABY, at(13, 14), 90, 'formula'), at(13, 14)),
       logBottle(BABY, at(14, 9), 100, 'formula'),
     ]
-    const csv = eventsToCsv({ name: '小米粒' }, events, at(13, 0), at(14, 0), at(14, 12))
+    const csv = eventsToCsv(
+      [{ id: BABY, name: '小米粒' }],
+      events,
+      at(13, 0),
+      at(14, 0),
+      at(14, 12),
+    )
     expect(csv.startsWith('﻿宝宝,日期,开始,结束,类型')).toBe(true)
     const lines = csv.trim().split('\r\n')
     expect(lines).toHaveLength(5)
