@@ -5,6 +5,7 @@ import { PageHeader } from '../components/PageHeader'
 import { StorageStatus } from '../components/StorageStatus'
 import { Card } from '../components/ui/Card'
 import { SegmentedControl } from '../components/ui/SegmentedControl'
+import { UnitsCard } from '../components/UnitsCard'
 import { BabyList } from '../features/babies/BabyList'
 import { ExportCard } from '../features/export/ExportCard'
 import { FamilySection } from '../features/family/FamilyCard'
@@ -44,6 +45,7 @@ function SettingsPage() {
           onChange={setPreference}
         />
       </Card>
+      <UnitsCard />
       {/* Hidden until a second locale ships; switching reloads the app in that locale. */}
       {localeOptions.length > 1 && (
         <Card className="flex flex-col gap-3">
