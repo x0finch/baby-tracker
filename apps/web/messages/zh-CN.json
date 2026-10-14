@@ -398,5 +398,13 @@
   "unitsVolume": "奶量",
   "unitsWeight": "体重",
   "unitsLength": "身长和头围",
-  "unitsTemperature": "体温"
+  "unitsTemperature": "体温",
+  "napTitle": "建议入睡时间",
+  "napWindow": "{from}–{to}",
+  "napUpcoming": "还有约 {duration}",
+  "napNow": "现在是入睡的好时机",
+  "napLate": "已过建议时间，宝宝可能累了",
+  "napBasisHistory": "根据月龄和最近 7 天的睡眠推算，仅供参考",
+  "napBasisAge": "根据月龄推算，多记录几次睡眠会更准。仅供参考",
+  "napUnknown": "记录一次睡眠后，这里会建议下次入睡的时间"
 }
