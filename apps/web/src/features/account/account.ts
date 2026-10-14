@@ -1,8 +1,8 @@
-import type { FamilySummary } from '@bobo/shared'
+import { type FamilySummary, canAddBabies } from '@bobo/shared'
 
 import type { LocalStore } from '../../db'
 import { HttpError, apiFetch } from '../../lib/api'
-import { markDirty, setAccount, setCursor } from '../../sync/local'
+import { claimLocalData, setAccount, setCursor, unclaimedCount } from '../../sync/local'
 import { derivePasswordKey, normalizeEmail } from './password'
 
 export interface SessionUser {
@@ -92,61 +92,43 @@ export async function deleteAccountRemote() {
 }
 
 /** Babies and events created while signed out (not yet in any family). */
-export function unclaimedCount(store: LocalStore): number {
-  const babies = store.babies.toArray.filter((b) => b.familyId === null && b.deletedAt === null)
-  return babies.length
-}
-
-/**
- * Moves everything created while signed out into a family and queues it for upload.
- * Events follow their baby, so a family's events always travel with its babies.
- */
-export function claimLocalData(store: LocalStore, familyId: string, now: number = Date.now()) {
-  for (const baby of store.babies.toArray) {
-    if (baby.familyId !== null) continue
-    const updatedAt = Math.max(now, baby.updatedAt)
-    store.babies.update(baby.id, (draft) => Object.assign(draft, { familyId, updatedAt }))
-    markDirty(store, 'babies', { ...baby, familyId, updatedAt })
-  }
-  for (const event of store.events.toArray) {
-    if (event.familyId !== null) continue
-    const babyFamily = store.babies.get(event.babyId)?.familyId ?? familyId
-    const updatedAt = Math.max(now, event.updatedAt)
-    store.events.update(event.id, (draft) =>
-      Object.assign(draft, { familyId: babyFamily, updatedAt }),
-    )
-    markDirty(store, 'events', { ...event, familyId: babyFamily, updatedAt })
-  }
-}
-
 export type ConnectResult =
   | { status: 'signed-out' }
-  | { status: 'connected'; family: FamilySummary }
+  /** Linked; `family` is where new babies go by default, if the account has one. */
+  | { status: 'connected'; family: FamilySummary | undefined }
   /** The account already has a family and this device has its own records: ask the user. */
   | { status: 'choose'; families: FamilySummary[]; user: SessionUser }
 
 /**
- * Links a signed-in account to this device. A new account gets a family with this device's
- * records; a device without local records joins the account's family and pulls its data.
+ * Links a signed-in account to this device. This device's own records go into a new family
+ * named after the user; without any, nothing is created, so someone who only looks after
+ * other families' babies doesn't get an empty family of their own.
  */
 export async function connectAccount(
   store: LocalStore,
   api: AccountApi,
-  defaultFamilyName: string,
+  familyName: (user: SessionUser) => string,
 ): Promise<ConnectResult> {
   const user = await api.me()
   if (!user) return { status: 'signed-out' }
   const families = await api.families()
-  if (families.length > 0 && unclaimedCount(store) > 0) return { status: 'choose', families, user }
-  const family = families[0] ?? (await api.createFamily(defaultFamilyName))
+  const unclaimed = unclaimedCount(store)
+  if (families.length > 0 && unclaimed > 0) return { status: 'choose', families, user }
+  const family =
+    families.find(canAddBabies) ??
+    (unclaimed > 0 ? await api.createFamily(familyName(user)) : undefined)
   completeConnect(store, user, family)
   return { status: 'connected', family }
 }
 
-/** Finishes linking with the chosen family (also used after the user chooses). */
-export function completeConnect(store: LocalStore, user: SessionUser, family: FamilySummary) {
-  claimLocalData(store, family.id)
-  setAccount(store, { userId: user.id, familyId: family.id })
+/** Finishes linking, with the chosen family for this device's records (if any). */
+export function completeConnect(
+  store: LocalStore,
+  user: SessionUser,
+  family: FamilySummary | undefined,
+) {
+  if (family) claimLocalData(store, family.id)
+  setAccount(store, { userId: user.id, userName: user.name, familyId: family?.id ?? null })
 }
 
 /** Forgets the account on this device; optionally removes all local records too. */

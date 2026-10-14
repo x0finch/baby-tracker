@@ -33,6 +33,11 @@ export const familyApi = {
     }),
   rename: (familyId: string, name: string) =>
     apiFetch<void>(familyPath(familyId), json('PATCH', { name })),
+  setAlias: (familyId: string, alias: string) =>
+    apiFetch<void>(`${familyPath(familyId)}/alias`, json('PUT', { alias })),
+  remove: (familyId: string) => apiFetch<void>(familyPath(familyId), { method: 'DELETE' }),
+  transfer: (familyId: string, userId: string) =>
+    apiFetch<void>(`${familyPath(familyId)}/transfer`, json('POST', { userId })),
   createInvite: (familyId: string, body: CreateInviteRequest) =>
     apiFetch<Invite>(`${familyPath(familyId)}/invites`, json('POST', body)),
   invites: (familyId: string) => apiFetch<Invite[]>(`${familyPath(familyId)}/invites`),

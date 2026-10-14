@@ -79,6 +79,8 @@ export const memberships = sqliteTable(
     babyScope: text('baby_scope', { enum: ['all', 'selected'] })
       .notNull()
       .default('all'),
+    /** The member's private name for the family, shown only to them. */
+    alias: text('alias'),
     createdAt: integer('created_at').notNull(),
   },
   (table) => [

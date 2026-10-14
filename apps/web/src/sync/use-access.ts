@@ -3,7 +3,7 @@ import { useLiveQuery } from '@tanstack/react-db'
 import { useMemo } from 'react'
 
 import { useLocalStore } from '../db'
-import { type Permissions, babyPermissions, canAddBaby, canEditEvent } from './access'
+import { type Permissions, babyFamilyChoices, babyPermissions, canEditEvent } from './access'
 import { getAccess, getAccount } from './local'
 
 export interface AccessView {
@@ -12,7 +12,8 @@ export interface AccessView {
   userId: string | undefined
   forBaby: (baby: Pick<Baby, 'familyId'> | undefined) => Permissions
   canEditEvent: (event: Pick<Event, 'familyId' | 'createdBy'>) => boolean
-  canAddBaby: boolean
+  /** Where a new baby can go; `null` stands for a new family of the user's own. */
+  babyFamilies: ReturnType<typeof babyFamilyChoices>
 }
 
 /** The signed-in user's permissions, updated when a pull changes their access. */
@@ -27,7 +28,7 @@ export function useAccess(): AccessView {
       userId,
       forBaby: (baby) => babyPermissions(access, baby),
       canEditEvent: (event) => canEditEvent(access, event, userId),
-      canAddBaby: canAddBaby(store),
+      babyFamilies: babyFamilyChoices(store),
     }
     // Recomputed whenever the meta records (account, access) change.
     // oxlint-disable-next-line react-hooks/exhaustive-deps

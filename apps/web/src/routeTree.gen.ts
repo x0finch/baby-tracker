@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as StatsRouteImport } from './routes/stats'
 import { Route as UiRouteImport } from './routes/ui'
+import { Route as FamilyFamilyIdRouteImport } from './routes/family.$familyId'
 import { Route as JoinCodeRouteImport } from './routes/join.$code'
 
 const IndexRoute = IndexRouteImport.update({
@@ -35,6 +36,11 @@ const UiRoute = UiRouteImport.update({
   path: '/ui',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FamilyFamilyIdRoute = FamilyFamilyIdRouteImport.update({
+  id: '/family/$familyId',
+  path: '/family/$familyId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const JoinCodeRoute = JoinCodeRouteImport.update({
   id: '/join/$code',
   path: '/join/$code',
@@ -46,6 +52,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
   '/ui': typeof UiRoute
+  '/family/$familyId': typeof FamilyFamilyIdRoute
   '/join/$code': typeof JoinCodeRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
   '/ui': typeof UiRoute
+  '/family/$familyId': typeof FamilyFamilyIdRoute
   '/join/$code': typeof JoinCodeRoute
 }
 export interface FileRoutesById {
@@ -61,14 +69,23 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
   '/ui': typeof UiRoute
+  '/family/$familyId': typeof FamilyFamilyIdRoute
   '/join/$code': typeof JoinCodeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/settings' | '/stats' | '/ui' | '/join/$code'
+  fullPaths:
+    '/' | '/settings' | '/stats' | '/ui' | '/family/$familyId' | '/join/$code'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/settings' | '/stats' | '/ui' | '/join/$code'
-  id: '__root__' | '/' | '/settings' | '/stats' | '/ui' | '/join/$code'
+  to: '/' | '/settings' | '/stats' | '/ui' | '/family/$familyId' | '/join/$code'
+  id:
+    | '__root__'
+    | '/'
+    | '/settings'
+    | '/stats'
+    | '/ui'
+    | '/family/$familyId'
+    | '/join/$code'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -76,6 +93,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   StatsRoute: typeof StatsRoute
   UiRoute: typeof UiRoute
+  FamilyFamilyIdRoute: typeof FamilyFamilyIdRoute
   JoinCodeRoute: typeof JoinCodeRoute
 }
 
@@ -109,6 +127,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UiRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/family/$familyId': {
+      id: '/family/$familyId'
+      path: '/family/$familyId'
+      fullPath: '/family/$familyId'
+      preLoaderRoute: typeof FamilyFamilyIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/join/$code': {
       id: '/join/$code'
       path: '/join/$code'
@@ -124,6 +149,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   StatsRoute: StatsRoute,
   UiRoute: UiRoute,
+  FamilyFamilyIdRoute: FamilyFamilyIdRoute,
   JoinCodeRoute: JoinCodeRoute,
 }
 export const routeTree = rootRouteImport

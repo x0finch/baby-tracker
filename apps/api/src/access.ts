@@ -18,6 +18,8 @@ export interface FamilyAccess {
   role: FamilyRole
   /** null: every baby of the family. */
   babyIds: ReadonlySet<string> | null
+  alias: string | null
+  memberCount: number
 }
 
 export type Access = ReadonlyMap<string, FamilyAccess>
@@ -28,6 +30,8 @@ interface AccessRow {
   role: FamilyRole
   babyScope: 'all' | 'selected'
   babyIds: string
+  alias: string | null
+  memberCount: number
 }
 
 /** Parses a JSON array of strings from SQLite (e.g. `json_group_array`), skipping non-strings. */
@@ -49,7 +53,8 @@ export const memberSeesBaby = (babyIdColumn: string) =>
 export async function loadAccess(db: D1Database, userId: string): Promise<Access> {
   const { results } = await db
     .prepare(
-      `select f.id, f.name, m.role, m.baby_scope as babyScope, ${MEMBER_BABY_IDS} as babyIds
+      `select f.id, f.name, m.role, m.baby_scope as babyScope, ${MEMBER_BABY_IDS} as babyIds,
+         m.alias, (select count(*) from memberships o where o.family_id = m.family_id) as memberCount
        from memberships m join families f on f.id = m.family_id
        where m.user_id = ? order by m.created_at`,
     )
@@ -63,6 +68,8 @@ export async function loadAccess(db: D1Database, userId: string): Promise<Access
         name: row.name,
         role: row.role,
         babyIds: row.babyScope === 'all' ? null : new Set(parseStringList(row.babyIds)),
+        alias: row.alias,
+        memberCount: row.memberCount,
       },
     ]),
   )
@@ -74,6 +81,8 @@ export function toSummaries(access: Access): FamilySummary[] {
     name: family.name,
     role: family.role,
     babyIds: family.babyIds ? [...family.babyIds] : null,
+    alias: family.alias,
+    memberCount: family.memberCount,
   }))
 }
 

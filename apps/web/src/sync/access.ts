@@ -3,6 +3,7 @@ import {
   type Event,
   type FamilyRole,
   type FamilySummary,
+  canAddBabies,
   inBabyScope,
   isManager,
 } from '@bobo/shared'
@@ -109,10 +110,21 @@ export function canEditEvent(
   return true
 }
 
-/** Whether the user can add babies to the family new records go to. */
-export function canAddBaby(store: LocalStore): boolean {
+/**
+ * Families a new baby can go to: those the user manages, plus `null` (a new family of their
+ * own, created on the next sync) when they don't own one yet. Signed out, babies stay local.
+ */
+export function babyFamilyChoices(store: LocalStore): {
+  choices: (string | null)[]
+  preferred: string | null
+} {
   const account = getAccount(store)
-  if (!account) return true
-  const family = familyOf(getAccess(store), account.familyId)
-  return !family || (isManager(family.role) && !family.babyIds)
+  if (!account) return { choices: [null], preferred: null }
+  const access = getAccess(store)
+  // Before the first pull, only the account's own default is known.
+  if (!access) return { choices: [account.familyId], preferred: account.familyId }
+  const choices: (string | null)[] = access.filter(canAddBabies).map((family) => family.id)
+  if (!access.some((family) => family.role === 'owner')) choices.push(null)
+  const preferred = choices.includes(account.familyId) ? account.familyId : (choices[0] ?? null)
+  return { choices, preferred }
 }

@@ -127,7 +127,7 @@ describe('roles, baby scope and member management', () => {
       expect(page.babies.map((b) => b.id)).toEqual([babyA.id])
       expect(page.events.every((event) => event.babyId === babyA.id)).toBe(true)
       expect(page.events.map((event) => event.id)).not.toContain(eventB.id)
-      expect(page.access).toEqual([
+      expect(page.access).toMatchObject([
         { id: familyId, name: '我们家', role: 'caregiver', babyIds: [babyA.id] },
       ])
     })
@@ -173,7 +173,7 @@ describe('roles, baby scope and member management', () => {
       const path = `/api/families/${familyId}/members/${member.id}`
       expect((await send('PATCH', path, owner, { role: 'caregiver' })).status).toBe(204)
       expect((await send('PATCH', path, owner, { babyIds: [babyB.id] })).status).toBe(204)
-      expect((await pull(member)).access).toEqual([
+      expect((await pull(member)).access).toMatchObject([
         { id: familyId, name: '我们家', role: 'caregiver', babyIds: [babyB.id] },
       ])
       expect((await send('PATCH', path, owner, { babyIds: null })).status).toBe(204)
@@ -229,6 +229,26 @@ describe('roles, baby scope and member management', () => {
     })
   })
 
+  describe('aliases', () => {
+    it('keeps an alias private to the member who set it', async () => {
+      const caregiver = await join('caregiver')
+      const alias = (body: unknown) =>
+        send('PUT', `/api/families/${familyId}/alias`, caregiver, body)
+      expect((await alias({ alias: '  女儿家 ' })).status).toBe(204)
+      expect((await pull(caregiver)).access[0]).toMatchObject({ name: '我们家', alias: '女儿家' })
+      expect((await pull(owner)).access[0]).toMatchObject({ alias: null })
+      expect((await alias({ alias: '' })).status).toBe(204)
+      expect((await pull(caregiver)).access[0]?.alias).toBeNull()
+      expect((await alias({ alias: 'x'.repeat(41) })).status).toBe(400)
+      await send('DELETE', at(caregiver.id), caregiver)
+    })
+
+    it('reports how many members a family has', async () => {
+      const { access } = await pull(owner)
+      expect(access[0]?.memberCount).toBe((await members(owner)).length)
+    })
+  })
+
   describe('ownership transfer', () => {
     it('makes the target the owner with every baby and the previous owner an admin', async () => {
       const t2 = await createTestApp()
@@ -261,6 +281,47 @@ describe('roles, baby scope and member management', () => {
           ((await (await t2.request('/api/families', { headers })).json()) as FamilySummary[])[0]
         expect(await roles(b.headers)).toMatchObject({ role: 'owner', babyIds: null })
         expect(await roles(a.headers)).toMatchObject({ role: 'admin', babyIds: null })
+      } finally {
+        await t2.dispose()
+      }
+    })
+  })
+
+  describe('deleting a family', () => {
+    it('lets only the owner delete it, removing its data for everyone', async () => {
+      const t2 = await createTestApp()
+      try {
+        const a = await t2.signIn('a')
+        const b = await t2.signIn('b')
+        const res = await t2.send('POST', '/api/families', a.headers, { name: '家' })
+        const family = (await res.json()) as FamilySummary
+        const kid = baby(family.id)
+        await t2.send('POST', '/api/sync/push', a.headers, {
+          babies: [kid],
+          events: [diaper(kid.id, family.id)],
+        })
+        await t2.env.DB.prepare(
+          "insert into memberships (family_id, user_id, role, created_at) values (?, ?, 'admin', ?)",
+        )
+          .bind(family.id, b.user.id, Date.now())
+          .run()
+
+        const remove = (headers: Headers) =>
+          t2.send('DELETE', `/api/families/${family.id}`, headers)
+        expect((await remove(b.headers)).status).toBe(403)
+        expect((await remove(a.headers)).status).toBe(204)
+
+        for (const who of [a, b]) {
+          const pulled = (await (
+            await t2.request('/api/sync/pull', { headers: who.headers })
+          ).json()) as PullResponse
+          expect(pulled).toMatchObject({ access: [], babies: [], events: [] })
+        }
+        const left = await t2.env.DB.prepare(
+          `select (select count(*) from babies) + (select count(*) from events)
+             + (select count(*) from memberships) + (select count(*) from families) as n`,
+        ).first<{ n: number }>()
+        expect(left?.n).toBe(0)
       } finally {
         await t2.dispose()
       }

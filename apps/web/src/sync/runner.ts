@@ -1,9 +1,23 @@
+import { type FamilySummary, canAddBabies } from '@bobo/shared'
+
 import type { LocalStore } from '../db'
-import { HttpError } from '../lib/api'
+import { HttpError, apiFetch } from '../lib/api'
 import { createStore, useStore } from '../lib/store'
+import { m } from '../paraglide/messages.js'
 import { type SyncApi, syncOnce } from './engine'
 import { httpSyncApi } from './http'
-import { getAccount } from './local'
+import {
+  type SyncAccount,
+  claimLocalData,
+  getAccess,
+  getAccount,
+  setAccount,
+  unclaimedCount,
+} from './local'
+
+/** Name of the family created for a user's own babies, e.g. 王丽的家. */
+export const ownFamilyName = (user: { name: string }) =>
+  m.defaultFamilyName({ name: user.name.trim() || m.familyMemberYou() })
 
 export type SyncPhase = 'signed-out' | 'idle' | 'syncing' | 'offline' | 'error' | 'unauthorized'
 
@@ -45,10 +59,33 @@ export function requestSync(): Promise<void> {
   return running
 }
 
+/**
+ * Babies added for "a new family of my own" (or before the account had any family) wait
+ * without a family; the first sync creates one named after the user and moves them in.
+ */
+async function fileUnclaimed(store: LocalStore, account: SyncAccount) {
+  if (unclaimedCount(store) === 0) return
+  const family = await apiFetch<FamilySummary>('/api/families', {
+    method: 'POST',
+    body: JSON.stringify({ name: ownFamilyName({ name: account.userName ?? '' }) }),
+  })
+  claimLocalData(store, family.id)
+  setAccount(store, { ...account, familyId: family.id })
+}
+
+/** After leaving or deleting the default family, new babies go to another one the user manages. */
+function keepDefaultFamily(store: LocalStore) {
+  const account = getAccount(store)
+  const access = getAccess(store)
+  if (!account?.familyId || !access || access.some((f) => f.id === account.familyId)) return
+  setAccount(store, { ...account, familyId: access.find(canAddBabies)?.id ?? null })
+}
+
 async function runRound() {
   if (!current) return
   const { store, api } = current
-  if (!getAccount(store)) {
+  const account = getAccount(store)
+  if (!account) {
     setState({ phase: 'signed-out' })
     return
   }
@@ -58,7 +95,9 @@ async function runRound() {
   }
   setState({ ...syncState.get(), phase: 'syncing' })
   try {
+    await fileUnclaimed(store, account)
     const result = await syncOnce(store, api)
+    keepDefaultFamily(store)
     const at = Date.now()
     if (result.rejected.length > 0) console.warn('Sync rejected changes', result.rejected)
     setState({

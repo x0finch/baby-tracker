@@ -4,10 +4,16 @@ import type { LocalStore } from '../db'
 
 export type SyncTable = 'babies' | 'events'
 
-/** Signed-in account and the family new records belong to. Absent while signed out. */
+/** Signed-in account. Absent while signed out. */
 export interface SyncAccount {
   userId: string
-  familyId: string
+  /** Shown in the name of the family created for the user's own babies. */
+  userName?: string
+  /**
+   * Family new babies go to by default; null until the user has one of their own (a family is
+   * created for them when they first add a baby, see fileUnclaimed in runner.ts).
+   */
+  familyId: string | null
 }
 
 const ACCOUNT_KEY = 'account'
@@ -33,7 +39,7 @@ function isAccount(value: unknown): value is SyncAccount {
     'userId' in value &&
     typeof value.userId === 'string' &&
     'familyId' in value &&
-    typeof value.familyId === 'string'
+    (typeof value.familyId === 'string' || value.familyId === null)
   )
 }
 
@@ -119,4 +125,31 @@ export function removeLocal(store: LocalStore, table: SyncTable, id: string) {
   if (collection.has(id)) collection.delete(id)
   const key = outboxKey(table, id)
   if (store.outbox.has(key)) store.outbox.delete(key)
+}
+
+/** Babies not yet in any family: created while signed out, or for a new family of the user's. */
+export function unclaimedCount(store: LocalStore): number {
+  return store.babies.toArray.filter((b) => b.familyId === null && b.deletedAt === null).length
+}
+
+/**
+ * Moves every baby and event without a family into one and queues them for upload.
+ * Events follow their baby, so a family's events always travel with its babies.
+ */
+export function claimLocalData(store: LocalStore, familyId: string, now: number = Date.now()) {
+  for (const baby of store.babies.toArray) {
+    if (baby.familyId !== null) continue
+    const updatedAt = Math.max(now, baby.updatedAt)
+    store.babies.update(baby.id, (draft) => Object.assign(draft, { familyId, updatedAt }))
+    markDirty(store, 'babies', { ...baby, familyId, updatedAt })
+  }
+  for (const event of store.events.toArray) {
+    if (event.familyId !== null) continue
+    const babyFamily = store.babies.get(event.babyId)?.familyId ?? familyId
+    const updatedAt = Math.max(now, event.updatedAt)
+    store.events.update(event.id, (draft) =>
+      Object.assign(draft, { familyId: babyFamily, updatedAt }),
+    )
+    markDirty(store, 'events', { ...event, familyId: babyFamily, updatedAt })
+  }
 }
