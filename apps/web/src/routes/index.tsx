@@ -2,6 +2,7 @@ import type { Baby } from '@bobo/shared'
 import { createFileRoute } from '@tanstack/react-router'
 
 import { Card } from '../components/ui/Card'
+import { BadgeToast } from '../features/achievements/BadgeToast'
 import { RequireBaby } from '../features/babies/RequireBaby'
 import { useSelectedBaby } from '../features/babies/use-babies'
 import { NapPrediction } from '../features/events/NapPrediction'
@@ -47,6 +48,7 @@ function BabyToday({ baby }: { baby: Baby }) {
         </Card>
       )}
       <TodayList events={events} />
+      <BadgeToast baby={baby} events={events} />
     </div>
   )
 }
