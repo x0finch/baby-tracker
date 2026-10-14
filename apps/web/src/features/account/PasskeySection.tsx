@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
-import { Button } from '../components/ui/Button'
-import { formatDate } from '../lib/i18n'
-import { m } from '../paraglide/messages.js'
+import { Button } from '../../components/ui/Button'
+import { formatDate } from '../../lib/i18n'
+import { m } from '../../paraglide/messages.js'
 import {
   type PasskeyInfo,
   addPasskey,

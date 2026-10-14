@@ -1,6 +1,24 @@
-import type { ButtonTone } from '../../components/ui/Button'
-import type { Category } from './describe'
+import type { Event } from '@bobo/shared'
 
+import type { ButtonTone } from '../../components/ui/Button'
+import { m } from '../../paraglide/messages.js'
+
+/** One per event type; the unit for titles, colors, icons and timeline lanes. */
+export type Category = Event['type']
+
+export const categoryTitle: Record<Category, () => string> = {
+  feeding: m.categoryFeeding,
+  sleep: m.categorySleep,
+  diaper: m.categoryDiaper,
+  pumping: m.categoryPumping,
+  temperature: m.categoryTemperature,
+  medication: m.categoryMedication,
+  note: m.categoryNote,
+  growth: m.categoryGrowth,
+}
+
+// Colors are full class names so Tailwind can find them; keep these maps side by side.
+// Buttons only come in the main tones, so the less frequent types borrow one.
 export const categoryTone: Record<Category, ButtonTone> = {
   feeding: 'feeding',
   sleep: 'sleep',
@@ -12,6 +30,7 @@ export const categoryTone: Record<Category, ButtonTone> = {
   growth: 'primary',
 }
 
+/** Fill of a type's icon badge and timeline dot. */
 export const categoryDot: Record<Category, string> = {
   feeding: 'bg-feeding',
   sleep: 'bg-sleep',

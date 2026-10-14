@@ -1,8 +1,8 @@
 import type { FamilySummary } from '@bobo/shared'
 
-import type { LocalStore } from '../db'
-import { HttpError, apiFetch } from './api'
-import { markDirty, setAccount, setCursor } from './local'
+import type { LocalStore } from '../../db'
+import { HttpError, apiFetch } from '../../lib/api'
+import { markDirty, setAccount, setCursor } from '../../sync/local'
 import { derivePasswordKey, normalizeEmail } from './password'
 
 export interface SessionUser {

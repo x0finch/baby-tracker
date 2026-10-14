@@ -8,7 +8,7 @@ import type {
 import { queryOptions, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
-import { apiFetch } from '../../sync/api'
+import { apiFetch } from '../../lib/api'
 
 const json = (method: string, body: unknown): RequestInit => ({
   method,

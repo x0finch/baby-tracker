@@ -2,10 +2,11 @@ import { type FamilySummary, newId } from '@bobo/shared'
 import { IDBFactory } from 'fake-indexeddb'
 import { describe, expect, it } from 'vitest'
 
-import { type LocalStore, openLocalStore } from '../db/local-store'
-import { createBaby } from '../features/babies/actions'
-import { addEvent } from '../features/events/actions'
-import { logDiaper } from '../features/events/records'
+import { type LocalStore, openLocalStore } from '../../db/local-store'
+import { getAccount, getCursor, setCursor } from '../../sync/local'
+import { createBaby } from '../babies/actions'
+import { addEvent } from '../events/actions'
+import { logDiaper } from '../events/records'
 import {
   type AccountApi,
   claimLocalData,
@@ -14,7 +15,6 @@ import {
   disconnectLocal,
   unclaimedCount,
 } from './account'
-import { getAccount, getCursor, setCursor } from './local'
 
 const user = { id: 'user-1', name: '家长', email: 'a@example.com', image: null }
 

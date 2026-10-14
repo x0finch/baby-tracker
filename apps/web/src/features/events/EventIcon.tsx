@@ -2,8 +2,8 @@ import type { Event, PoopDetails } from '@bobo/shared'
 import { clsx } from 'clsx'
 import type { ReactNode } from 'react'
 
-import type { Category } from './describe'
-import { DiaperArt } from './DiaperIcon'
+import type { Category } from './category'
+import { DiaperArt } from './DiaperArt'
 
 /** Icon subjects: each category, with feeds and sleeps split by kind. */
 export type IconKind =

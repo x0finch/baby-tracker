@@ -4,8 +4,8 @@ import { useState } from 'react'
 
 import { Toast, toastActionClass } from '../../components/ui/Toast'
 import { jsonCodec, readStored, stringList, writeStored } from '../../lib/store'
+import { useNow } from '../../lib/use-now'
 import { m } from '../../paraglide/messages.js'
-import { useNow } from '../events/use-events'
 import { computeBadges } from './achievements'
 import { badgeLabel } from './badge-labels'
 

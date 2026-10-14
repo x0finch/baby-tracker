@@ -5,9 +5,9 @@ import { Card } from '../../components/ui/Card'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { formatDate, formatNumber } from '../../lib/i18n'
 import { convertToDisplay, getUnits, unitLabel } from '../../lib/units'
+import { useNow } from '../../lib/use-now'
 import { m } from '../../paraglide/messages.js'
 import { durationLabel } from '../events/duration-label'
-import { useNow } from '../events/use-events'
 import { type DayTrend, dailyTrends } from './trends'
 
 type Range = 7 | 30

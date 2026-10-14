@@ -5,9 +5,10 @@ import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
+import { useNow } from '../../lib/use-now'
 import { m } from '../../paraglide/messages.js'
 import { useBabies } from '../babies/use-babies'
-import { useBabyEvents, useNow } from '../events/use-events'
+import { useBabyEvents } from '../events/use-events'
 import { csvFileName, downloadCsv, eventsToCsv, exportRangeLabel } from './csv'
 
 /** Exports one baby's events in a date range as CSV, entirely on the device. */

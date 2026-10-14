@@ -7,7 +7,7 @@ import {
   startRegistration,
 } from '@simplewebauthn/browser'
 
-import { HttpError, apiFetch } from './api'
+import { HttpError, apiFetch } from '../../lib/api'
 
 export interface PasskeyInfo {
   id: string

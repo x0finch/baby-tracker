@@ -2,12 +2,13 @@ import type { Baby, Reminder, ReminderKind } from '@bobo/shared'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
-import { Button } from '../components/ui/Button'
-import { Card } from '../components/ui/Card'
-import { SegmentedControl } from '../components/ui/SegmentedControl'
-import { useBabies } from '../features/babies/use-babies'
-import { formatNumber } from '../lib/i18n'
-import { m } from '../paraglide/messages.js'
+import { Button } from '../../components/ui/Button'
+import { Card } from '../../components/ui/Card'
+import { SegmentedControl } from '../../components/ui/SegmentedControl'
+import { formatNumber } from '../../lib/i18n'
+import { m } from '../../paraglide/messages.js'
+import { useAccess } from '../../sync/use-access'
+import { useBabies } from '../babies/use-babies'
 import {
   type PushState,
   disablePush,
@@ -17,7 +18,6 @@ import {
   reminderApi,
   sendTestNotification,
 } from './notifications'
-import { useAccess } from './use-access'
 
 /** Interval choices in minutes; 0 turns the reminder off. */
 const CHOICES: Record<ReminderKind, number[]> = {

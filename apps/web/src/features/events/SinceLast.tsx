@@ -1,10 +1,10 @@
 import { type Event, isRunning } from '@bobo/shared'
 
+import { useNow } from '../../lib/use-now'
 import { m } from '../../paraglide/messages.js'
 import { durationLabel } from './duration-label'
 import { EventIcon, type IconKind } from './EventIcon'
 import { lastActivityAt } from './summary'
-import { useNow } from './use-events'
 
 /** "Time since last" hints, the main question at 3am: when did the baby last eat? */
 export function SinceLast({ events }: { events: readonly Event[] }) {

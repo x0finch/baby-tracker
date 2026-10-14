@@ -1,9 +1,10 @@
 import { type FormEvent, useEffect, useState } from 'react'
 
-import { Button } from '../components/ui/Button'
-import { FormError } from '../components/ui/FormError'
-import { Input } from '../components/ui/Input'
-import { m } from '../paraglide/messages.js'
+import { Button } from '../../components/ui/Button'
+import { FormError } from '../../components/ui/FormError'
+import { Input } from '../../components/ui/Input'
+import { HttpError } from '../../lib/api'
+import { m } from '../../paraglide/messages.js'
 import {
   requestPasswordReset,
   resetPassword,
@@ -11,7 +12,6 @@ import {
   signInWithGoogle,
   signUpWithEmail,
 } from './account'
-import { HttpError } from './api'
 import { isPasskeyCancel, passkeysSupported, signInWithPasskey } from './passkey'
 import { MIN_PASSWORD_LENGTH } from './password'
 

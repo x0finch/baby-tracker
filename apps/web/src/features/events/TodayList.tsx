@@ -1,17 +1,16 @@
 import { type Event, startOfLocalDay } from '@bobo/shared'
 import { useEffect, useState } from 'react'
 
-import { Sheet } from '../../components/ui/Sheet'
 import { Toast, ToastAction } from '../../components/ui/Toast'
 import { useLocalStore } from '../../db'
 import { formatDate, formatTime } from '../../lib/i18n'
+import { useNow } from '../../lib/use-now'
 import { m } from '../../paraglide/messages.js'
 import { saveEvent } from './actions'
 import { describeEvent } from './describe'
-import { EditEventForm } from './EditEventSheet'
+import { EditEventSheet } from './EditEventSheet'
 import { EventIcon, eventIconProps } from './EventIcon'
 import { restoreEvent } from './records'
-import { useNow } from './use-events'
 
 const UNDO_MS = 6000
 
@@ -49,7 +48,6 @@ export function TodayList({ events }: { events: readonly Event[] }) {
       : daysBack === 1
         ? m.yesterdayRecords()
         : m.dayRecords({ date: formatDate(dayStart) })
-  const editing = events.find((event) => event.id === editingId)
   const close = () => setEditingId(null)
 
   useEffect(() => {
@@ -117,17 +115,7 @@ export function TodayList({ events }: { events: readonly Event[] }) {
         </ul>
       )}
 
-      <Sheet open={editing !== undefined} onClose={close} title={m.editEventTitle()}>
-        {editing && (
-          <EditEventForm
-            key={editing.id}
-            event={editing}
-            events={events}
-            onDone={close}
-            onDeleted={setDeleted}
-          />
-        )}
-      </Sheet>
+      <EditEventSheet eventId={editingId} events={events} onClose={close} onDeleted={setDeleted} />
 
       {deleted && (
         <Toast

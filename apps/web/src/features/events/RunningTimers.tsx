@@ -4,12 +4,12 @@ import { clsx } from 'clsx'
 import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { useLocalStore } from '../../db'
+import { useNow } from '../../lib/use-now'
 import { m } from '../../paraglide/messages.js'
 import { useAccess } from '../../sync/use-access'
 import { saveEvent } from './actions'
 import { currentBreastSide, stopEvent, switchBreastSide } from './records'
 import { formatClock } from './time'
-import { useNow } from './use-events'
 
 const sideLabel = (side: 'left' | 'right') => (side === 'left' ? m.sideLeft() : m.sideRight())
 

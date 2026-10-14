@@ -7,6 +7,7 @@ import { Input } from '../../components/ui/Input'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { useLocalStore } from '../../db'
 import { getUnits, quantityInputProps, unitLabel } from '../../lib/units'
+import { useNow } from '../../lib/use-now'
 import { m } from '../../paraglide/messages.js'
 import { addEvent } from './actions'
 import { type Milk, parseBottle } from './bottle-input'
@@ -16,7 +17,6 @@ import { AgoChips } from './QuickTimeField'
 import { logBottle, logSolids, startBreastFeed, suggestedBreastSide } from './records'
 import { toDateTimeLocal } from './time'
 import { TimeField } from './TimeField'
-import { useNow } from './use-events'
 import { validateTime } from './validation'
 
 type Kind = 'breast' | 'bottle' | 'solids'
@@ -24,7 +24,7 @@ type Kind = 'breast' | 'bottle' | 'solids'
 /** One-tap bottle amounts in display units. */
 const QUICK_AMOUNTS = { ml: [60, 90, 120, 150], oz: [2, 3, 4, 5] } as const
 
-export function FeedingSheetContent({
+export function FeedingForm({
   babyIds,
   events,
   targets,
