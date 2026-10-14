@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { Workbox } from 'workbox-window'
 
 /** Installed to the home screen (or running in the native shell later). */
@@ -68,6 +68,9 @@ export function useInstallPrompt(): (() => Promise<void>) | null {
  */
 export function useServiceWorkerUpdate(): (() => void) | null {
   const [workbox, setWorkbox] = useState<Workbox | null>(null)
+  // A worker also takes control on the very first visit (clients.claim); reloading then
+  // would interrupt onboarding, so only reload after the user asked for the update.
+  const accepted = useRef(false)
 
   useEffect(() => {
     if (import.meta.env.DEV || !('serviceWorker' in navigator)) return undefined
@@ -81,7 +84,9 @@ export function useServiceWorkerUpdate(): (() => void) | null {
         if (!cancelled) setWorkbox(wb)
       })
       // Reload once the new worker takes over after the user accepted the update.
-      wb.addEventListener('controlling', () => window.location.reload())
+      wb.addEventListener('controlling', () => {
+        if (accepted.current) window.location.reload()
+      })
       void wb.register()
     })
     return () => {
@@ -89,5 +94,10 @@ export function useServiceWorkerUpdate(): (() => void) | null {
     }
   }, [])
 
-  return workbox ? () => workbox.messageSkipWaiting() : null
+  return workbox
+    ? () => {
+        accepted.current = true
+        workbox.messageSkipWaiting()
+      }
+    : null
 }
