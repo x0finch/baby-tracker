@@ -36,5 +36,7 @@
   // To send email with Cloudflare Email Service (Workers Paid plan), add:
   //   "send_email": [{ "name": "EMAIL" }]
   // On the free plan, set the RESEND_API_KEY secret instead. Both need EMAIL_FROM.
+  // Reminder dispatch (src/reminders.ts).
+  "triggers": { "crons": ["* * * * *"] },
   "observability": { "enabled": true },
 }
