@@ -104,7 +104,7 @@ describe('summarizeDay', () => {
 })
 
 describe('lastActivityAt', () => {
-  it('uses the end of timed events and the time of instants', () => {
+  it('counts sleeps from waking up and everything else from its start', () => {
     const events = [
       logSleep(BABY, at(9), at(10), at(10)),
       logDiaper(BABY, at(11), 'wet'),
@@ -113,5 +113,8 @@ describe('lastActivityAt', () => {
     expect(lastActivityAt(events, 'sleep', at(12))).toBe(at(10))
     expect(lastActivityAt(events, 'diaper', at(12))).toBe(at(11))
     expect(lastActivityAt(events, 'feeding', at(12))).toBeUndefined()
+    // Feeds are spaced start to start, however long they took.
+    const feed = logBottle(BABY, at(9), 120, 'formula', at(9, 30), undefined, 20 * MIN)
+    expect(lastActivityAt([feed], 'feeding', at(12))).toBe(at(9))
   })
 })

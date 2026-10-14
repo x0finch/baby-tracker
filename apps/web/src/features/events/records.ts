@@ -47,12 +47,14 @@ export function logBottle(
   milk: 'breast' | 'formula' | 'mixed',
   now: number = at,
   split?: { breastMl: number; formulaMl: number },
+  /** How long the feed took, when known. */
+  durationMs: number | null = null,
 ): FeedingEvent {
   return {
     ...base(babyId, now),
     type: 'feeding',
     startAt: at,
-    endAt: null,
+    endAt: durationMs === null ? null : at + durationMs,
     data: { kind: 'bottle', amountMl, milk, ...(milk === 'mixed' && split) },
   }
 }
@@ -62,12 +64,13 @@ export function logSolids(
   at: number,
   food: string,
   now: number = at,
+  durationMs: number | null = null,
 ): FeedingEvent {
   return {
     ...base(babyId, now),
     type: 'feeding',
     startAt: at,
-    endAt: null,
+    endAt: durationMs === null ? null : at + durationMs,
     data: { kind: 'solids', food: food.trim() },
   }
 }

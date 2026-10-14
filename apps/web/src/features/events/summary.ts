@@ -1,4 +1,4 @@
-import { type Event, breastSideDurations, eventDurationMs, isTimed } from '@bobo/shared'
+import { type Event, breastSideDurations, eventDurationMs } from '@bobo/shared'
 
 export interface DaySummary {
   feedings: number
@@ -110,7 +110,10 @@ export function summarizeDay(
   return summary
 }
 
-/** Most recent event of a category, for "time since last" hints. Timed events count from their end. */
+/**
+ * Most recent event of a category, for "time since last" hints. Sleeps count from waking up;
+ * everything else, feeds included, from when it started (feeds are spaced start to start).
+ */
 export function lastActivityAt(
   events: readonly Event[],
   type: Event['type'],
@@ -119,7 +122,7 @@ export function lastActivityAt(
   let latest: number | undefined
   for (const event of events) {
     if (event.deletedAt !== null || event.type !== type) continue
-    const at = isTimed(event) ? (event.endAt ?? now) : event.startAt
+    const at = event.type === 'sleep' ? (event.endAt ?? now) : event.startAt
     if (latest === undefined || at > latest) latest = at
   }
   return latest

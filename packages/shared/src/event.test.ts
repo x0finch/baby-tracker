@@ -28,6 +28,15 @@ const instant = (type: string, data: unknown, note: string | null = null) =>
 const mixedBottle = (data: object) =>
   instant('feeding', { kind: 'bottle', amountMl: 120, milk: 'mixed', ...data })
 
+/** An event that ended 15 minutes after it started. */
+const finished = (type: string, data: unknown) => ({
+  ...baseEvent(),
+  type,
+  startAt: T0,
+  endAt: T0 + 15 * MINUTE,
+  data,
+})
+
 describe('eventSchema', () => {
   it('accepts each event type', () => {
     expect(eventSchema.safeParse(sleep(T0 + 30 * MINUTE)).success).toBe(true)
@@ -97,15 +106,14 @@ describe('eventSchema', () => {
     expect(eventSchema.safeParse(sleep(T0 - MINUTE)).success).toBe(false)
   })
 
-  it('rejects an end time on instant events', () => {
-    const bottle = {
-      ...baseEvent(),
-      type: 'feeding',
-      startAt: T0,
-      endAt: T0 + MINUTE,
-      data: { kind: 'bottle', amountMl: 90, milk: 'breast' },
-    }
-    expect(eventSchema.safeParse(bottle).success).toBe(false)
+  it('allows an end time only on bottles and solids among instant events', () => {
+    const bottle = finished('feeding', { kind: 'bottle', amountMl: 90, milk: 'breast' })
+    expect(eventSchema.safeParse(bottle).success).toBe(true)
+    expect(
+      eventSchema.safeParse(finished('feeding', { kind: 'solids', food: '米粉' })).success,
+    ).toBe(true)
+    expect(eventSchema.safeParse(finished('diaper', { contents: 'wet' })).success).toBe(false)
+    expect(eventDurationMs(eventSchema.parse(bottle), T0)).toBe(15 * MINUTE)
   })
 
   describe('breast segments', () => {

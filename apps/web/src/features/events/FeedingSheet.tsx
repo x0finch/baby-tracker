@@ -10,6 +10,7 @@ import { getUnits, quantityInputProps, unitLabel } from '../../lib/units'
 import { m } from '../../paraglide/messages.js'
 import { addEvent } from './actions'
 import { type Milk, parseBottle } from './bottle-input'
+import { FeedDurationField } from './FeedDurationField'
 import { MixedAmounts } from './MixedAmounts'
 import { logBottle, logSolids, startBreastFeed, suggestedBreastSide } from './records'
 import { toDateTimeLocal } from './time'
@@ -18,6 +19,8 @@ import { useNow } from './use-events'
 import { validateTime } from './validation'
 
 type Kind = 'breast' | 'bottle' | 'solids'
+
+const MINUTE = 60_000
 
 /** One-tap bottle amounts in display units. */
 const QUICK_AMOUNTS = { ml: [60, 90, 120, 150], oz: [2, 3, 4, 5] } as const
@@ -45,6 +48,10 @@ export function FeedingSheetContent({
   const [breastPart, setBreastPart] = useState('')
   const [formulaPart, setFormulaPart] = useState('')
   const [food, setFood] = useState('')
+  const [duration, setDuration] = useState<number | null>(null)
+  // Until the time is edited by hand, picking a duration means "just finished" and moves the
+  // start back by that much.
+  const [timeEdited, setTimeEdited] = useState(false)
   const [errors, setErrors] = useState<{ time?: string; amount?: string; food?: string }>({})
 
   const feeds = events.filter((event): event is FeedingEvent => event.type === 'feeding')
@@ -59,6 +66,11 @@ export function FeedingSheetContent({
     onDone()
   }
 
+  function chooseDuration(minutes: number | null) {
+    setDuration(minutes)
+    if (!timeEdited) setTime(toDateTimeLocal(Date.now() - (minutes ?? 0) * MINUTE))
+  }
+
   function submit(event: FormEvent) {
     event.preventDefault()
     const current = Date.now()
@@ -68,6 +80,14 @@ export function FeedingSheetContent({
     const bottle = parseBottle({ milk, amount, breast: breastPart, formula: formulaPart })
     if (kind === 'bottle' && 'error' in bottle) nextErrors.amount = bottle.error
     if (kind === 'solids' && !food.trim()) nextErrors.food = m.solidsFoodRequired()
+    const durationMs = duration === null ? null : duration * MINUTE
+    if (
+      'at' in timeResult &&
+      durationMs !== null &&
+      timeResult.at + durationMs > current + MINUTE
+    ) {
+      nextErrors.time = m.feedEndFuture()
+    }
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0 || !('at' in timeResult)) return
 
@@ -76,8 +96,8 @@ export function FeedingSheetContent({
       addEvent(
         store,
         kind === 'bottle' && 'amountMl' in bottle
-          ? logBottle(id, at, bottle.amountMl, milk, current, bottle.split)
-          : logSolids(id, at, food, current),
+          ? logBottle(id, at, bottle.amountMl, milk, current, bottle.split, durationMs)
+          : logSolids(id, at, food, current, durationMs),
       )
     }
     onDone()
@@ -186,10 +206,18 @@ export function FeedingSheetContent({
               onChange={(event) => setFood(event.target.value)}
             />
           )}
+          <FeedDurationField
+            value={duration}
+            onChange={chooseDuration}
+            hint={duration !== null && !timeEdited ? m.feedBackdated() : undefined}
+          />
           <TimeField
-            label={m.eventTime()}
+            label={m.eventStart()}
             value={time}
-            onChange={setTime}
+            onChange={(value) => {
+              setTime(value)
+              setTimeEdited(true)
+            }}
             error={errors.time}
             now={now}
           />

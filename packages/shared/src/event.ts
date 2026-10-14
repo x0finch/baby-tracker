@@ -90,7 +90,10 @@ const eventBase = {
   babyId: idSchema,
   familyId: idSchema.nullable(),
   startAt: timestampSchema,
-  /** Null while a timed event is running; always null for instant events. */
+  /**
+   * Null while a timed event is running. Bottles and solids may record when they finished;
+   * other instant events never have one.
+   */
   endAt: timestampSchema.nullable(),
   note: z.string().trim().max(500).nullable(),
   ...syncFields,
@@ -113,7 +116,7 @@ export const eventSchema = z
     if (event.endAt !== null && event.endAt < event.startAt) {
       ctx.addIssue({ code: 'custom', message: 'endAt must not be before startAt', path: ['endAt'] })
     }
-    if (!isTimed(event) && event.endAt !== null) {
+    if (!isTimed(event) && !hasOptionalDuration(event) && event.endAt !== null) {
       ctx.addIssue({ code: 'custom', message: 'Instant events have no endAt', path: ['endAt'] })
     }
     if (event.type === 'feeding' && event.data.kind === 'bottle') {
@@ -200,17 +203,24 @@ export function isTimed(event: Pick<Event, 'type' | 'data'>): boolean {
   return event.type === 'feeding' && 'kind' in event.data && event.data.kind === 'breast'
 }
 
+/** Bottles and solids happen at their start time and may also record how long they took. */
+export function hasOptionalDuration(event: Pick<Event, 'type' | 'data'>): boolean {
+  return event.type === 'feeding' && 'kind' in event.data && event.data.kind !== 'breast'
+}
+
 export function isRunning(event: Pick<Event, 'type' | 'data' | 'endAt'>): boolean {
   return isTimed(event) && event.endAt === null
 }
 
-/** Elapsed time of a timed event; running events count up to `now`. Instants are 0. */
+/**
+ * Elapsed time of an event; running timers count up to `now`. Instants without an end are 0.
+ */
 export function eventDurationMs(
   event: Pick<Event, 'type' | 'data' | 'startAt' | 'endAt'>,
   now: number,
 ): number {
-  if (!isTimed(event)) return 0
-  return Math.max(0, (event.endAt ?? now) - event.startAt)
+  const end = event.endAt ?? (isTimed(event) ? now : event.startAt)
+  return Math.max(0, end - event.startAt)
 }
 
 export function breastSideDurations(
