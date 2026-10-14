@@ -14,15 +14,16 @@ import { DayTimeline } from '../features/events/DayTimeline'
 import { EditEventForm } from '../features/events/EditEventSheet'
 import { useBabyEvents, useNow } from '../features/events/use-events'
 import { GrowthView } from '../features/growth/GrowthView'
+import { TrendsView } from '../features/trends/TrendsView'
 import { formatDate } from '../lib/i18n'
 import { m } from '../paraglide/messages.js'
 
 const searchSchema = z.object({
   day: z.iso.date().optional().catch(undefined),
-  view: z.enum(['growth']).optional().catch(undefined),
+  view: z.enum(['trends', 'growth']).optional().catch(undefined),
 })
 
-type View = 'day' | 'growth'
+type View = 'day' | 'trends' | 'growth'
 
 export const Route = createFileRoute('/stats')({
   validateSearch: searchSchema,
@@ -40,6 +41,7 @@ function StatsPage() {
           label={m.statsTitle()}
           options={[
             { value: 'day', label: m.statsViewDay() },
+            { value: 'trends', label: m.statsViewTrends() },
             { value: 'growth', label: m.statsViewGrowth() },
           ]}
           value={view}
@@ -48,9 +50,15 @@ function StatsPage() {
           }
         />
       </div>
-      {view === 'growth' ? <Growth /> : <DayView />}
+      {view === 'growth' ? <Growth /> : view === 'trends' ? <Trends /> : <DayView />}
     </RequireBaby>
   )
+}
+
+function Trends() {
+  const { baby } = useSelectedBaby()
+  const events = useBabyEvents(baby?.id ?? '')
+  return <TrendsView key={baby?.id} events={events} />
 }
 
 function Growth() {
