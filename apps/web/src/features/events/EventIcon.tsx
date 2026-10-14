@@ -12,11 +12,16 @@ export type IconKind =
   | 'sleep'
   | 'nap'
   | 'diaper'
+  | 'diaperWet'
+  | 'diaperDirty'
+  | 'diaperMixed'
   | 'pumping'
   | 'temperature'
   | 'medication'
   | 'note'
   | 'growth'
+
+const DIAPER_KIND = { wet: 'diaperWet', dirty: 'diaperDirty', mixed: 'diaperMixed' } as const
 
 const CATEGORY_KIND: Record<Category, IconKind> = {
   feeding: 'bottle',
@@ -32,6 +37,7 @@ const CATEGORY_KIND: Record<Category, IconKind> = {
 export function iconKindOf(event: Event): IconKind {
   if (event.type === 'feeding') return event.data.kind
   if (event.type === 'sleep') return event.data.kind === 'nap' ? 'nap' : 'sleep'
+  if (event.type === 'diaper') return DIAPER_KIND[event.data.contents]
   return CATEGORY_KIND[event.type]
 }
 
@@ -45,6 +51,9 @@ const TONE: Record<IconKind, string> = {
   sleep: 'fill-sleep',
   nap: 'fill-sleep',
   diaper: 'fill-diaper',
+  diaperWet: 'fill-diaper',
+  diaperDirty: 'fill-diaper',
+  diaperMixed: 'fill-diaper',
   pumping: 'fill-avatar-pink',
   temperature: 'fill-danger',
   medication: 'fill-avatar-yellow',
@@ -53,6 +62,32 @@ const TONE: Record<IconKind, string> = {
 }
 
 const W = '#ffffff'
+const PEE = '#ffcf33'
+const POOP = '#8b5a2b'
+
+const DIAPER_BODY =
+  'M10 12 H38 Q42 12 40 16 L33 24 Q31 27 33 30 L38 35 Q40 39 36 39 H12 Q8 39 10 35 L15 30 Q17 27 15 24 L8 16 Q6 12 10 12 Z'
+
+function Drop({ x, y, scale = 1 }: { x: number; y: number; scale?: number }) {
+  return (
+    <path
+      transform={`translate(${x} ${y}) scale(${scale})`}
+      d="M0 -9 C0 -9 -6 -1.5 -6 2.5 A6 6 0 0 0 6 2.5 C6 -1.5 0 -9 0 -9 Z"
+      fill={PEE}
+    />
+  )
+}
+
+function Poop({ x, y, scale = 1 }: { x: number; y: number; scale?: number }) {
+  return (
+    <g transform={`translate(${x} ${y}) scale(${scale})`} fill={POOP}>
+      <ellipse cx="0" cy="5" rx="8" ry="3.6" />
+      <ellipse cx="0" cy="0.5" rx="6" ry="3.2" />
+      <ellipse cx="0.5" cy="-3.6" rx="3.6" ry="2.6" />
+      <path d="M1 -5.8 Q3.5 -8.5 1.5 -10 Q2.5 -7.5 -1 -6.2 Z" />
+    </g>
+  )
+}
 
 /** Flat white artwork on a 48×48 grid; `tone` paints details in the kind's color. */
 function glyph(kind: IconKind, tone: string): ReactNode {
@@ -119,15 +154,34 @@ function glyph(kind: IconKind, tone: string): ReactNode {
     case 'diaper':
       return (
         <>
-          <path
-            d="M10 12 H38 Q42 12 40 16 L33 24 Q31 27 33 30 L38 35 Q40 39 36 39 H12 Q8 39 10 35 L15 30 Q17 27 15 24 L8 16 Q6 12 10 12 Z"
-            fill={W}
-          />
+          <path d={DIAPER_BODY} fill={W} />
           <path
             d="M20 15 H28 L26 25 Q25 27 26 29 L28 36 H20 L22 29 Q23 27 22 25 Z"
             className={tone}
             opacity="0.3"
           />
+        </>
+      )
+    case 'diaperWet':
+      return (
+        <>
+          <path d={DIAPER_BODY} fill={W} />
+          <Drop x={24} y={26} />
+        </>
+      )
+    case 'diaperDirty':
+      return (
+        <>
+          <path d={DIAPER_BODY} fill={W} />
+          <Poop x={24} y={25} />
+        </>
+      )
+    case 'diaperMixed':
+      return (
+        <>
+          <path d={DIAPER_BODY} fill={W} />
+          <Drop x={18.5} y={27} scale={0.72} />
+          <Poop x={29} y={26} scale={0.72} />
         </>
       )
     case 'pumping':
