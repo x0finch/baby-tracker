@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from 'react'
+import { type FormEvent, type ReactNode, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
 import { useLocalStore } from '../../db'
@@ -11,7 +11,15 @@ import { TimeField } from './TimeField'
 import { useNow } from './use-events'
 import { validateTime } from './validation'
 
-export function DiaperSheetContent({ babyId, onDone }: { babyId: string; onDone: () => void }) {
+export function DiaperSheetContent({
+  babyIds,
+  targets,
+  onDone,
+}: {
+  babyIds: readonly string[]
+  targets?: ReactNode
+  onDone: () => void
+}) {
   const store = useLocalStore()
   // Time the sheet opened; the form defaults and the max selectable time derive from it.
   const now = useNow(60_000)
@@ -27,12 +35,13 @@ export function DiaperSheetContent({ babyId, onDone }: { babyId: string; onDone:
       setError(result.error)
       return
     }
-    addEvent(store, logDiaper(babyId, result.at, diaper, current))
+    for (const babyId of babyIds) addEvent(store, logDiaper(babyId, result.at, diaper, current))
     onDone()
   }
 
   return (
     <form noValidate onSubmit={submit} className="flex flex-col gap-5">
+      {targets}
       <TimeField label={m.eventTime()} value={time} onChange={setTime} error={error} now={now} />
       <DiaperFields value={diaper} onChange={setDiaper} />
       <Button type="submit" tone="diaper" size="lg" block>

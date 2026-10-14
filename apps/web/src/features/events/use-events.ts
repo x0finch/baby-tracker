@@ -53,3 +53,18 @@ export function useNow(intervalMs: number, active = true): number {
   }, [intervalMs, active])
   return now
 }
+
+/** Non-deleted events of several babies, newest first, keyed by baby. */
+export function useEventsByBaby(babyIds: readonly string[]): ReadonlyMap<string, Event[]> {
+  const { events } = useLocalStore()
+  const { data } = useLiveQuery({ query: (q) => q.from({ event: events }) })
+  const key = babyIds.join(',')
+  return useMemo(() => {
+    const byBaby = new Map<string, Event[]>(key.split(',').map((id) => [id, []]))
+    for (const event of data ?? []) {
+      if (event.deletedAt === null) byBaby.get(event.babyId)?.push(event)
+    }
+    for (const list of byBaby.values()) list.sort((a, b) => b.startAt - a.startAt)
+    return byBaby
+  }, [data, key])
+}

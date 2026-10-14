@@ -1,6 +1,6 @@
 import type { BreastSide, Event, FeedingEvent } from '@bobo/shared'
 import { isRunning } from '@bobo/shared'
-import { type FormEvent, useState } from 'react'
+import { type FormEvent, type ReactNode, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
@@ -23,14 +23,18 @@ type Kind = 'breast' | 'bottle' | 'solids'
 const QUICK_AMOUNTS = { ml: [60, 90, 120, 150], oz: [2, 3, 4, 5] } as const
 
 export function FeedingSheetContent({
-  babyId,
+  babyIds,
   events,
+  targets,
   onDone,
 }: {
-  babyId: string
+  /** The selected baby first; breastfeeding is only timed for it. */
+  babyIds: readonly string[]
   events: readonly Event[]
+  targets?: ReactNode
   onDone: () => void
 }) {
+  const babyId = babyIds[0] ?? ''
   const store = useLocalStore()
   const [kind, setKind] = useState<Kind>('breast')
   // Time the sheet opened; the form defaults and the max selectable time derive from it.
@@ -67,12 +71,15 @@ export function FeedingSheetContent({
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0 || !('at' in timeResult)) return
 
-    addEvent(
-      store,
-      kind === 'bottle' && 'amountMl' in bottle
-        ? logBottle(babyId, timeResult.at, bottle.amountMl, milk, current, bottle.split)
-        : logSolids(babyId, timeResult.at, food, current),
-    )
+    const at = timeResult.at
+    for (const id of babyIds) {
+      addEvent(
+        store,
+        kind === 'bottle' && 'amountMl' in bottle
+          ? logBottle(id, at, bottle.amountMl, milk, current, bottle.split)
+          : logSolids(id, at, food, current),
+      )
+    }
     onDone()
   }
 
@@ -88,6 +95,7 @@ export function FeedingSheetContent({
         value={kind}
         onChange={setKind}
       />
+      {kind !== 'breast' && targets}
 
       {kind === 'breast' &&
         (runningBreast ? (

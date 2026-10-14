@@ -17,14 +17,18 @@ export function BabyAvatar({
 }: {
   name: string
   color: AvatarColor
-  size?: 'md' | 'lg'
+  size?: 'sm' | 'md' | 'lg'
 }) {
   return (
     <span
       aria-hidden
       className={clsx(
         'inline-flex shrink-0 items-center justify-center rounded-full font-extrabold text-on-accent',
-        size === 'md' ? 'size-10 text-body' : 'size-14 text-title',
+        size === 'sm'
+          ? 'size-8 text-caption'
+          : size === 'md'
+            ? 'size-10 text-body'
+            : 'size-14 text-title',
         avatarBackground[color],
       )}
     >

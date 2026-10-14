@@ -40,7 +40,7 @@ function BabyToday({ baby }: { baby: Baby }) {
       <RunningTimers events={events} />
       <NapPrediction baby={baby} events={events} />
       {canLog ? (
-        <QuickActions babyId={baby.id} events={events} />
+        <QuickActions baby={baby} events={events} />
       ) : (
         <Card>
           <p className="m-0 text-fg-muted">{m.viewerNotice()}</p>
