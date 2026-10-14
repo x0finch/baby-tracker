@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button'
 import { Sheet } from '../../components/ui/Sheet'
 import { useLocalStore } from '../../db'
 import { m } from '../../paraglide/messages.js'
+import { useAccess } from '../../sync/use-access'
 import { useBabiesWithRunningTimers } from '../events/use-events'
 import { createBaby } from './actions'
 import { ageLabel } from './age-label'
@@ -20,6 +21,7 @@ export function BabySwitcher() {
   const { active } = useBabies()
   const { baby, select } = useSelectedBaby()
   const runningBabies = useBabiesWithRunningTimers()
+  const { canAddBaby } = useAccess()
   const otherRunning = active.some((b) => b.id !== baby?.id && runningBabies.has(b.id))
   const [sheet, setSheet] = useState<'closed' | 'pick' | 'add'>('closed')
   const close = () => setSheet('closed')
@@ -89,9 +91,11 @@ export function BabySwitcher() {
             </li>
           ))}
         </ul>
-        <Button variant="soft" tone="primary" block onClick={() => setSheet('add')}>
-          {m.addBabyTitle()}
-        </Button>
+        {canAddBaby && (
+          <Button variant="soft" tone="primary" block onClick={() => setSheet('add')}>
+            {m.addBabyTitle()}
+          </Button>
+        )}
       </Sheet>
 
       <Sheet open={sheet === 'add'} onClose={close} title={m.addBabyTitle()}>

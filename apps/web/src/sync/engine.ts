@@ -8,7 +8,8 @@ import {
 } from '@bobo/shared'
 
 import type { LocalStore } from '../db'
-import { type SyncTable, clearDirty, getCursor, isDirty, setCursor } from './local'
+import { applyAccess } from './access'
+import { type SyncTable, clearDirty, getCursor, isDirty, removeLocal, setCursor } from './local'
 
 export interface SyncApi {
   push: (request: PushRequest) => Promise<PushResponse>
@@ -18,7 +19,7 @@ export interface SyncApi {
 export interface SyncResult {
   pushed: number
   pulled: number
-  /** Pending changes the server refused (Phase 3 rolls these back, #30). */
+  /** Pending changes the server refused; they are rolled back to the server's version. */
   rejected: { table: SyncTable; id: string; reason?: string }[]
 }
 
@@ -59,8 +60,11 @@ async function pushOnce(store: LocalStore, api: SyncApi, result: SyncResult): Pr
       // rejected: will never be stored as sent, so retrying is pointless.
       clearDirty(store, table, item.id, pushedAt)
       if (item.status === 'accepted') result.pushed += 1
-      if (item.status === 'rejected')
+      if (item.status === 'rejected') {
         result.rejected.push({ table, id: item.id, reason: item.reason })
+        // Drop the refused version; the full pull below restores the server's copy, if any.
+        removeLocal(store, table, item.id)
+      }
     }
   }
   return sent.size === SYNC_PUSH_LIMIT
@@ -100,11 +104,21 @@ function applyRemoteEvent(store: LocalStore, remote: Event): boolean {
 }
 
 async function pullAll(store: LocalStore, api: SyncApi, result: SyncResult) {
+  // Rolled-back records may be older than the cursor; start over to get them back.
+  if (result.rejected.length > 0) setCursor(store, '')
   let cursor = getCursor(store)
+  let restarted = false
   for (let page = 0; page < MAX_PULL_PAGES; page += 1) {
     // Each page needs the cursor returned by the previous one.
     // oxlint-disable-next-line no-await-in-loop
     const response = await api.pull(cursor)
+    // Newly shared families or babies have records older than the cursor: pull from the start.
+    if (applyAccess(store, response.access) && cursor !== '' && !restarted) {
+      restarted = true
+      cursor = ''
+      setCursor(store, cursor)
+      continue
+    }
     for (const baby of response.babies) if (applyRemoteBaby(store, baby)) result.pulled += 1
     for (const event of response.events) if (applyRemoteEvent(store, event)) result.pulled += 1
     cursor = response.cursor

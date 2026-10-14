@@ -1,4 +1,4 @@
-import type { Baby, Event } from '@bobo/shared'
+import type { Baby, Event, FamilySummary } from '@bobo/shared'
 
 import type { LocalStore } from '../db'
 
@@ -12,6 +12,7 @@ export interface SyncAccount {
 
 const ACCOUNT_KEY = 'account'
 const CURSOR_KEY = 'cursor'
+const ACCESS_KEY = 'access'
 
 const outboxKey = (table: SyncTable, id: string) => `${table}:${id}`
 
@@ -86,4 +87,36 @@ export function isDirty(store: LocalStore, table: SyncTable, id: string): boolea
 /** Family for new records: the signed-in account's family, or none while signed out. */
 export function currentFamilyId(store: LocalStore): string | null {
   return getAccount(store)?.familyId ?? null
+}
+
+function isFamilySummary(value: unknown): value is FamilySummary {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    typeof value.id === 'string' &&
+    'role' in value &&
+    typeof value.role === 'string' &&
+    'babyIds' in value &&
+    (value.babyIds === null || Array.isArray(value.babyIds))
+  )
+}
+
+/** Families the account can access, as of the last pull; undefined before the first one. */
+export function getAccess(store: LocalStore): FamilySummary[] | undefined {
+  const value = store.meta.get(ACCESS_KEY)?.value
+  return Array.isArray(value) ? value.filter(isFamilySummary) : undefined
+}
+
+export function setAccess(store: LocalStore, access: FamilySummary[] | undefined) {
+  if (access) setMeta(store, ACCESS_KEY, access)
+  else if (store.meta.has(ACCESS_KEY)) store.meta.delete(ACCESS_KEY)
+}
+
+/** Removes a record and its pending change without queueing anything for the server. */
+export function removeLocal(store: LocalStore, table: SyncTable, id: string) {
+  const collection = table === 'babies' ? store.babies : store.events
+  if (collection.has(id)) collection.delete(id)
+  const key = outboxKey(table, id)
+  if (store.outbox.has(key)) store.outbox.delete(key)
 }
