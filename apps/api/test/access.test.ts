@@ -9,7 +9,19 @@ const BABY_B = newId()
 const ME = 'me'
 
 function access(role: FamilyRole, babyIds: string[] | null = null): Access {
-  return new Map([[F, { id: F, name: '家', role, babyIds: babyIds ? new Set(babyIds) : null }]])
+  return new Map([
+    [
+      F,
+      {
+        id: F,
+        name: '家',
+        role,
+        babyIds: babyIds ? new Set(babyIds) : null,
+        alias: null,
+        memberCount: 1,
+      },
+    ],
+  ])
 }
 
 const baby = (id = BABY_A) => ({ id, familyId: F }) as Baby
@@ -67,8 +79,18 @@ describe('readScope', () => {
   it('splits whole families from individually shared babies', () => {
     const other = newId()
     const combined: Access = new Map([
-      [F, { id: F, name: 'a', role: 'owner', babyIds: null }],
-      [other, { id: other, name: 'b', role: 'viewer', babyIds: new Set([BABY_B]) }],
+      [F, { id: F, name: 'a', role: 'owner', babyIds: null, alias: null, memberCount: 1 }],
+      [
+        other,
+        {
+          id: other,
+          name: 'b',
+          role: 'viewer',
+          babyIds: new Set([BABY_B]),
+          alias: null,
+          memberCount: 1,
+        },
+      ],
     ])
     expect(readScope(combined)).toEqual({ familyIds: [F], babyIds: [BABY_B] })
   })

@@ -65,7 +65,7 @@ describe('invites', () => {
     const res = await accept(created.code, grandma)
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ familyId })
-    expect(await families(grandma)).toEqual([
+    expect(await families(grandma)).toMatchObject([
       { id: familyId, name: '我们家', role: 'caregiver', babyIds: [babyA.id] },
     ])
   })

@@ -23,6 +23,10 @@ export function assignableRoles(actor: FamilyRole): MemberRole[] {
   return actor === 'admin' ? ['caregiver', 'viewer'] : []
 }
 
+/** Whether a member can add babies to the family (managers who see every baby). */
+export const canAddBabies = (family: { role: FamilyRole; babyIds: readonly string[] | null }) =>
+  isManager(family.role) && family.babyIds === null
+
 /** Whether a baby is within a member's scope; `null` means every baby of the family. */
 export function inBabyScope(
   babyIds: ReadonlySet<string> | readonly string[] | null,

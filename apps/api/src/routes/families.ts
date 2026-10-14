@@ -3,6 +3,7 @@ import {
   type FamilySummary,
   canManageMember,
   createFamilyRequestSchema,
+  familyAliasRequestSchema,
   newId,
   renameFamilyRequestSchema,
   transferOwnershipRequestSchema,
@@ -34,6 +35,8 @@ export const familyRoutes = new Hono<AppEnv>()
       name,
       role: 'owner',
       babyIds: null,
+      alias: null,
+      memberCount: 1,
     }
     await c.env.DB.batch([
       c.env.DB.prepare(
@@ -49,6 +52,35 @@ export const familyRoutes = new Hono<AppEnv>()
     await c.env.DB.prepare('update families set name = ?, updated_at = ? where id = ?')
       .bind(c.req.valid('json').name, Date.now(), c.req.param('familyId'))
       .run()
+    return c.body(null, 204)
+  })
+  .put('/:familyId/alias', familyMember, json(familyAliasRequestSchema), async (c) => {
+    await c.env.DB.prepare('update memberships set alias = ? where family_id = ? and user_id = ?')
+      .bind(c.req.valid('json').alias, c.req.param('familyId'), c.get('user').id)
+      .run()
+    return c.body(null, 204)
+  })
+  /**
+   * Deletes the family with all its babies and records for everyone; owner only. Members'
+   * devices drop the data on their next pull, when the family is gone from their access list.
+   */
+  .delete('/:familyId', familyMember, async (c) => {
+    if (c.var.role !== 'owner') fail('forbidden')
+    const db = c.env.DB
+    const familyId = c.req.param('familyId')
+    await db.batch([
+      db
+        .prepare(
+          'delete from reminders where baby_id in (select id from babies where family_id = ?)',
+        )
+        .bind(familyId),
+      db.prepare('delete from events where family_id = ?').bind(familyId),
+      db.prepare('delete from membership_babies where family_id = ?').bind(familyId),
+      db.prepare('delete from invites where family_id = ?').bind(familyId),
+      db.prepare('delete from memberships where family_id = ?').bind(familyId),
+      db.prepare('delete from babies where family_id = ?').bind(familyId),
+      db.prepare('delete from families where id = ?').bind(familyId),
+    ])
     return c.body(null, 204)
   })
   .get('/:familyId/members', familyMember, async (c) => {

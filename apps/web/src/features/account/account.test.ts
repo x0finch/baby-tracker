@@ -3,20 +3,14 @@ import { IDBFactory } from 'fake-indexeddb'
 import { describe, expect, it } from 'vitest'
 
 import { type LocalStore, openLocalStore } from '../../db/local-store'
-import { getAccount, getCursor, setCursor } from '../../sync/local'
+import { claimLocalData, getAccount, getCursor, setCursor, unclaimedCount } from '../../sync/local'
 import { createBaby } from '../babies/actions'
 import { addEvent } from '../events/actions'
 import { logDiaper } from '../events/records'
-import {
-  type AccountApi,
-  claimLocalData,
-  completeConnect,
-  connectAccount,
-  disconnectLocal,
-  unclaimedCount,
-} from './account'
+import { type AccountApi, completeConnect, connectAccount, disconnectLocal } from './account'
 
 const user = { id: 'user-1', name: '家长', email: 'a@example.com', image: null }
+const familyName = (u: { name: string }) => `${u.name}的家`
 
 async function device(): Promise<LocalStore> {
   const store = await openLocalStore({
@@ -74,10 +68,14 @@ describe('connectAccount', () => {
     const store = await device()
     createBaby(store, input)
     const { api, created } = fakeApi()
-    const result = await connectAccount(store, api, '我的家庭')
+    const result = await connectAccount(store, api, familyName)
     expect(result.status).toBe('connected')
-    expect(created.map((f) => f.name)).toEqual(['我的家庭'])
-    expect(getAccount(store)).toEqual({ userId: user.id, familyId: created[0]?.id })
+    expect(created.map((f) => f.name)).toEqual(['家长的家'])
+    expect(getAccount(store)).toEqual({
+      userId: user.id,
+      userName: '家长',
+      familyId: created[0]?.id,
+    })
     expect(unclaimedCount(store)).toBe(0)
   })
 
@@ -85,16 +83,35 @@ describe('connectAccount', () => {
     const store = await device()
     const family: FamilySummary = { id: newId(), name: '我们家', role: 'owner', babyIds: null }
     const { api, created } = fakeApi([family])
-    expect(await connectAccount(store, api, '我的家庭')).toEqual({ status: 'connected', family })
+    expect(await connectAccount(store, api, familyName)).toEqual({ status: 'connected', family })
     expect(created).toEqual([])
     expect(getAccount(store)?.familyId).toBe(family.id)
+  })
+
+  it('creates no family for an account without one when the device has no records', async () => {
+    const store = await device()
+    const { api, created } = fakeApi()
+    expect(await connectAccount(store, api, familyName)).toEqual({
+      status: 'connected',
+      family: undefined,
+    })
+    expect(created).toEqual([])
+    expect(getAccount(store)?.familyId).toBeNull()
+  })
+
+  it('defaults new babies to a family the user manages, not one they only help with', async () => {
+    const store = await device()
+    const helping: FamilySummary = { id: newId(), name: '张家', role: 'caregiver', babyIds: null }
+    const own: FamilySummary = { id: newId(), name: '我家', role: 'owner', babyIds: null }
+    await connectAccount(store, fakeApi([helping, own]).api, familyName)
+    expect(getAccount(store)?.familyId).toBe(own.id)
   })
 
   it('asks the user when both the account and the device have data', async () => {
     const store = await device()
     createBaby(store, input)
     const family: FamilySummary = { id: newId(), name: '我们家', role: 'owner', babyIds: null }
-    const result = await connectAccount(store, fakeApi([family]).api, '我的家庭')
+    const result = await connectAccount(store, fakeApi([family]).api, familyName)
     expect(result).toMatchObject({ status: 'choose', families: [family] })
     expect(getAccount(store)).toBeUndefined()
 
@@ -105,7 +122,7 @@ describe('connectAccount', () => {
 
   it('does nothing while signed out', async () => {
     const store = await device()
-    expect(await connectAccount(store, fakeApi([], false).api, '我的家庭')).toEqual({
+    expect(await connectAccount(store, fakeApi([], false).api, familyName)).toEqual({
       status: 'signed-out',
     })
   })
@@ -115,7 +132,7 @@ describe('disconnectLocal', () => {
   it('forgets the account and cursor but can keep the records', async () => {
     const store = await device()
     createBaby(store, input)
-    await connectAccount(store, fakeApi().api, '我的家庭')
+    await connectAccount(store, fakeApi().api, familyName)
     setCursor(store, 'abc')
     disconnectLocal(store, false)
     expect(getAccount(store)).toBeUndefined()

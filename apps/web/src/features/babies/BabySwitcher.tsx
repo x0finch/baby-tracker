@@ -1,13 +1,21 @@
-import { localDateString } from '@bobo/shared'
+import {
+  type AvatarColor,
+  type Baby,
+  type FamilySummary,
+  familyDisplayName,
+  localDateString,
+} from '@bobo/shared'
 import { clsx } from 'clsx'
 import { useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
+import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { Sheet } from '../../components/ui/Sheet'
 import { useLocalStore } from '../../db'
 import { m } from '../../paraglide/messages.js'
 import { useAccess } from '../../sync/use-access'
 import { useBabiesWithRunningTimers } from '../events/use-events'
+import { sortFamilies } from '../family/FamilyList'
 import { createBaby } from './actions'
 import { ageLabel } from './age-label'
 import { BabyAvatar } from './BabyAvatar'
@@ -17,11 +25,11 @@ import { selectBaby, useBabies, useSelectedBaby } from './use-babies'
 
 /** Top bar showing the selected baby; tapping it opens the baby picker. */
 export function BabySwitcher() {
-  const store = useLocalStore()
   const { active } = useBabies()
   const { baby, select } = useSelectedBaby()
   const runningBabies = useBabiesWithRunningTimers()
-  const { canAddBaby } = useAccess()
+  const { access, babyFamilies } = useAccess()
+  const groups = groupByFamily(active, access)
   const otherRunning = active.some((b) => b.id !== baby?.id && runningBabies.has(b.id))
   const [sheet, setSheet] = useState<'closed' | 'pick' | 'add'>('closed')
   const close = () => setSheet('closed')
@@ -62,55 +70,61 @@ export function BabySwitcher() {
       </button>
 
       <Sheet open={sheet === 'pick'} onClose={close} title={m.switcherTitle()}>
-        <ul className="m-0 flex list-none flex-col gap-2 p-0">
-          {active.map((option) => (
-            <li key={option.id}>
-              <button
-                type="button"
-                aria-pressed={option.id === baby.id}
-                onClick={() => {
-                  select(option.id)
-                  close()
-                }}
-                className={clsx(
-                  'flex min-h-touch w-full items-center gap-3 rounded-xl border-2 px-3 py-2 text-left',
-                  option.id === baby.id ? 'border-diaper bg-diaper-soft' : 'border-border',
-                )}
-              >
-                <BabyAvatar name={option.name} color={option.avatarColor} />
-                <span className="flex flex-col">
-                  <span className="font-extrabold">{option.name}</span>
-                  <span className="text-caption text-fg-muted">{ageLabel(option.birthDate)}</span>
-                </span>
-                {runningBabies.has(option.id) && (
-                  <span className="ml-auto rounded-full bg-danger-soft px-2 text-caption font-bold text-danger-text">
-                    {m.runningBadge()}
-                  </span>
-                )}
-              </button>
-            </li>
+        <div className="flex flex-col gap-4">
+          {groups.map((group) => (
+            <section key={group.key} className="flex flex-col gap-2">
+              {groups.length > 1 && (
+                <h3 className="text-caption font-bold text-fg-muted">{group.title}</h3>
+              )}
+              <ul className="m-0 flex list-none flex-col gap-2 p-0">
+                {group.babies.map((option) => (
+                  <li key={option.id}>
+                    <button
+                      type="button"
+                      aria-pressed={option.id === baby.id}
+                      onClick={() => {
+                        select(option.id)
+                        close()
+                      }}
+                      className={clsx(
+                        'flex min-h-touch w-full items-center gap-3 rounded-xl border-2 px-3 py-2 text-left',
+                        option.id === baby.id ? 'border-diaper bg-diaper-soft' : 'border-border',
+                      )}
+                    >
+                      <BabyAvatar name={option.name} color={option.avatarColor} />
+                      <span className="flex flex-col">
+                        <span className="font-extrabold">{option.name}</span>
+                        <span className="text-caption text-fg-muted">
+                          {ageLabel(option.birthDate)}
+                        </span>
+                      </span>
+                      {runningBabies.has(option.id) && (
+                        <span className="ml-auto rounded-full bg-danger-soft px-2 text-caption font-bold text-danger-text">
+                          {m.runningBadge()}
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ))}
-        </ul>
-        {canAddBaby && (
-          <Button variant="soft" tone="primary" block onClick={() => setSheet('add')}>
-            {m.addBabyTitle()}
-          </Button>
-        )}
+        </div>
+        <Button variant="soft" tone="primary" block onClick={() => setSheet('add')}>
+          {m.addBabyTitle()}
+        </Button>
       </Sheet>
 
       <Sheet open={sheet === 'add'} onClose={close} title={m.addBabyTitle()}>
         {sheet === 'add' && (
-          <BabyForm
-            initial={{
-              name: '',
-              birthDate: localDateString(),
-              sex: 'unspecified',
-              avatarColor: nextAvatarColor(active),
-            }}
-            submitLabel={m.addBabyTitle()}
+          <AddBaby
+            choices={babyFamilies.choices}
+            preferred={babyFamilies.preferred}
+            access={access}
+            nextColor={nextAvatarColor(active)}
             onCancel={close}
-            onSubmit={(input) => {
-              selectBaby(createBaby(store, input).id)
+            onAdded={(id) => {
+              selectBaby(id)
               close()
             }}
           />
@@ -118,4 +132,73 @@ export function BabySwitcher() {
       </Sheet>
     </>
   )
+}
+
+const NEW_FAMILY = 'new'
+
+/** The baby form, with a choice of family when the user can add babies to more than one. */
+function AddBaby({
+  choices,
+  preferred,
+  access,
+  nextColor,
+  onCancel,
+  onAdded,
+}: {
+  choices: readonly (string | null)[]
+  preferred: string | null
+  access: readonly FamilySummary[] | undefined
+  nextColor: AvatarColor
+  onCancel: () => void
+  onAdded: (id: string) => void
+}) {
+  const store = useLocalStore()
+  const [familyId, setFamilyId] = useState(preferred)
+  const label = (id: string | null) => {
+    const family = access?.find((item) => item.id === id)
+    return family ? familyDisplayName(family) : m.familyNewOwn()
+  }
+  return (
+    <div className="flex flex-col gap-4">
+      {choices.length > 1 && (
+        <SegmentedControl<string>
+          labelStyle="field"
+          label={m.babyFamilyLabel()}
+          options={choices.map((id) => ({ value: id ?? NEW_FAMILY, label: label(id) }))}
+          value={familyId ?? NEW_FAMILY}
+          onChange={(value) => setFamilyId(value === NEW_FAMILY ? null : value)}
+        />
+      )}
+      <BabyForm
+        initial={{
+          name: '',
+          birthDate: localDateString(),
+          sex: 'unspecified',
+          avatarColor: nextColor,
+        }}
+        submitLabel={m.addBabyTitle()}
+        onCancel={onCancel}
+        onSubmit={(input) => onAdded(createBaby(store, input, familyId).id)}
+      />
+    </div>
+  )
+}
+
+interface BabyGroup {
+  key: string
+  title: string
+  babies: Baby[]
+}
+
+/** Babies by family, the user's own families first; babies not yet in a family come last. */
+function groupByFamily(babies: readonly Baby[], access: readonly FamilySummary[] | undefined) {
+  const groups: BabyGroup[] = sortFamilies(access ?? []).map((family) => ({
+    key: family.id,
+    title: familyDisplayName(family),
+    babies: babies.filter((baby) => baby.familyId === family.id),
+  }))
+  const known = new Set(groups.map((group) => group.key))
+  const rest = babies.filter((baby) => baby.familyId === null || !known.has(baby.familyId))
+  groups.push({ key: 'local', title: m.babyGroupLocal(), babies: rest })
+  return groups.filter((group) => group.babies.length > 0)
 }

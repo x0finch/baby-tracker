@@ -4,6 +4,7 @@ import {
   type FamilySummary,
   type MemberRole,
   assignableRoles,
+  familyDisplayName,
 } from '@bobo/shared'
 import { useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -60,6 +61,7 @@ function MemberForm({
 }) {
   const [role, setRole] = useState<MemberRole>(member.role)
   const [babyIds, setBabyIds] = useState<string[] | null>(member.babyIds)
+  const [confirmingTransfer, setConfirmingTransfer] = useState(false)
   const change = useMutation({
     mutationFn: (action: () => Promise<void>) => action(),
     onSuccess: onDone,
@@ -89,6 +91,27 @@ function MemberForm({
       >
         {m.memberRemove()}
       </Button>
+      {family.role === 'owner' &&
+        (confirmingTransfer ? (
+          <div className="flex flex-col gap-3 rounded-xl border-2 border-border p-3">
+            <p>{m.memberTransferBody({ family: familyDisplayName(family), name: member.name })}</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant="outline" onClick={() => setConfirmingTransfer(false)}>
+                {m.actionCancel()}
+              </Button>
+              <Button
+                disabled={change.isPending}
+                onClick={() => change.mutate(() => familyApi.transfer(family.id, member.userId))}
+              >
+                {m.memberTransferConfirm()}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Button variant="ghost" onClick={() => setConfirmingTransfer(true)}>
+            {m.memberTransfer()}
+          </Button>
+        ))}
       {change.isError && <FormError>{m.actionFailed()}</FormError>}
     </div>
   )

@@ -9,7 +9,7 @@ import { UnitsCard } from '../components/UnitsCard'
 import { AccountCard } from '../features/account/AccountCard'
 import { BabyList } from '../features/babies/BabyList'
 import { ExportCard } from '../features/export/ExportCard'
-import { FamilySection } from '../features/family/FamilyCard'
+import { FamilyList } from '../features/family/FamilyList'
 import { RemindersCard } from '../features/reminders/RemindersCard'
 import { type Locale, getLocale, localeDisplayName, locales, setLocale } from '../lib/i18n'
 import type { ThemePreference } from '../lib/theme'
@@ -36,7 +36,7 @@ function SettingsPage() {
     <section className="flex flex-col gap-4">
       <PageHeader title={m.settingsTitle()} />
       <AccountCard />
-      <FamilySection />
+      <FamilyList />
       <RemindersCard />
       <Card className="flex flex-col gap-3">
         <h2 className="text-title font-extrabold">{m.settingsTheme()}</h2>

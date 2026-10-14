@@ -2,8 +2,13 @@ import type { LocalStore } from '../../db'
 import { currentFamilyId, markDirty } from '../../sync/local'
 import { type BabyInput, buildBaby } from './records'
 
-export function createBaby(store: LocalStore, input: BabyInput) {
-  const baby = { ...buildBaby(input), familyId: currentFamilyId(store) }
+/** Adds a baby to `familyId`; null keeps it local until it is claimed (see claimLocalData). */
+export function createBaby(
+  store: LocalStore,
+  input: BabyInput,
+  familyId: string | null = currentFamilyId(store),
+) {
+  const baby = { ...buildBaby(input), familyId }
   store.babies.insert(baby)
   markDirty(store, 'babies', baby)
   return baby

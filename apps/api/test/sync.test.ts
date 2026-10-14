@@ -40,7 +40,7 @@ describe('families and sync', () => {
 
   it('lists the families the user belongs to', async () => {
     const res = await t.request('/api/families', { headers })
-    expect(await res.json()).toEqual([
+    expect(await res.json()).toMatchObject([
       { id: familyId, name: '我们家', role: 'owner', babyIds: null },
     ])
   })

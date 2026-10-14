@@ -52,7 +52,14 @@ export interface FamilySummary {
   role: FamilyRole
   /** Babies this member may see; null means every baby of the family. */
   babyIds: string[] | null
+  /** This member's private name for the family, shown instead of `name` to them only. */
+  alias?: string | null
+  memberCount?: number
 }
+
+/** The name a member sees for a family: their alias if they set one. */
+export const familyDisplayName = (family: Pick<FamilySummary, 'name' | 'alias'>) =>
+  family.alias || family.name
 
 export const createFamilyRequestSchema = z.object({
   name: z.string().trim().min(1).max(40),
@@ -75,6 +82,15 @@ export const updateMemberRequestSchema = z
   .refine((body) => body.role !== undefined || body.babyIds !== undefined)
 
 export const renameFamilyRequestSchema = createFamilyRequestSchema
+/** An empty alias clears it. */
+export const familyAliasRequestSchema = z.object({
+  alias: z
+    .string()
+    .trim()
+    .max(40)
+    .nullable()
+    .transform((alias) => alias || null),
+})
 export const transferOwnershipRequestSchema = z.object({ userId: z.string().min(1) })
 
 /** How long an invite link stays valid. */
