@@ -1,5 +1,6 @@
 import { useLiveQuery } from '@tanstack/react-db'
-import { useEffect, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -8,13 +9,7 @@ import { Sheet } from '../components/ui/Sheet'
 import { useLocalStore } from '../db'
 import { formatTime } from '../lib/i18n'
 import { m } from '../paraglide/messages.js'
-import {
-  type SessionUser,
-  deleteAccountRemote,
-  disconnectLocal,
-  httpAccountApi,
-  signOutRemote,
-} from './account'
+import { deleteAccountRemote, disconnectLocal, httpAccountApi, signOutRemote } from './account'
 import { connectIfSignedIn } from './connection'
 import { getAccount } from './local'
 import { disablePush } from './notifications'
@@ -46,31 +41,27 @@ export function AccountCard() {
   useLiveQuery({ query: (q) => q.from({ meta: store.meta }) })
   const { data: pending } = useLiveQuery({ query: (q) => q.from({ entry: store.outbox }) })
   const account = getAccount(store)
-  const [user, setUser] = useState<SessionUser | null>(null)
+  const queryClient = useQueryClient()
   const [signingOut, setSigningOut] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [deleteFailed, setDeleteFailed] = useState(false)
 
   const userId = account?.userId
-  useEffect(() => {
-    if (!userId) return
-    httpAccountApi.me().then(setUser, () => setUser(null))
-  }, [userId])
+  const { data: user } = useQuery({
+    queryKey: ['me', userId],
+    queryFn: () => httpAccountApi.me(),
+    enabled: Boolean(userId),
+  })
 
-  async function deleteAccount() {
-    setDeleteFailed(false)
-    try {
-      await deleteAccountRemote()
-    } catch {
-      // Keep everything on the device if the server could not delete the account.
-      setDeleteFailed(true)
-      return
-    }
-    await disablePush().catch(() => undefined)
-    disconnectLocal(store, true)
-    setUser(null)
-    setDeleting(false)
-  }
+  // Keeps everything on the device if the server could not delete the account.
+  const deleteAccount = useMutation({
+    mutationFn: deleteAccountRemote,
+    onSuccess: async () => {
+      await disablePush().catch(() => undefined)
+      disconnectLocal(store, true)
+      queryClient.clear()
+      setDeleting(false)
+    },
+  })
 
   async function signOut(clearData: boolean) {
     // Reminders for this account shouldn't keep arriving on this device.
@@ -81,7 +72,8 @@ export function AccountCard() {
       // Already signed out on the server, or offline; forget the account locally anyway.
     }
     disconnectLocal(store, clearData)
-    setUser(null)
+    // Cached lists (passkeys, reminders, members) belonged to the account that left.
+    queryClient.clear()
     setSigningOut(false)
   }
 
@@ -128,8 +120,9 @@ export function AccountCard() {
             onClose={() => setDeleting(false)}
             title={m.deleteAccount()}
             confirmLabel={m.deleteAccountConfirm()}
-            onConfirm={() => void deleteAccount()}
-            error={deleteFailed ? m.deleteAccountFailed() : undefined}
+            onConfirm={() => deleteAccount.mutate()}
+            busy={deleteAccount.isPending}
+            error={deleteAccount.isError ? m.deleteAccountFailed() : undefined}
           >
             {m.deleteAccountBody()}
           </ConfirmSheet>

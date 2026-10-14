@@ -1,13 +1,14 @@
 import type { InvitePreview } from '@bobo/shared'
+import { type UseMutationResult, useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
+import { type ReactNode, useEffect } from 'react'
 
 import { PageHeader } from '../components/PageHeader'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { FormError } from '../components/ui/FormError'
 import { useLocalStore } from '../db'
-import { familyApi } from '../features/family/api'
+import { familyApi, invitePreviewQuery } from '../features/family/api'
 import { roleLabel } from '../features/family/FamilyCard'
 import { m } from '../paraglide/messages.js'
 import { httpAccountApi, signInWithGoogle } from '../sync/account'
@@ -18,6 +19,19 @@ import { requestSync } from '../sync/runner'
 import { SignInOptions } from '../sync/SignInOptions'
 
 export const Route = createFileRoute('/join/$code')({
+  loader: ({ context: { queryClient }, params }) =>
+    queryClient.ensureQueryData(invitePreviewQuery(params.code)),
+  pendingComponent: () => (
+    <JoinLayout>
+      <p className="text-fg-muted">{m.joinLoading()}</p>
+    </JoinLayout>
+  ),
+  // Unknown codes and offline both land here; either way there is no invite to show.
+  errorComponent: () => (
+    <JoinLayout>
+      <p>{m.joinNotFound()}</p>
+    </JoinLayout>
+  ),
   component: JoinPage,
 })
 
@@ -41,14 +55,8 @@ function writePending(code: string | null) {
   }
 }
 
-type Phase =
-  | { name: 'loading' }
-  | { name: 'missing' }
-  | { name: 'ready'; preview: InvitePreview }
-  | { name: 'joining'; preview: InvitePreview }
-  | { name: 'joined'; preview: InvitePreview }
-  | { name: 'member'; preview: InvitePreview }
-  | { name: 'failed'; preview: InvitePreview }
+/** Joined, already a member, or left for Google sign-in (the page reloads on return). */
+type JoinOutcome = 'joined' | 'member' | 'redirected'
 
 const statusMessage = {
   used: m.joinUsed,
@@ -56,78 +64,67 @@ const statusMessage = {
   expired: m.joinExpired,
 } as const
 
+function JoinLayout({ children }: { children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-4">
+      <PageHeader title={m.joinTitle()} />
+      <Card className="flex flex-col gap-3">{children}</Card>
+    </section>
+  )
+}
+
 function JoinPage() {
   const { code } = Route.useParams()
+  const { data: preview } = useSuspenseQuery(invitePreviewQuery(code))
   const store = useLocalStore()
-  const [phase, setPhase] = useState<Phase>({ name: 'loading' })
 
-  async function join(preview: InvitePreview) {
-    setPhase({ name: 'joining', preview })
-    try {
+  const join = useMutation({
+    mutationFn: async (): Promise<JoinOutcome> => {
       if (!(await httpAccountApi.me())) {
         writePending(code)
         await signInWithGoogle(`/join/${code}`)
-        return
+        return 'redirected'
       }
       writePending(null)
       try {
         await familyApi.acceptInvite(code)
       } catch (error) {
-        if (!(error instanceof HttpError && error.status === 409)) throw error
-        setPhase({ name: 'member', preview })
-        return
+        if (error instanceof HttpError && error.status === 409) return 'member'
+        throw error
       }
-      setPhase({ name: 'joined', preview })
       // A first sign-in on this device links the account now (the family is already joined);
       // otherwise the next pull sees the new family and fetches its records.
       if (getAccount(store)) await requestSync()
       else await connectIfSignedIn(store)
-    } catch {
-      setPhase({ name: 'failed', preview })
-    }
-  }
+      return 'joined'
+    },
+  })
 
+  // Back from Google sign-in with this invite pending: accept it without another tap.
+  const { mutate } = join
+  const resume = preview.status === 'active' && readPending() === code
   useEffect(() => {
-    let current = true
-    familyApi.previewInvite(code).then(
-      (preview) => {
-        if (!current) return
-        setPhase({ name: 'ready', preview })
-        if (preview.status === 'active' && readPending() === code) void join(preview)
-      },
-      () => current && setPhase({ name: 'missing' }),
-    )
-    return () => {
-      current = false
-    }
-    // Runs once per invite code; join() only reads the latest state through setters.
-    // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [code])
+    if (!resume) return
+    writePending(null)
+    mutate()
+  }, [resume, mutate])
 
   return (
-    <section className="flex flex-col gap-4">
-      <PageHeader title={m.joinTitle()} />
-      <Card className="flex flex-col gap-3">
-        {phase.name === 'loading' && <p className="m-0 text-fg-muted">{m.joinLoading()}</p>}
-        {phase.name === 'missing' && <p className="m-0">{m.joinNotFound()}</p>}
-        {phase.name !== 'loading' && phase.name !== 'missing' && (
-          <InviteBody code={code} phase={phase} onJoin={(preview) => void join(preview)} />
-        )}
-      </Card>
-    </section>
+    <JoinLayout>
+      <InviteBody code={code} preview={preview} join={join} />
+    </JoinLayout>
   )
 }
 
 function InviteBody({
   code,
-  phase,
-  onJoin,
+  preview,
+  join,
 }: {
   code: string
-  phase: Exclude<Phase, { name: 'loading' } | { name: 'missing' }>
-  onJoin: (preview: InvitePreview) => void
+  preview: InvitePreview
+  join: UseMutationResult<JoinOutcome, Error, void>
 }) {
-  const { preview } = phase
   const signedIn = getAccount(useLocalStore()) !== undefined
   const navigate = useNavigate()
   const home = (
@@ -148,27 +145,27 @@ function InviteBody({
       {preview.babyNames && preview.babyNames.length > 0 && (
         <p className="m-0 text-fg-muted">{m.joinBabies({ names: preview.babyNames.join('、') })}</p>
       )}
-      {phase.name === 'joined' && (
+      {join.data === 'joined' && (
         <>
           <p className="m-0 font-bold">{m.joinDone({ family: preview.familyName })}</p>
           {home}
         </>
       )}
-      {phase.name === 'member' && (
+      {join.data === 'member' && (
         <>
           <p className="m-0 font-bold">{m.joinAlreadyMember()}</p>
           {home}
         </>
       )}
-      {(phase.name === 'ready' || phase.name === 'joining' || phase.name === 'failed') &&
+      {(join.data === undefined || join.data === 'redirected') &&
         (preview.status !== 'active' ? (
           <FormError>{statusMessage[preview.status]()}</FormError>
         ) : signedIn ? (
           <Button
             size="lg"
             block
-            disabled={phase.name === 'joining'}
-            onClick={() => onJoin(preview)}
+            disabled={join.isPending || join.data === 'redirected'}
+            onClick={() => join.mutate()}
           >
             {m.joinAccept()}
           </Button>
@@ -178,11 +175,11 @@ function InviteBody({
             <SignInOptions
               returnTo={`/join/${code}`}
               onGoogle={() => writePending(code)}
-              onSignedIn={() => onJoin(preview)}
+              onSignedIn={() => join.mutate()}
             />
           </>
         ))}
-      {phase.name === 'failed' && <FormError>{m.actionFailed()}</FormError>}
+      {join.isError && <FormError>{m.actionFailed()}</FormError>}
     </>
   )
 }

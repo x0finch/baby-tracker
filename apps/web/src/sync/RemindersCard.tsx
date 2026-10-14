@@ -1,4 +1,5 @@
 import type { Baby, Reminder, ReminderKind } from '@bobo/shared'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
 import { Button } from '../components/ui/Button'
@@ -30,7 +31,11 @@ const KIND_LABEL: Record<ReminderKind, () => string> = {
 /** Interval kept when a reminder is off, so turning it on again restores it. */
 const DEFAULT_MINUTES: Record<ReminderKind, number> = { feeding: 180, diaper: 180 }
 
-const keyOf = (babyId: string, kind: ReminderKind) => `${babyId}:${kind}`
+const REMINDERS_KEY = ['reminders']
+const PUSH_STATE_KEY = ['push-state']
+
+const sameReminder = (a: Reminder, b: Pick<Reminder, 'babyId' | 'kind'>) =>
+  a.babyId === b.babyId && a.kind === b.kind
 
 const pushHint: Partial<Record<PushState, () => string>> = {
   unsupported: m.pushUnsupported,
@@ -49,74 +54,61 @@ function Reminders() {
   const { active } = useBabies()
   // Reminders run on the server, so only babies that have synced to a family can have them.
   const babies = active.filter((baby) => baby.familyId !== null)
-  const [push, setPush] = useState<PushState>()
-  const [reminders, setReminders] = useState<ReadonlyMap<string, Reminder>>(new Map())
+  const queryClient = useQueryClient()
+  const { data: push } = useQuery({ queryKey: PUSH_STATE_KEY, queryFn: getPushState })
+  const { data: reminders = [] } = useQuery({ queryKey: REMINDERS_KEY, queryFn: reminderApi.list })
   const [message, setMessage] = useState<string>()
-  const [busy, setBusy] = useState(false)
 
+  // Browsers may rotate subscriptions, and the device may have changed hands since.
   useEffect(() => {
-    let current = true
-    void getPushState().then((state) => current && setPush(state))
     void refreshPushSubscription().catch(() => undefined)
-    reminderApi.list().then(
-      (list) => current && setReminders(new Map(list.map((r) => [keyOf(r.babyId, r.kind), r]))),
-      () => undefined,
-    )
-    return () => {
-      current = false
-    }
   }, [])
 
-  async function togglePush() {
-    setBusy(true)
-    setMessage(undefined)
-    try {
-      if (push === 'on') {
-        await disablePush()
-        setPush('off')
-      } else {
-        setPush(await enablePush())
-      }
-    } catch {
-      setMessage(m.pushFailed())
-    } finally {
-      setBusy(false)
-    }
-  }
+  const togglePush = useMutation({
+    mutationFn: async (): Promise<PushState> => {
+      if (push !== 'on') return enablePush()
+      await disablePush()
+      return 'off'
+    },
+    onMutate: () => setMessage(undefined),
+    onSuccess: (state) => queryClient.setQueryData(PUSH_STATE_KEY, state),
+    onError: () => setMessage(m.pushFailed()),
+  })
 
-  async function test() {
-    setMessage(undefined)
-    try {
-      const { sent } = await sendTestNotification()
-      setMessage(sent > 0 ? m.pushTestSent() : m.pushTestNone())
-    } catch {
-      setMessage(m.pushFailed())
-    }
-  }
+  const test = useMutation({
+    mutationFn: sendTestNotification,
+    onMutate: () => setMessage(undefined),
+    onSuccess: ({ sent }) => setMessage(sent > 0 ? m.pushTestSent() : m.pushTestNone()),
+    onError: () => setMessage(m.pushFailed()),
+  })
 
-  async function save(baby: Baby, kind: ReminderKind, minutes: number) {
-    const previous = reminders.get(keyOf(baby.id, kind))
-    const next: Reminder = {
+  // Optimistic: the choice shows at once and rolls back if the server refuses it.
+  const save = useMutation({
+    mutationFn: reminderApi.save,
+    onMutate: async (next: Reminder) => {
+      setMessage(undefined)
+      await queryClient.cancelQueries({ queryKey: REMINDERS_KEY })
+      const previous = queryClient.getQueryData<Reminder[]>(REMINDERS_KEY)
+      queryClient.setQueryData<Reminder[]>(REMINDERS_KEY, (list = []) => [
+        ...list.filter((item) => !sameReminder(item, next)),
+        next,
+      ])
+      return { previous }
+    },
+    onError: (_error, _next, context) => {
+      queryClient.setQueryData(REMINDERS_KEY, context?.previous)
+      setMessage(m.reminderSaveFailed())
+    },
+  })
+
+  function choose(baby: Baby, kind: ReminderKind, minutes: number) {
+    const previous = reminders.find((item) => sameReminder(item, { babyId: baby.id, kind }))
+    save.mutate({
       babyId: baby.id,
       kind,
       intervalMinutes: minutes || previous?.intervalMinutes || DEFAULT_MINUTES[kind],
       enabled: minutes > 0,
-    }
-    const update = (reminder: Reminder | undefined) =>
-      setReminders((map) => {
-        const copy = new Map(map)
-        if (reminder) copy.set(keyOf(baby.id, kind), reminder)
-        else copy.delete(keyOf(baby.id, kind))
-        return copy
-      })
-    update(next)
-    setMessage(undefined)
-    try {
-      await reminderApi.save(next)
-    } catch {
-      update(previous)
-      setMessage(m.reminderSaveFailed())
-    }
+    })
   }
 
   const hint = push ? pushHint[push] : undefined
@@ -135,13 +127,13 @@ function Reminders() {
             <div className="flex flex-wrap gap-2">
               <Button
                 variant={push === 'on' ? 'outline' : 'solid'}
-                disabled={busy}
-                onClick={() => void togglePush()}
+                disabled={togglePush.isPending}
+                onClick={() => togglePush.mutate()}
               >
                 {push === 'on' ? m.pushDisable() : m.pushEnable()}
               </Button>
               {push === 'on' && (
-                <Button variant="ghost" onClick={() => void test()}>
+                <Button variant="ghost" disabled={test.isPending} onClick={() => test.mutate()}>
                   {m.pushTest()}
                 </Button>
               )}
@@ -154,7 +146,7 @@ function Reminders() {
         <section key={baby.id} className="flex flex-col gap-3 border-t-2 border-border pt-3">
           <h3 className="m-0 font-extrabold">{baby.name}</h3>
           {(['feeding', 'diaper'] as const).map((kind) => {
-            const reminder = reminders.get(keyOf(baby.id, kind))
+            const reminder = reminders.find((item) => sameReminder(item, { babyId: baby.id, kind }))
             const value = reminder?.enabled ? reminder.intervalMinutes : 0
             const choices = CHOICES[kind].includes(value)
               ? CHOICES[kind]
@@ -174,7 +166,7 @@ function Reminders() {
                         : m.reminderHours({ hours: formatNumber(minutes / 60) }),
                   }))}
                   value={String(value)}
-                  onChange={(minutes) => void save(baby, kind, Number(minutes))}
+                  onChange={(minutes) => choose(baby, kind, Number(minutes))}
                 />
               </div>
             )

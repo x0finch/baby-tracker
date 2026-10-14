@@ -3,31 +3,22 @@ import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
 
 import { Toast, toastActionClass } from '../../components/ui/Toast'
+import { jsonCodec, readStored, stringList, writeStored } from '../../lib/store'
 import { m } from '../../paraglide/messages.js'
 import { useNow } from '../events/use-events'
 import { computeBadges } from './achievements'
 import { badgeLabel } from './badge-labels'
 
 const seenKey = (babyId: string) => `bobo.seenBadges.${babyId}`
+const idList = jsonCodec(stringList)
 
 function readSeen(babyId: string): Set<string> | undefined {
-  try {
-    const raw = localStorage.getItem(seenKey(babyId))
-    if (raw === null) return undefined
-    const value: unknown = JSON.parse(raw)
-    return new Set(Array.isArray(value) ? value.filter((id) => typeof id === 'string') : [])
-  } catch {
-    return undefined
-  }
+  const ids = readStored(seenKey(babyId), idList)
+  return ids && new Set(ids)
 }
 
-function writeSeen(babyId: string, ids: Iterable<string>) {
-  try {
-    localStorage.setItem(seenKey(babyId), JSON.stringify([...ids]))
-  } catch {
-    // Without storage the toast may show again next time; harmless.
-  }
-}
+// Without storage the toast may show again next time; harmless.
+const writeSeen = (babyId: string, ids: string[]) => writeStored(seenKey(babyId), idList, ids)
 
 /** Celebrates a newly earned badge once; badges earned before this device saw them stay quiet. */
 export function BadgeToast({ baby, events }: { baby: Baby; events: readonly Event[] }) {

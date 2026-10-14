@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Workbox } from 'workbox-window'
+
+import { createStore, useStore } from './store'
 
 /** Installed to the home screen (or running in the native shell later). */
 export function isStandalone(): boolean {
@@ -28,37 +30,24 @@ function isBeforeInstallPromptEvent(event: Event): event is BeforeInstallPromptE
 }
 
 // Chrome fires beforeinstallprompt once, possibly before React mounts, so capture it early.
-let installPrompt: BeforeInstallPromptEvent | null = null
-const installListeners = new Set<() => void>()
+const installPrompt = createStore<BeforeInstallPromptEvent | null>(null)
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeinstallprompt', (event) => {
     if (!isBeforeInstallPromptEvent(event)) return
     event.preventDefault()
-    installPrompt = event
-    for (const listener of installListeners) listener()
+    installPrompt.set(event)
   })
-  window.addEventListener('appinstalled', () => {
-    installPrompt = null
-    for (const listener of installListeners) listener()
-  })
+  window.addEventListener('appinstalled', () => installPrompt.set(null))
 }
 
 /** The deferred Android/Chrome install prompt, if the browser offered one. */
 export function useInstallPrompt(): (() => Promise<void>) | null {
-  const prompt = useSyncExternalStore(
-    (onChange) => {
-      installListeners.add(onChange)
-      return () => installListeners.delete(onChange)
-    },
-    () => installPrompt,
-    () => null,
-  )
+  const prompt = useStore(installPrompt)
   if (!prompt) return null
   return async () => {
     await prompt.prompt()
     await prompt.userChoice
-    installPrompt = null
-    for (const listener of installListeners) listener()
+    installPrompt.set(null)
   }
 }
 

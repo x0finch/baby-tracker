@@ -1,32 +1,9 @@
-import { useCallback, useSyncExternalStore } from 'react'
+import { useCallback, useMemo } from 'react'
+
+import { createStoredValue, jsonCodec, stringList, useStore } from '../../lib/store'
 
 // Babies to log for together (e.g. twins); a per-device preference, not synced data.
-const TOGETHER_KEY = 'bobo.logTogether'
-const TOGETHER_EVENT = 'bobo:log-together'
-
-let memoryIds: string[] = []
-
-function readIds(): string {
-  try {
-    return localStorage.getItem(TOGETHER_KEY) ?? JSON.stringify(memoryIds)
-  } catch {
-    return JSON.stringify(memoryIds)
-  }
-}
-
-function parseIds(raw: string): string[] {
-  try {
-    const value: unknown = JSON.parse(raw)
-    return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : []
-  } catch {
-    return []
-  }
-}
-
-function subscribe(onChange: () => void) {
-  window.addEventListener(TOGETHER_EVENT, onChange)
-  return () => window.removeEventListener(TOGETHER_EVENT, onChange)
-}
+const logTogether = createStoredValue<string[]>('bobo.logTogether', jsonCodec(stringList), [])
 
 /**
  * Babies that are logged together with the selected one. The list is stored as a whole, so
@@ -36,25 +13,19 @@ export function useLogTogether(): {
   together: ReadonlySet<string>
   toggle: (babyId: string, currentId: string) => void
 } {
-  const raw = useSyncExternalStore(subscribe, readIds, () => '[]')
-  const together = new Set(parseIds(raw))
+  const ids = useStore(logTogether)
+  const together = useMemo(() => new Set(ids), [ids])
   const toggle = useCallback((babyId: string, currentId: string) => {
-    const ids = new Set(parseIds(readIds()))
-    if (ids.has(babyId)) {
-      ids.delete(babyId)
+    const next = new Set(logTogether.get())
+    if (next.has(babyId)) {
+      next.delete(babyId)
       // A group of one isn't a group: unlinking the last other baby clears the selection.
-      if (ids.size === 1) ids.clear()
+      if (next.size === 1) next.clear()
     } else {
-      ids.add(babyId)
-      ids.add(currentId)
+      next.add(babyId)
+      next.add(currentId)
     }
-    memoryIds = [...ids]
-    try {
-      localStorage.setItem(TOGETHER_KEY, JSON.stringify(memoryIds))
-    } catch {
-      // Falls back to memoryIds.
-    }
-    window.dispatchEvent(new Event(TOGETHER_EVENT))
+    logTogether.set([...next])
   }, [])
   return { together, toggle }
 }

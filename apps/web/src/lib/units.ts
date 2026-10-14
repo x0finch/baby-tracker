@@ -1,7 +1,6 @@
-import { useSyncExternalStore } from 'react'
-
 import { m } from '../paraglide/messages.js'
 import { formatNumber } from './i18n'
+import { createStoredValue, jsonCodec, useStore } from './store'
 
 /**
  * Display units. Records always store milliliters, kilograms, centimeters and degrees Celsius;
@@ -109,42 +108,17 @@ export function parseUnitPreferences(value: unknown): UnitPreferences {
   }
 }
 
-function readStored(): UnitPreferences {
-  try {
-    const stored = localStorage.getItem(UNITS_STORAGE_KEY)
-    return parseUnitPreferences(stored ? JSON.parse(stored) : undefined)
-  } catch {
-    return DEFAULT_UNITS
-  }
-}
+const unitStore = createStoredValue(
+  UNITS_STORAGE_KEY,
+  jsonCodec(parseUnitPreferences),
+  DEFAULT_UNITS,
+)
 
-let current: UnitPreferences | undefined
-const listeners = new Set<() => void>()
-
-export function getUnits(): UnitPreferences {
-  current ??= typeof window === 'undefined' ? DEFAULT_UNITS : readStored()
-  return current
-}
-
-export function setUnits(next: UnitPreferences) {
-  current = next
-  try {
-    localStorage.setItem(UNITS_STORAGE_KEY, JSON.stringify(next))
-  } catch {
-    // Storage can be unavailable (private mode); the choice then lasts for this session.
-  }
-  for (const listener of listeners) listener()
-}
-
-function subscribe(listener: () => void) {
-  listeners.add(listener)
-  return () => listeners.delete(listener)
-}
+export const getUnits = (): UnitPreferences => unitStore.get()
+export const setUnits = (next: UnitPreferences) => unitStore.set(next)
 
 /** The current unit preferences; re-renders when they change. */
-export function useUnits(): UnitPreferences {
-  return useSyncExternalStore(subscribe, getUnits, () => DEFAULT_UNITS)
-}
+export const useUnits = (): UnitPreferences => useStore(unitStore)
 
 function spec(quantity: Quantity, units: UnitPreferences): UnitSpec {
   const byUnit: Record<string, UnitSpec> = specs[quantity]

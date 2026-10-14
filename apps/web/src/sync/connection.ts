@@ -1,7 +1,7 @@
 import { type FamilySummary } from '@bobo/shared'
-import { useSyncExternalStore } from 'react'
 
 import type { LocalStore } from '../db'
+import { createStore, useStore } from '../lib/store'
 import { m } from '../paraglide/messages.js'
 import {
   type SessionUser,
@@ -20,22 +20,9 @@ export interface ClaimChoice {
   unclaimed: number
 }
 
-let choice: ClaimChoice | null = null
-const listeners = new Set<() => void>()
-const emit = () => {
-  for (const listener of listeners) listener()
-}
+const claimChoice = createStore<ClaimChoice | null>(null)
 
-export function useClaimChoice(): ClaimChoice | null {
-  return useSyncExternalStore(
-    (onChange) => {
-      listeners.add(onChange)
-      return () => listeners.delete(onChange)
-    },
-    () => choice,
-    () => null,
-  )
-}
+export const useClaimChoice = (): ClaimChoice | null => useStore(claimChoice)
 
 /** Links the session to this device if signed in and not linked yet (e.g. after OAuth). */
 export async function connectIfSignedIn(store: LocalStore) {
@@ -44,8 +31,11 @@ export async function connectIfSignedIn(store: LocalStore) {
     const result = await connectAccount(store, httpAccountApi, m.defaultFamilyName())
     if (result.status === 'connected') await requestSync()
     if (result.status === 'choose') {
-      choice = { user: result.user, families: result.families, unclaimed: unclaimedCount(store) }
-      emit()
+      claimChoice.set({
+        user: result.user,
+        families: result.families,
+        unclaimed: unclaimedCount(store),
+      })
     }
   } catch (error) {
     // Offline or server unavailable: try again on the next app start.
@@ -54,12 +44,12 @@ export async function connectIfSignedIn(store: LocalStore) {
 }
 
 export async function resolveClaimChoice(store: LocalStore, family: FamilySummary | 'new') {
+  const choice = claimChoice.get()
   if (!choice) return
   const { user } = choice
   const target =
     family === 'new' ? await httpAccountApi.createFamily(m.defaultFamilyName()) : family
   completeConnect(store, user, target)
-  choice = null
-  emit()
+  claimChoice.set(null)
   await requestSync()
 }
