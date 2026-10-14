@@ -101,7 +101,47 @@ const input = {
   avatarColor: 'green',
 } as const
 
+/** Polls the raw database until writes made through the collections have been persisted. */
+async function waitForStoreCount(idbFactory: IDBFactory, storeName: string, count: number) {
+  const countOnce = () =>
+    new Promise<number>((resolve, reject) => {
+      const open = idbFactory.open('bobo')
+      open.addEventListener('error', () => reject(open.error))
+      open.addEventListener('success', () => {
+        const db = open.result
+        const request = db.transaction(storeName).objectStore(storeName).count()
+        request.addEventListener('success', () => {
+          db.close()
+          resolve(request.result)
+        })
+        request.addEventListener('error', () => reject(request.error))
+      })
+    })
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if ((await countOnce()) >= count) return
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  }
+  throw new Error(`${storeName} never reached ${count} records`)
+}
+
 describe('syncOnce', () => {
+  it('sees records persisted in an earlier session (collections load before use)', async () => {
+    const idbFactory = new IDBFactory()
+    const first = await openLocalStore({ idbFactory, requestPersistence: async () => true })
+    setAccount(first, { userId: 'user-1', familyId: FAMILY })
+    const baby = createBaby(first, input)
+    const event = logDiaper(baby.id, Date.now(), 'wet')
+    addEvent(first, event)
+    await waitForStoreCount(idbFactory, 'outbox', 2)
+
+    // Next app start: nothing has queried the collections yet.
+    const reopened = await openLocalStore({ idbFactory, requestPersistence: async () => true })
+    const server = createFakeServer()
+    await syncOnce(reopened, server.api)
+    expect(server.rows.events.has(event.id)).toBe(true)
+    expect(reopened.outbox.size).toBe(0)
+  })
+
   it('moves records from one device to another and empties the outbox', async () => {
     const server = createFakeServer()
     const a = await device()

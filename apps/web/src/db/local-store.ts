@@ -129,6 +129,24 @@ export async function openLocalStore(options: OpenLocalStoreOptions = {}): Promi
     return { ...createMemoryCollections(), mode: 'memory' }
   }
 
-  const persisted = await (options.requestPersistence ?? requestPersistentStorage)()
-  return { ...createIndexedDBCollections(db), mode: persisted ? 'persistent' : 'best-effort' }
+  const [persisted, collections] = await Promise.all([
+    (options.requestPersistence ?? requestPersistentStorage)(),
+    loadAll(createIndexedDBCollections(db)),
+  ])
+  return { ...collections, mode: persisted ? 'persistent' : 'best-effort' }
+}
+
+/**
+ * Collections load lazily, but sync and claiming read them directly (`get`, `toArray`), so
+ * an unloaded collection would look empty and pending changes could be dropped. Load
+ * everything before the store is handed out; the pages need all of it anyway.
+ */
+async function loadAll<T extends Omit<LocalStore, 'mode'>>(collections: T): Promise<T> {
+  await Promise.all([
+    collections.babies.preload(),
+    collections.events.preload(),
+    collections.outbox.preload(),
+    collections.meta.preload(),
+  ])
+  return collections
 }
