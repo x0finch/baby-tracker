@@ -7,6 +7,7 @@ import { PageHeader } from '../components/PageHeader'
 import { Button } from '../components/ui/Button'
 import { SegmentedControl } from '../components/ui/SegmentedControl'
 import { Sheet } from '../components/ui/Sheet'
+import { AchievementsView } from '../features/achievements/AchievementsView'
 import { RequireBaby } from '../features/babies/RequireBaby'
 import { useSelectedBaby } from '../features/babies/use-babies'
 import { DaySummaryCards } from '../features/events/DaySummaryCards'
@@ -20,10 +21,10 @@ import { m } from '../paraglide/messages.js'
 
 const searchSchema = z.object({
   day: z.iso.date().optional().catch(undefined),
-  view: z.enum(['trends', 'growth']).optional().catch(undefined),
+  view: z.enum(['trends', 'growth', 'achievements']).optional().catch(undefined),
 })
 
-type View = 'day' | 'trends' | 'growth'
+type View = 'day' | 'trends' | 'growth' | 'achievements'
 
 export const Route = createFileRoute('/stats')({
   validateSearch: searchSchema,
@@ -43,6 +44,7 @@ function StatsPage() {
             { value: 'day', label: m.statsViewDay() },
             { value: 'trends', label: m.statsViewTrends() },
             { value: 'growth', label: m.statsViewGrowth() },
+            { value: 'achievements', label: m.statsViewAchievements() },
           ]}
           value={view}
           onChange={(next) =>
@@ -50,7 +52,15 @@ function StatsPage() {
           }
         />
       </div>
-      {view === 'growth' ? <Growth /> : view === 'trends' ? <Trends /> : <DayView />}
+      {view === 'growth' ? (
+        <Growth />
+      ) : view === 'trends' ? (
+        <Trends />
+      ) : view === 'achievements' ? (
+        <Achievements />
+      ) : (
+        <DayView />
+      )}
     </RequireBaby>
   )
 }
@@ -59,6 +69,12 @@ function Trends() {
   const { baby } = useSelectedBaby()
   const events = useBabyEvents(baby?.id ?? '')
   return <TrendsView key={baby?.id} events={events} />
+}
+
+function Achievements() {
+  const { baby } = useSelectedBaby()
+  const events = useBabyEvents(baby?.id ?? '')
+  return baby ? <AchievementsView key={baby.id} baby={baby} events={events} /> : null
 }
 
 function Growth() {
