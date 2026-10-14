@@ -48,16 +48,16 @@ export async function sendEmail(env: Env, email: OutgoingEmail): Promise<void> {
   console.log(`[email] to=${email.to} subject=${email.subject}\n${email.text}`)
 }
 
-/** The sign-in code email. The UI is Chinese-only for now (#37 adds English). */
-export function signInCodeEmail(to: string, code: string, minutes: number): OutgoingEmail {
+/** The password reset code email. The UI is Chinese-only for now (#37 adds English). */
+export function passwordResetEmail(to: string, code: string, minutes: number): OutgoingEmail {
   return {
     to,
-    subject: `Bobo 登录验证码：${code}`,
-    text: `你的 Bobo 登录验证码是 ${code}，${minutes} 分钟内有效。\n\n如果不是你本人操作，请忽略这封邮件。`,
+    subject: `Bobo 重置密码验证码：${code}`,
+    text: `你正在重置 Bobo 的登录密码，验证码是 ${code}，${minutes} 分钟内有效。\n\n如果不是你本人操作，请忽略这封邮件，你的密码不会改变。`,
     html: `<div style="font-family:sans-serif;font-size:16px;color:#3c3c3c">
-<p>你的 Bobo 登录验证码是：</p>
+<p>你正在重置 Bobo 的登录密码，验证码是：</p>
 <p style="font-size:32px;font-weight:800;letter-spacing:6px;color:#46a302">${code}</p>
-<p>${minutes} 分钟内有效。如果不是你本人操作，请忽略这封邮件。</p>
+<p>${minutes} 分钟内有效。如果不是你本人操作，请忽略这封邮件，你的密码不会改变。</p>
 </div>`,
   }
 }

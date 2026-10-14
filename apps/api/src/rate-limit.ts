@@ -2,8 +2,19 @@ import type { MiddlewareHandler } from 'hono'
 
 import type { AppEnv } from './types'
 
-const SEND_PATH = '/api/auth/email-otp/send-verification-otp'
-const VERIFY_PATH = '/api/auth/sign-in/email-otp'
+/** Sends an email: limited per address so nobody can flood an inbox. */
+const SENDS_EMAIL = new Set([
+  '/api/auth/email-otp/request-password-reset',
+  '/api/auth/email-otp/send-verification-otp',
+  '/api/auth/forget-password/email-otp',
+])
+/** Checks a secret: limited per account so passwords and codes cannot be guessed quickly. */
+const GUESSES = new Set([
+  '/api/auth/sign-in/email',
+  '/api/auth/email-otp/reset-password',
+  '/api/auth/sign-in/email-otp',
+])
+const SIGN_UP = '/api/auth/sign-up/email'
 
 async function emailOf(request: Request): Promise<string | undefined> {
   try {
@@ -20,21 +31,29 @@ async function emailOf(request: Request): Promise<string | undefined> {
   }
 }
 
+const allowed = { success: true }
+
 /**
- * Limits sending codes per email address (stops mail bombing one inbox), and sending and
- * checking codes per IP (stops one client spraying addresses or guessing). Guesses per code
- * are also capped by the plugin's allowedAttempts. Workers rate limiters count in memory at
- * the edge, so this costs no D1 queries. Without the bindings (tests, dev) nothing is limited.
+ * Rate limits for the auth endpoints, using Workers rate limiters (counted in memory at the
+ * edge, no D1 queries):
+ * - per IP, every sign-in, sign-up and reset request
+ * - per address, emails sent (AUTH_EMAIL_RATE_LIMIT) and password or code checks
+ *   (AUTH_IP_RATE_LIMIT's budget under an account key)
+ * Without the bindings (tests, local dev without them) nothing is limited.
  */
-export const otpRateLimit: MiddlewareHandler<AppEnv> = async (c, next) => {
-  const sending = c.req.path === SEND_PATH
-  if (c.req.method !== 'POST' || !(sending || c.req.path === VERIFY_PATH)) return next()
+export const authRateLimit: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const path = c.req.path
+  const sends = SENDS_EMAIL.has(path)
+  const guesses = GUESSES.has(path)
+  if (c.req.method !== 'POST' || !(sends || guesses || path === SIGN_UP)) return next()
+
   const { AUTH_EMAIL_RATE_LIMIT: byEmail, AUTH_IP_RATE_LIMIT: byIp } = c.env
   const ip = c.req.header('cf-connecting-ip')
-  const email = byEmail && sending ? await emailOf(c.req.raw) : undefined
+  const email = (sends && byEmail) || (guesses && byIp) ? await emailOf(c.req.raw) : undefined
   const checks = await Promise.all([
-    byIp && ip ? byIp.limit({ key: ip }) : { success: true },
-    byEmail && email ? byEmail.limit({ key: email }) : { success: true },
+    byIp && ip ? byIp.limit({ key: `ip:${ip}` }) : allowed,
+    sends && byEmail && email ? byEmail.limit({ key: email }) : allowed,
+    guesses && byIp && email ? byIp.limit({ key: `account:${email}` }) : allowed,
   ])
   if (checks.some((check) => !check.success)) {
     return c.json({ code: 'TOO_MANY_REQUESTS', message: 'Too many requests' }, 429)

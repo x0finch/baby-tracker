@@ -20,7 +20,7 @@
       "migrations_dir": "migrations",
     },
   ],
-  // Sign-in code limits (src/rate-limit.ts). namespace_id must be unique in the account.
+  // Auth endpoint limits (src/rate-limit.ts). namespace_id must be unique in the account.
   "ratelimits": [
     {
       "name": "AUTH_EMAIL_RATE_LIMIT",

@@ -3,6 +3,7 @@ import type { FamilySummary } from '@bobo/shared'
 import type { LocalStore } from '../db'
 import { HttpError, apiFetch } from './api'
 import { markDirty, setAccount, setCursor } from './local'
+import { derivePasswordKey, normalizeEmail } from './password'
 
 export interface SessionUser {
   id: string
@@ -40,19 +41,44 @@ export async function signInWithGoogle(returnTo = '/settings') {
   window.location.assign(url)
 }
 
-/** Emails a one-time sign-in code; new addresses get an account when they sign in. */
-export async function sendEmailCode(email: string) {
-  await apiFetch('/api/auth/email-otp/send-verification-otp', {
+/** Creates an account; the session cookie is set by the response. */
+export async function signUpWithEmail(email: string, password: string, name: string) {
+  await apiFetch('/api/auth/sign-up/email', {
     method: 'POST',
-    body: JSON.stringify({ email, type: 'sign-in' }),
+    body: JSON.stringify({
+      email: normalizeEmail(email),
+      password: await derivePasswordKey(email, password),
+      name: name.trim(),
+    }),
   })
 }
 
-/** Signs in with an emailed code; the session cookie is set by the response. */
-export async function signInWithEmailCode(email: string, otp: string) {
-  await apiFetch('/api/auth/sign-in/email-otp', {
+export async function signInWithEmail(email: string, password: string) {
+  await apiFetch('/api/auth/sign-in/email', {
     method: 'POST',
-    body: JSON.stringify({ email, otp }),
+    body: JSON.stringify({
+      email: normalizeEmail(email),
+      password: await derivePasswordKey(email, password),
+    }),
+  })
+}
+
+/** Emails a reset code; the server answers the same whether or not the address exists. */
+export async function requestPasswordReset(email: string) {
+  await apiFetch('/api/auth/email-otp/request-password-reset', {
+    method: 'POST',
+    body: JSON.stringify({ email: normalizeEmail(email) }),
+  })
+}
+
+export async function resetPassword(email: string, otp: string, password: string) {
+  await apiFetch('/api/auth/email-otp/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({
+      email: normalizeEmail(email),
+      otp,
+      password: await derivePasswordKey(email, password),
+    }),
   })
 }
 

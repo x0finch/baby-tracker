@@ -6,8 +6,9 @@ import { emailOTP } from 'better-auth/plugins/email-otp'
 import { drizzle } from 'drizzle-orm/d1'
 
 import * as schema from './db/schema'
-import { sendEmail, signInCodeEmail } from './email'
+import { passwordResetEmail, sendEmail } from './email'
 import type { Env } from './env'
+import { hashPassword, verifyPassword } from './password'
 
 /** The app origin plus the future Capacitor shell (#45), which calls the API cross-origin. */
 export function trustedOrigins(env: Env): string[] {
@@ -19,11 +20,12 @@ export function trustedOrigins(env: Env): string[] {
  * - `better-auth/minimal` (no Kysely) and only the bearer plugin, to keep the bundle small
  * - signed cookie cache (compact HMAC, not JWE) so most requests validate the session
  *   without a D1 read, and a long `updateAge` so sessions are rarely rewritten
- * - no email/password (avoids scrypt); email sign-in uses one-time codes, stored hashed with
- *   SHA-256, which costs microseconds
- * - no DB-backed rate limiting: sending codes is limited by a Workers rate limiter (app.ts)
+ * - email/password without scrypt: the app stretches passwords and the server stores a
+ *   salted SHA-256 of the result (password.ts); resets use emailed one-time codes, stored
+ *   hashed with SHA-256
+ * - no DB-backed rate limiting: Workers rate limiters guard the auth endpoints (app.ts)
  */
-/** Sign-in codes stay valid for 10 minutes. */
+/** Password reset codes stay valid for 10 minutes. */
 export const OTP_TTL_SECONDS = 10 * 60
 
 export function createAuthOptions(env: Env) {
@@ -38,7 +40,14 @@ export function createAuthOptions(env: Env) {
     secret: env.BETTER_AUTH_SECRET,
     database: drizzleAdapter(drizzle(env.DB, { schema }), { provider: 'sqlite', schema }),
     socialProviders: google ? { google } : {},
-    emailAndPassword: { enabled: false },
+    emailAndPassword: {
+      enabled: true,
+      // The app sends a 64-hex-character derived key, never the password itself.
+      minPasswordLength: 64,
+      maxPasswordLength: 64,
+      password: { hash: hashPassword, verify: verifyPassword },
+      revokeSessionsOnPasswordReset: true,
+    },
     session: {
       expiresIn: 60 * 60 * 24 * 60,
       updateAge: 60 * 60 * 24,
@@ -68,10 +77,11 @@ export function createAuthOptions(env: Env) {
         expiresIn: OTP_TTL_SECONDS,
         allowedAttempts: 5,
         storeOTP: 'hashed',
+        // Codes are only used to reset a forgotten password; signing in needs the password.
+        disableSignUp: true,
         sendVerificationOTP: async ({ email, otp, type }) => {
-          // Only sign-in codes are used; other flows (password reset, ...) are disabled.
-          if (type !== 'sign-in') return
-          await sendEmail(env, signInCodeEmail(email, otp, OTP_TTL_SECONDS / 60))
+          if (type !== 'forget-password') return
+          await sendEmail(env, passwordResetEmail(email, otp, OTP_TTL_SECONDS / 60))
         },
       }),
     ],
