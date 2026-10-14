@@ -9,14 +9,16 @@ import { formatTime } from '../lib/i18n'
 import { m } from '../paraglide/messages.js'
 import {
   type SessionUser,
+  unclaimedCount,
   deleteAccountRemote,
   disconnectLocal,
   httpAccountApi,
-  signInWithGoogle,
   signOutRemote,
 } from './account'
+import { connectIfSignedIn } from './connection'
 import { getAccount } from './local'
 import { requestSync, useSyncState } from './runner'
+import { SignInOptions } from './SignInOptions'
 
 function SyncStatusLine() {
   const { phase, lastSyncedAt } = useSyncState()
@@ -43,7 +45,6 @@ export function AccountCard() {
   const { data: pending } = useLiveQuery({ query: (q) => q.from({ entry: store.outbox }) })
   const account = getAccount(store)
   const [user, setUser] = useState<SessionUser | null>(null)
-  const [error, setError] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteFailed, setDeleteFailed] = useState(false)
@@ -53,15 +54,6 @@ export function AccountCard() {
     if (!userId) return
     httpAccountApi.me().then(setUser, () => setUser(null))
   }, [userId])
-
-  async function signIn() {
-    setError(false)
-    try {
-      await signInWithGoogle()
-    } catch {
-      setError(true)
-    }
-  }
 
   async function deleteAccount() {
     setDeleteFailed(false)
@@ -141,10 +133,7 @@ export function AccountCard() {
       ) : (
         <>
           <p className="m-0 text-fg-muted">{m.accountSignedOutBody()}</p>
-          <Button size="lg" block onClick={() => void signIn()}>
-            {m.signInGoogle()}
-          </Button>
-          {error && <p className="m-0 font-bold text-danger-text">{m.signInFailed()}</p>}
+          <SignInOptions onSignedIn={() => connectIfSignedIn(store, () => unclaimedCount(store))} />
         </>
       )}
     </Card>

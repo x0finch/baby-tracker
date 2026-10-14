@@ -1,5 +1,5 @@
 import { betterAuth } from 'better-auth/minimal'
-import { bearer, testUtils } from 'better-auth/plugins'
+import { testUtils } from 'better-auth/plugins'
 
 import { createApp } from '../src/app'
 import { createAuthOptions } from '../src/auth'
@@ -29,7 +29,8 @@ export async function createTestApp(overrides: Partial<Env> = {}) {
     GOOGLE_CLIENT_SECRET: 'test-client-secret',
     ...overrides,
   }
-  const auth = betterAuth({ ...createAuthOptions(env), plugins: [bearer(), testUtils()] })
+  const options = createAuthOptions(env)
+  const auth = betterAuth({ ...options, plugins: [...options.plugins, testUtils()] })
   const app = createApp({ auth: () => auth })
   const helpers = (await auth.$context).test
 

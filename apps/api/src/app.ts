@@ -3,6 +3,7 @@ import { cors } from 'hono/cors'
 
 import { getAuth, trustedOrigins } from './auth'
 import { requireUser } from './middleware'
+import { authRateLimit } from './rate-limit'
 import { accountRoutes } from './routes/account'
 import { familyRoutes } from './routes/families'
 import { familyInviteRoutes, inviteAcceptRoutes, invitePreviewRoutes } from './routes/invites'
@@ -36,6 +37,7 @@ export function createApp(options: AppOptions = {}) {
     return c.json({ ok: true })
   })
 
+  app.use('/auth/*', authRateLimit)
   app.on(['GET', 'POST'], '/auth/*', (c) => authFor(c.env).handler(c.req.raw))
 
   const auth = requireUser(authFor)
