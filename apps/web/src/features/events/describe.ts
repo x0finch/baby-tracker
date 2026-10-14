@@ -1,6 +1,6 @@
 import { type Event, breastSideDurations, eventDurationMs, isRunning } from '@bobo/shared'
 
-import { formatNumber } from '../../lib/i18n'
+import { formatQuantity, unitLabel } from '../../lib/units'
 import { m } from '../../paraglide/messages.js'
 import { amountLabel, poopColorLabel, poopConsistencyLabel } from './diaper-labels'
 import { durationLabel } from './duration-label'
@@ -23,9 +23,6 @@ export const FEVER_CELSIUS = 38
 
 const pumpingSides = { left: m.sideLeft, right: m.sideRight, both: m.pumpingBoth }
 
-const oneDecimal = (value: number) =>
-  formatNumber(value, { minimumFractionDigits: 0, maximumFractionDigits: 1 })
-
 export function growthDetail(data: {
   weightKg: number | null
   lengthCm: number | null
@@ -33,16 +30,31 @@ export function growthDetail(data: {
 }): string {
   return [
     data.weightKg !== null &&
-      m.growthWeightValue({ value: formatNumber(data.weightKg, { maximumFractionDigits: 2 }) }),
-    data.lengthCm !== null && m.growthLengthValue({ value: oneDecimal(data.lengthCm) }),
-    data.headCm !== null && m.growthHeadValue({ value: oneDecimal(data.headCm) }),
+      m.growthWeightValue({
+        value: formatQuantity('weight', data.weightKg),
+        unit: unitLabel('weight'),
+      }),
+    data.lengthCm !== null &&
+      m.growthLengthValue({
+        value: formatQuantity('length', data.lengthCm),
+        unit: unitLabel('length'),
+      }),
+    data.headCm !== null &&
+      m.growthHeadValue({
+        value: formatQuantity('length', data.headCm),
+        unit: unitLabel('length'),
+      }),
   ]
     .filter((part) => typeof part === 'string')
     .join(' · ')
 }
 
-export function formatCelsius(celsius: number): string {
-  return formatNumber(celsius, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+/** A temperature in the preferred unit, e.g. "37.5 °C". */
+export function temperatureText(celsius: number): string {
+  return m.temperatureDetail({
+    value: formatQuantity('temperature', celsius),
+    unit: unitLabel('temperature'),
+  })
 }
 
 const milkLabels = { breast: m.milkBreast, formula: m.milkFormula, mixed: m.milkMixed }
@@ -72,12 +84,14 @@ export function describeEvent(event: Event, now: number): { title: string; detai
           detail:
             data.breastMl !== undefined && data.formulaMl !== undefined
               ? m.bottleSplitDetail({
-                  amount: formatNumber(data.amountMl),
-                  breast: formatNumber(data.breastMl),
-                  formula: formatNumber(data.formulaMl),
+                  amount: formatQuantity('volume', data.amountMl),
+                  breast: formatQuantity('volume', data.breastMl),
+                  formula: formatQuantity('volume', data.formulaMl),
+                  unit: unitLabel('volume'),
                 })
               : m.bottleDetail({
-                  amount: formatNumber(data.amountMl),
+                  amount: formatQuantity('volume', data.amountMl),
+                  unit: unitLabel('volume'),
                   milk: milkLabels[data.milk](),
                 }),
         }
@@ -107,11 +121,12 @@ export function describeEvent(event: Event, now: number): { title: string; detai
         title: m.categoryPumping(),
         detail: m.pumpingDetail({
           side: pumpingSides[event.data.side](),
-          amount: formatNumber(event.data.amountMl),
+          amount: formatQuantity('volume', event.data.amountMl),
+          unit: unitLabel('volume'),
         }),
       }
     case 'temperature': {
-      const value = m.temperatureDetail({ value: formatCelsius(event.data.celsius) })
+      const value = temperatureText(event.data.celsius)
       return {
         title: m.categoryTemperature(),
         detail: event.data.celsius >= FEVER_CELSIUS ? `${value} · ${m.temperatureFever()}` : value,

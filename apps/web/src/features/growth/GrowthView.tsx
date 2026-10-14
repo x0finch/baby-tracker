@@ -6,6 +6,7 @@ import { Card } from '../../components/ui/Card'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { Sheet } from '../../components/ui/Sheet'
 import { formatDate, formatNumber } from '../../lib/i18n'
+import { convertToDisplay, formatQuantity, unitLabel } from '../../lib/units'
 import { m } from '../../paraglide/messages.js'
 import { EditEventForm } from '../events/EditEventSheet'
 import {
@@ -25,15 +26,12 @@ const measureLabel = {
   length: m.growthMeasureLength,
   head: m.growthMeasureHead,
 }
-const unitValue = {
-  weight: (value: string) => m.growthWeightValue({ value }),
-  length: (value: string) => m.growthLengthValue({ value }),
-  head: (value: string) => m.growthLengthValue({ value }),
-}
+const QUANTITY = { weight: 'weight', length: 'length', head: 'length' } as const
 
 function formatMeasure(measure: GrowthMeasure, value: number): string {
-  const digits = measure === 'weight' ? 2 : 1
-  return unitValue[measure](formatNumber(value, { maximumFractionDigits: digits }))
+  const quantity = QUANTITY[measure]
+  const params = { value: formatQuantity(quantity, value), unit: unitLabel(quantity) }
+  return measure === 'weight' ? m.growthWeightValue(params) : m.growthLengthValue(params)
 }
 
 interface Point {
@@ -76,22 +74,29 @@ function GrowthChart({
   const lastMonths = Math.max(monthsNow, ...charted.map((point) => point.months))
   const xMax = Math.min(MAX_MONTHS, Math.max(6, Math.ceil(lastMonths) + 2))
 
+  // Charted in the preferred unit so the axis has round ticks.
+  const toUnits = (value: number) => convertToDisplay(QUANTITY[measure], value)
   const samples = Array.from({ length: xMax * 4 + 1 }, (_, i) => i / 4)
   const curves = REFERENCE_CURVES.map((curve) => {
     const values = samples.map((months) => {
       const lms = lmsAt(measure, sex, months)
-      return lms ? valueAtZ(curve.z, lms) : 0
+      return lms ? toUnits(valueAtZ(curve.z, lms)) : 0
     })
     return { percentile: curve.percentile, values }
   })
-  const allValues = [...curves.flatMap((curve) => curve.values), ...charted.map((p) => p.value)]
+  const allValues = [
+    ...curves.flatMap((curve) => curve.values),
+    ...charted.map((p) => toUnits(p.value)),
+  ]
   const step = niceStep(Math.max(...allValues) - Math.min(...allValues))
   const yMin = Math.floor(Math.min(...allValues) / step) * step
   const yMax = Math.ceil(Math.max(...allValues) / step) * step
 
   const x = (months: number) => PAD.left + (months / xMax) * (W - PAD.left - PAD.right)
-  const y = (value: number) =>
+  // Ticks and curves are in display units; `y` places stored readings.
+  const yDisplay = (value: number) =>
     H - PAD.bottom - ((value - yMin) / (yMax - yMin)) * (H - PAD.top - PAD.bottom)
+  const y = (value: number) => yDisplay(toUnits(value))
 
   const yTicks = Array.from(
     { length: Math.round((yMax - yMin) / step) + 1 },
@@ -109,14 +114,14 @@ function GrowthChart({
             <line
               x1={PAD.left}
               x2={W - PAD.right}
-              y1={y(tick)}
-              y2={y(tick)}
+              y1={yDisplay(tick)}
+              y2={yDisplay(tick)}
               className="stroke-border"
               strokeWidth={1}
             />
             <text
               x={PAD.left - 6}
-              y={y(tick)}
+              y={yDisplay(tick)}
               textAnchor="end"
               dominantBaseline="middle"
               className="fill-fg-muted text-[10px] tabular-nums"
@@ -139,7 +144,7 @@ function GrowthChart({
         {curves.map((curve) => (
           <g key={curve.percentile}>
             <path
-              d={path(samples.map((months, i) => [x(months), y(curve.values[i] ?? 0)]))}
+              d={path(samples.map((months, i) => [x(months), yDisplay(curve.values[i] ?? 0)]))}
               fill="none"
               className="stroke-fg-muted"
               strokeOpacity={curve.percentile === 50 ? 0.9 : 0.4}
@@ -148,7 +153,7 @@ function GrowthChart({
             />
             <text
               x={W - PAD.right + 4}
-              y={y(curve.values.at(-1) ?? 0)}
+              y={yDisplay(curve.values.at(-1) ?? 0)}
               dominantBaseline="middle"
               className="fill-fg-muted text-[10px] tabular-nums"
             >

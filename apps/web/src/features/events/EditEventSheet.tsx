@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { useLocalStore } from '../../db'
+import { inputValue, quantityInputProps, unitLabel } from '../../lib/units'
 import { m } from '../../paraglide/messages.js'
 import { useAccess } from '../../sync/use-access'
 import { useMemberName } from '../family/api'
@@ -12,8 +13,8 @@ import { type GrowthErrors, growthFieldValue, parseGrowth } from '../growth/grow
 import { saveEvent } from './actions'
 import { parseBottle } from './bottle-input'
 import { type DiaperData, DiaperFields } from './DiaperFields'
+import { parseTemperature, parseVolume } from './measure-input'
 import { MixedAmounts } from './MixedAmounts'
-import { validCelsius, validPumpingMl } from './OtherEventSheet'
 import { deleteEvent, moveEventStart, setEventNote } from './records'
 import { toDateTimeLocal } from './time'
 import { TimeField } from './TimeField'
@@ -47,26 +48,26 @@ export function EditEventForm({
   const [note, setNote] = useState(event.note ?? '')
   const [amount, setAmount] = useState(() =>
     event.type === 'feeding' && event.data.kind === 'bottle'
-      ? String(event.data.amountMl)
+      ? inputValue('volume', event.data.amountMl)
       : event.type === 'pumping'
-        ? String(event.data.amountMl)
+        ? inputValue('volume', event.data.amountMl)
         : '',
   )
   const [pumpingSide, setPumpingSide] = useState(() =>
     event.type === 'pumping' ? event.data.side : 'both',
   )
   const [celsius, setCelsius] = useState(() =>
-    event.type === 'temperature' ? String(event.data.celsius) : '',
+    event.type === 'temperature' ? inputValue('temperature', event.data.celsius) : '',
   )
   const [medName, setMedName] = useState(() => (event.type === 'medication' ? event.data.name : ''))
   const [weight, setWeight] = useState(() =>
-    event.type === 'growth' ? growthFieldValue(event.data.weightKg) : '',
+    event.type === 'growth' ? growthFieldValue('weight', event.data.weightKg) : '',
   )
   const [length, setLength] = useState(() =>
-    event.type === 'growth' ? growthFieldValue(event.data.lengthCm) : '',
+    event.type === 'growth' ? growthFieldValue('length', event.data.lengthCm) : '',
   )
   const [head, setHead] = useState(() =>
-    event.type === 'growth' ? growthFieldValue(event.data.headCm) : '',
+    event.type === 'growth' ? growthFieldValue('length', event.data.headCm) : '',
   )
   const [medDose, setMedDose] = useState(() =>
     event.type === 'medication' ? (event.data.dose ?? '') : '',
@@ -82,12 +83,12 @@ export function EditEventForm({
   )
   const [breastPart, setBreastPart] = useState(() =>
     event.type === 'feeding' && event.data.kind === 'bottle' && event.data.breastMl !== undefined
-      ? String(event.data.breastMl)
+      ? inputValue('volume', event.data.breastMl)
       : '',
   )
   const [formulaPart, setFormulaPart] = useState(() =>
     event.type === 'feeding' && event.data.kind === 'bottle' && event.data.formulaMl !== undefined
-      ? String(event.data.formulaMl)
+      ? inputValue('volume', event.data.formulaMl)
       : '',
   )
   const [sleepKind, setSleepKind] = useState(() =>
@@ -138,14 +139,14 @@ export function EditEventForm({
     }
     if (next.type === 'diaper') next = { ...next, data: diaper }
     if (next.type === 'pumping') {
-      const amountMl = Number(amount)
-      if (!validPumpingMl(amountMl)) nextErrors.amount = m.bottleAmountInvalid()
-      else next = { ...next, data: { side: pumpingSide, amountMl } }
+      const pumping = parseVolume(amount)
+      if ('error' in pumping) nextErrors.amount = pumping.error
+      else next = { ...next, data: { side: pumpingSide, amountMl: pumping.amountMl } }
     }
     if (next.type === 'temperature') {
-      const value = Number(celsius)
-      if (!validCelsius(value)) nextErrors.celsius = m.temperatureInvalid()
-      else next = { ...next, data: { celsius: Math.round(value * 10) / 10 } }
+      const temperature = parseTemperature(celsius)
+      if ('error' in temperature) nextErrors.celsius = temperature.error
+      else next = { ...next, data: { celsius: temperature.celsius } }
     }
     if (next.type === 'medication') {
       if (!medName.trim()) nextErrors.name = m.medicationNameRequired()
@@ -201,9 +202,8 @@ export function EditEventForm({
             ) : (
               <>
                 <Input
-                  label={m.bottleAmount()}
-                  type="number"
-                  inputMode="numeric"
+                  label={m.bottleAmount({ unit: unitLabel('volume') })}
+                  {...quantityInputProps('volume')}
                   value={amount}
                   error={errors.amount}
                   onChange={(e) => setAmount(e.target.value)}
@@ -247,9 +247,8 @@ export function EditEventForm({
               onChange={setPumpingSide}
             />
             <Input
-              label={m.pumpingAmount()}
-              type="number"
-              inputMode="numeric"
+              label={m.pumpingAmount({ unit: unitLabel('volume') })}
+              {...quantityInputProps('volume')}
               value={amount}
               error={errors.amount}
               onChange={(e) => setAmount(e.target.value)}
@@ -259,28 +258,22 @@ export function EditEventForm({
         {event.type === 'growth' && (
           <>
             <Input
-              label={m.growthWeight()}
-              type="number"
-              inputMode="decimal"
-              step="0.01"
+              label={m.growthWeight({ unit: unitLabel('weight') })}
+              {...quantityInputProps('weight')}
               value={weight}
               error={errors.weight}
               onChange={(e) => setWeight(e.target.value)}
             />
             <Input
-              label={m.growthLength()}
-              type="number"
-              inputMode="decimal"
-              step="0.1"
+              label={m.growthLength({ unit: unitLabel('length') })}
+              {...quantityInputProps('length')}
               value={length}
               error={errors.length}
               onChange={(e) => setLength(e.target.value)}
             />
             <Input
-              label={m.growthHead()}
-              type="number"
-              inputMode="decimal"
-              step="0.1"
+              label={m.growthHead({ unit: unitLabel('length') })}
+              {...quantityInputProps('length')}
               value={head}
               error={errors.head}
               onChange={(e) => setHead(e.target.value)}
@@ -289,10 +282,8 @@ export function EditEventForm({
         )}
         {event.type === 'temperature' && (
           <Input
-            label={m.temperatureLabel()}
-            type="number"
-            inputMode="decimal"
-            step="0.1"
+            label={m.temperatureLabel({ unit: unitLabel('temperature') })}
+            {...quantityInputProps('temperature')}
             value={celsius}
             error={errors.celsius}
             onChange={(e) => setCelsius(e.target.value)}

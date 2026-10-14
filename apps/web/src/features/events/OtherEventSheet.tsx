@@ -4,10 +4,12 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { useLocalStore } from '../../db'
+import { inputValue, quantityInputProps, unitLabel } from '../../lib/units'
 import { m } from '../../paraglide/messages.js'
 import { type GrowthErrors, parseGrowth } from '../growth/growth-input'
 import { addEvent } from './actions'
 import { type OtherCategory, categoryTone } from './category'
+import { parseTemperature, parseVolume } from './measure-input'
 import { logGrowth, logMedication, logNote, logPumping, logTemperature } from './records'
 import { toDateTimeLocal } from './time'
 import { TimeField } from './TimeField'
@@ -17,15 +19,6 @@ import { validateTime } from './validation'
 type PumpingSide = 'left' | 'right' | 'both'
 type Errors = Partial<Record<'time' | 'amount' | 'celsius' | 'name' | 'text', string>> &
   GrowthErrors
-
-/** Plausible body temperatures; the schema allows a wider range for unusual readings. */
-export function validCelsius(value: number): boolean {
-  return value >= 34 && value <= 43
-}
-
-export function validPumpingMl(value: number): boolean {
-  return value > 0 && value <= 1000
-}
 
 /** Form for the less frequent event types (pumping, temperature, medication, notes). */
 export function OtherEventForm({
@@ -57,12 +50,10 @@ export function OtherEventForm({
     const next: Errors = {}
     const timeResult = validateTime(time, current)
     if ('error' in timeResult) next.time = timeResult.error
-    if (category === 'pumping' && !validPumpingMl(Number(amount))) {
-      next.amount = m.bottleAmountInvalid()
-    }
-    if (category === 'temperature' && !validCelsius(Number(celsius))) {
-      next.celsius = m.temperatureInvalid()
-    }
+    const pumping = category === 'pumping' ? parseVolume(amount) : undefined
+    if (pumping && 'error' in pumping) next.amount = pumping.error
+    const temperature = category === 'temperature' ? parseTemperature(celsius) : undefined
+    if (temperature && 'error' in temperature) next.celsius = temperature.error
     if (category === 'medication' && !name.trim()) next.name = m.medicationNameRequired()
     if (category === 'note' && !text.trim()) next.text = m.noteRequired()
     const growth = category === 'growth' ? parseGrowth({ weight, length, head }) : undefined
@@ -74,10 +65,10 @@ export function OtherEventForm({
     const event =
       growth && 'data' in growth
         ? logGrowth(babyId, at, growth.data, current)
-        : category === 'pumping'
-          ? logPumping(babyId, at, side, Number(amount), current)
-          : category === 'temperature'
-            ? logTemperature(babyId, at, Number(celsius), current)
+        : pumping && 'amountMl' in pumping
+          ? logPumping(babyId, at, side, pumping.amountMl, current)
+          : temperature && 'celsius' in temperature
+            ? logTemperature(babyId, at, temperature.celsius, current)
             : category === 'medication'
               ? logMedication(babyId, at, name, dose, current)
               : logNote(babyId, at, text, current)
@@ -100,9 +91,8 @@ export function OtherEventForm({
             onChange={setSide}
           />
           <Input
-            label={m.pumpingAmount()}
-            type="number"
-            inputMode="numeric"
+            label={m.pumpingAmount({ unit: unitLabel('volume') })}
+            {...quantityInputProps('volume')}
             value={amount}
             error={errors.amount}
             onChange={(e) => setAmount(e.target.value)}
@@ -112,28 +102,22 @@ export function OtherEventForm({
       {category === 'growth' && (
         <>
           <Input
-            label={m.growthWeight()}
-            type="number"
-            inputMode="decimal"
-            step="0.01"
+            label={m.growthWeight({ unit: unitLabel('weight') })}
+            {...quantityInputProps('weight')}
             value={weight}
             error={errors.weight}
             onChange={(e) => setWeight(e.target.value)}
           />
           <Input
-            label={m.growthLength()}
-            type="number"
-            inputMode="decimal"
-            step="0.1"
+            label={m.growthLength({ unit: unitLabel('length') })}
+            {...quantityInputProps('length')}
             value={length}
             error={errors.length}
             onChange={(e) => setLength(e.target.value)}
           />
           <Input
-            label={m.growthHead()}
-            type="number"
-            inputMode="decimal"
-            step="0.1"
+            label={m.growthHead({ unit: unitLabel('length') })}
+            {...quantityInputProps('length')}
             value={head}
             error={errors.head}
             onChange={(e) => setHead(e.target.value)}
@@ -143,11 +127,9 @@ export function OtherEventForm({
       )}
       {category === 'temperature' && (
         <Input
-          label={m.temperatureLabel()}
-          type="number"
-          inputMode="decimal"
-          step="0.1"
-          placeholder="36.8"
+          label={m.temperatureLabel({ unit: unitLabel('temperature') })}
+          {...quantityInputProps('temperature')}
+          placeholder={inputValue('temperature', 36.8)}
           value={celsius}
           error={errors.celsius}
           onChange={(e) => setCelsius(e.target.value)}

@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { useLocalStore } from '../../db'
+import { getUnits, quantityInputProps, unitLabel } from '../../lib/units'
 import { m } from '../../paraglide/messages.js'
 import { addEvent } from './actions'
 import { type Milk, parseBottle } from './bottle-input'
@@ -18,7 +19,8 @@ import { validateTime } from './validation'
 
 type Kind = 'breast' | 'bottle' | 'solids'
 
-const QUICK_AMOUNTS = [60, 90, 120, 150] as const
+/** One-tap bottle amounts in display units. */
+const QUICK_AMOUNTS = { ml: [60, 90, 120, 150], oz: [2, 3, 4, 5] } as const
 
 export function FeedingSheetContent({
   babyId,
@@ -142,17 +144,15 @@ export function FeedingSheetContent({
               ) : (
                 <>
                   <Input
-                    label={m.bottleAmount()}
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    max={1000}
+                    label={m.bottleAmount({ unit: unitLabel('volume') })}
+                    {...quantityInputProps('volume')}
+                    min={0}
                     value={amount}
                     error={errors.amount}
                     onChange={(event) => setAmount(event.target.value)}
                   />
                   <div className="grid grid-cols-4 gap-2">
-                    {QUICK_AMOUNTS.map((value) => (
+                    {QUICK_AMOUNTS[getUnits().volume].map((value) => (
                       <Button
                         key={value}
                         variant={amount === String(value) ? 'solid' : 'soft'}
