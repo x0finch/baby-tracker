@@ -6,7 +6,8 @@ import { bearer } from 'better-auth/plugins/bearer'
 import { emailOTP } from 'better-auth/plugins/email-otp'
 import { drizzle } from 'drizzle-orm/d1'
 
-import * as schema from './db/schema'
+// Only Better Auth's own tables; the app's tables are queried with prepared statements.
+import * as schema from './db/auth-schema'
 import { passwordResetEmail, sendEmail } from './email'
 import type { Env } from './env'
 import { hashPassword, verifyPassword } from './password'
@@ -23,6 +24,9 @@ export function trustedOrigins(env: Env): string[] {
   return [env.BETTER_AUTH_URL, ...extra, 'capacitor://localhost', 'https://localhost']
 }
 
+/** Password reset codes stay valid for 10 minutes. */
+export const OTP_TTL_SECONDS = 10 * 60
+
 /**
  * Better Auth configured for the Workers free plan (10ms CPU per request):
  * - `better-auth/minimal` (no Kysely) and few plugins, to keep the bundle small
@@ -33,9 +37,6 @@ export function trustedOrigins(env: Env): string[] {
  *   hashed with SHA-256
  * - no DB-backed rate limiting: Workers rate limiters guard the auth endpoints (app.ts)
  */
-/** Password reset codes stay valid for 10 minutes. */
-export const OTP_TTL_SECONDS = 10 * 60
-
 export function createAuthOptions(env: Env) {
   const google =
     env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET

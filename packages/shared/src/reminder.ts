@@ -25,6 +25,9 @@ export const pushSubscriptionSchema = z.object({
 })
 export type PushSubscriptionInput = z.infer<typeof pushSubscriptionSchema>
 
+/** Body of an unsubscribe: only the endpoint identifies the device. */
+export const pushUnsubscribeSchema = z.object({ endpoint: z.string().min(1).max(2048) })
+
 /** Payload of a notification, shown by the service worker. */
 export interface PushMessage {
   title: string

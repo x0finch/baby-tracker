@@ -9,24 +9,7 @@ import {
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { createTestApp } from './app'
-
-const T0 = Date.UTC(2026, 9, 13, 8)
-
-function baby(familyId: string, name: string): Baby {
-  return {
-    id: newId(),
-    familyId,
-    name,
-    birthDate: '2026-09-30',
-    sex: 'unspecified',
-    avatarColor: 'green',
-    archivedAt: null,
-    createdAt: T0,
-    updatedAt: T0,
-    deletedAt: null,
-    createdBy: null,
-  }
-}
+import { baby } from './fixtures'
 
 type User = { id: string; headers: Headers }
 
@@ -37,11 +20,7 @@ describe('invites', () => {
   let babyA: Baby
 
   const send = (method: string, path: string, who?: User, body?: unknown) =>
-    t.request(path, {
-      method,
-      headers: { ...Object.fromEntries(who?.headers ?? []), 'Content-Type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    })
+    t.send(method, path, who?.headers, body)
   const user = async (name: string): Promise<User> => {
     const signedIn = await t.signIn(name)
     return { id: signedIn.user.id, headers: signedIn.headers }
@@ -61,9 +40,9 @@ describe('invites', () => {
     const res = await send('POST', '/api/families', owner, { name: '我们家' })
     const family: FamilySummary = await res.json()
     familyId = family.id
-    babyA = baby(familyId, '老大')
+    babyA = baby(familyId, { name: '老大' })
     await send('POST', '/api/sync/push', owner, {
-      babies: [babyA, baby(familyId, '老二')],
+      babies: [babyA, baby(familyId, { name: '老二' })],
       events: [],
     })
   })

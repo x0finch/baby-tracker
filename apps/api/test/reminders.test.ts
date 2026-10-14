@@ -1,16 +1,10 @@
-import {
-  type Baby,
-  type Event,
-  type PushMessage,
-  base64UrlDecode,
-  base64UrlEncode,
-  newId,
-} from '@bobo/shared'
+import { type Event, type PushMessage, base64UrlDecode, base64UrlEncode, newId } from '@bobo/shared'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { dispatchReminders } from '../src/reminders'
 import { encryptPayload, generateVapidKeys, vapidAuthorization } from '../src/web-push'
 import { createTestApp } from './app'
+import { baby as fixtureBaby } from './fixtures'
 
 const HOUR = 3_600_000
 
@@ -140,27 +134,8 @@ describe('reminders', () => {
   const now = Date.now()
 
   const send = (method: string, path: string, body: unknown, h = headers) =>
-    t.request(path, {
-      method,
-      headers: { ...Object.fromEntries(h), 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-
-  function baby(): Baby {
-    return {
-      id: newId(),
-      familyId,
-      name: '小米粒',
-      birthDate: '2026-08-01',
-      sex: 'unspecified',
-      avatarColor: 'green',
-      archivedAt: null,
-      createdAt: now,
-      updatedAt: now,
-      deletedAt: null,
-      createdBy: null,
-    }
-  }
+    t.send(method, path, h, body)
+  const baby = () => fixtureBaby(familyId, { name: '小米粒', createdAt: now, updatedAt: now })
 
   function feeding(babyId: string, startAt: number): Event {
     return {

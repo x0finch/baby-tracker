@@ -1,7 +1,7 @@
 import {
   type FamilyMember,
   type FamilySummary,
-  MANAGE_ROLES,
+  canManageMember,
   createFamilyRequestSchema,
   newId,
   renameFamilyRequestSchema,
@@ -10,20 +10,28 @@ import {
 } from '@bobo/shared'
 import { Hono } from 'hono'
 
-import { loadAccess, parseStringList, toSummaries } from '../access'
-import { babiesInFamily, canManageMember, roleOf } from '../members'
+import {
+  MEMBER_BABY_IDS,
+  babiesInFamily,
+  familyManager,
+  familyMember,
+  loadAccess,
+  parseStringList,
+  roleOf,
+  toSummaries,
+} from '../access'
+import { fail, json } from '../http'
 import type { AppEnv } from '../types'
 
 export const familyRoutes = new Hono<AppEnv>()
   .get('/', async (c) => c.json(toSummaries(await loadAccess(c.env.DB, c.get('user').id))))
-  .post('/', async (c) => {
-    const parsed = createFamilyRequestSchema.safeParse(await c.req.json().catch(() => null))
-    if (!parsed.success) return c.json({ error: 'invalid' }, 400)
+  .post('/', json(createFamilyRequestSchema), async (c) => {
+    const { name } = c.req.valid('json')
     const userId = c.get('user').id
     const now = Date.now()
     const family: FamilySummary = {
       id: newId(now),
-      name: parsed.data.name,
+      name,
       role: 'owner',
       babyIds: null,
     }
@@ -37,25 +45,17 @@ export const familyRoutes = new Hono<AppEnv>()
     ])
     return c.json(family, 201)
   })
-  .patch('/:familyId', async (c) => {
-    const role = await roleOf(c.env.DB, c.req.param('familyId'), c.get('user').id)
-    if (!role || !MANAGE_ROLES.includes(role)) return c.json({ error: 'forbidden' }, 403)
-    const parsed = renameFamilyRequestSchema.safeParse(await c.req.json().catch(() => null))
-    if (!parsed.success) return c.json({ error: 'invalid' }, 400)
+  .patch('/:familyId', familyMember, familyManager, json(renameFamilyRequestSchema), async (c) => {
     await c.env.DB.prepare('update families set name = ?, updated_at = ? where id = ?')
-      .bind(parsed.data.name, Date.now(), c.req.param('familyId'))
+      .bind(c.req.valid('json').name, Date.now(), c.req.param('familyId'))
       .run()
     return c.body(null, 204)
   })
-  .get('/:familyId/members', async (c) => {
+  .get('/:familyId/members', familyMember, async (c) => {
     const familyId = c.req.param('familyId')
-    if (!(await roleOf(c.env.DB, familyId, c.get('user').id))) {
-      return c.json({ error: 'forbidden' }, 403)
-    }
     const { results } = await c.env.DB.prepare(
       `select m.user_id as userId, u.name, u.image, m.role, m.baby_scope as babyScope,
-         (select json_group_array(mb.baby_id) from membership_babies mb
-          where mb.family_id = m.family_id and mb.user_id = m.user_id) as babyIds
+         ${MEMBER_BABY_IDS} as babyIds
        from memberships m join user u on u.id = m.user_id
        where m.family_id = ? order by m.created_at`,
     )
@@ -70,25 +70,15 @@ export const familyRoutes = new Hono<AppEnv>()
     }))
     return c.json(members)
   })
-  .patch('/:familyId/members/:userId', async (c) => {
+  .patch('/:familyId/members/:userId', familyMember, json(updateMemberRequestSchema), async (c) => {
     const db = c.env.DB
     const familyId = c.req.param('familyId')
     const targetId = c.req.param('userId')
-    const parsed = updateMemberRequestSchema.safeParse(await c.req.json().catch(() => null))
-    if (!parsed.success) return c.json({ error: 'invalid' }, 400)
-    const [actor, target] = await Promise.all([
-      roleOf(db, familyId, c.get('user').id),
-      roleOf(db, familyId, targetId),
-    ])
-    if (!actor || !target || !canManageMember(actor, target, parsed.data.role)) {
-      return c.json({ error: 'forbidden' }, 403)
-    }
-
-    const { role, babyIds } = parsed.data
-    if (babyIds) {
-      // Only babies of this family can be granted.
-      if (!(await babiesInFamily(db, familyId, babyIds))) return c.json({ error: 'invalid' }, 400)
-    }
+    const { role, babyIds } = c.req.valid('json')
+    const target = await roleOf(db, familyId, targetId)
+    if (!target || !canManageMember(c.var.role, target, role)) fail('forbidden')
+    // Only babies of this family can be granted.
+    if (babyIds && !(await babiesInFamily(db, familyId, babyIds))) fail('invalid')
 
     const statements: D1PreparedStatement[] = []
     if (role) {
@@ -121,19 +111,13 @@ export const familyRoutes = new Hono<AppEnv>()
     await db.batch(statements)
     return c.body(null, 204)
   })
-  .delete('/:familyId/members/:userId', async (c) => {
+  .delete('/:familyId/members/:userId', familyMember, async (c) => {
     const db = c.env.DB
     const familyId = c.req.param('familyId')
-    const userId = c.get('user').id
     const targetId = c.req.param('userId')
-    const [actor, target] = await Promise.all([
-      roleOf(db, familyId, userId),
-      roleOf(db, familyId, targetId),
-    ])
-    const leaving = targetId === userId && target !== null && target !== 'owner'
-    if (!actor || !target || !(leaving || canManageMember(actor, target))) {
-      return c.json({ error: 'forbidden' }, 403)
-    }
+    const target = await roleOf(db, familyId, targetId)
+    const leaving = targetId === c.get('user').id && target !== null && target !== 'owner'
+    if (!target || !(leaving || canManageMember(c.var.role, target))) fail('forbidden')
     await db.batch([
       db
         .prepare('delete from membership_babies where family_id = ? and user_id = ?')
@@ -150,18 +134,13 @@ export const familyRoutes = new Hono<AppEnv>()
     ])
     return c.body(null, 204)
   })
-  .post('/:familyId/transfer', async (c) => {
+  .post('/:familyId/transfer', familyMember, json(transferOwnershipRequestSchema), async (c) => {
     const db = c.env.DB
     const familyId = c.req.param('familyId')
     const userId = c.get('user').id
-    const parsed = transferOwnershipRequestSchema.safeParse(await c.req.json().catch(() => null))
-    if (!parsed.success) return c.json({ error: 'invalid' }, 400)
-    const [actor, target] = await Promise.all([
-      roleOf(db, familyId, userId),
-      roleOf(db, familyId, parsed.data.userId),
-    ])
-    if (actor !== 'owner' || !target || parsed.data.userId === userId) {
-      return c.json({ error: 'forbidden' }, 403)
+    const next = c.req.valid('json').userId
+    if (c.var.role !== 'owner' || next === userId || !(await roleOf(db, familyId, next))) {
+      fail('forbidden')
     }
     // The new owner sees every baby; the previous owner stays on as an admin.
     await db.batch([
@@ -169,10 +148,10 @@ export const familyRoutes = new Hono<AppEnv>()
         .prepare(
           "update memberships set role = 'owner', baby_scope = 'all' where family_id = ? and user_id = ?",
         )
-        .bind(familyId, parsed.data.userId),
+        .bind(familyId, next),
       db
         .prepare('delete from membership_babies where family_id = ? and user_id = ?')
-        .bind(familyId, parsed.data.userId),
+        .bind(familyId, next),
       db
         .prepare("update memberships set role = 'admin' where family_id = ? and user_id = ?")
         .bind(familyId, userId),

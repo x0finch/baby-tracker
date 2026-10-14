@@ -1,7 +1,14 @@
-import { type Reminder, pushSubscriptionSchema, reminderSchema } from '@bobo/shared'
+import {
+  type Reminder,
+  pushSubscriptionSchema,
+  pushUnsubscribeSchema,
+  reminderSchema,
+} from '@bobo/shared'
 import { Hono } from 'hono'
 
-import { getVapidKeys, notifyUser } from '../reminders'
+import { memberSeesBaby } from '../access'
+import { fail, json } from '../http'
+import { getVapidKeys, notifyUser } from '../push'
 import type { AppEnv } from '../types'
 
 /** Whether the user can see the baby: a member of its family, within their baby scope. */
@@ -9,9 +16,7 @@ async function canSeeBaby(db: D1Database, userId: string, babyId: string): Promi
   const row = await db
     .prepare(
       `select 1 from babies b join memberships m on m.family_id = b.family_id and m.user_id = ?1
-       where b.id = ?2 and b.deleted_at is null and (m.baby_scope = 'all' or exists (
-         select 1 from membership_babies mb
-         where mb.family_id = m.family_id and mb.user_id = m.user_id and mb.baby_id = b.id))`,
+       where b.id = ?2 and b.deleted_at is null and ${memberSeesBaby('b.id')}`,
     )
     .bind(userId, babyId)
     .first()
@@ -21,10 +26,8 @@ async function canSeeBaby(db: D1Database, userId: string, babyId: string): Promi
 /** Push subscriptions of the signed-in user's devices. */
 export const pushRoutes = new Hono<AppEnv>()
   .get('/key', async (c) => c.json({ publicKey: (await getVapidKeys(c.env.DB)).publicKey }))
-  .put('/subscription', async (c) => {
-    const parsed = pushSubscriptionSchema.safeParse(await c.req.json().catch(() => null))
-    if (!parsed.success) return c.json({ error: 'invalid' }, 400)
-    const { endpoint, keys } = parsed.data
+  .put('/subscription', json(pushSubscriptionSchema), async (c) => {
+    const { endpoint, keys } = c.req.valid('json')
     // A browser belongs to whoever signed in on it last.
     await c.env.DB.prepare(
       `insert into push_subscriptions (endpoint, user_id, p256dh, auth, created_at)
@@ -36,11 +39,8 @@ export const pushRoutes = new Hono<AppEnv>()
       .run()
     return c.body(null, 204)
   })
-  .delete('/subscription', async (c) => {
-    const body: unknown = await c.req.json().catch(() => null)
-    const endpoint =
-      typeof body === 'object' && body !== null && 'endpoint' in body ? body.endpoint : undefined
-    if (typeof endpoint !== 'string') return c.json({ error: 'invalid' }, 400)
+  .delete('/subscription', json(pushUnsubscribeSchema), async (c) => {
+    const { endpoint } = c.req.valid('json')
     await c.env.DB.prepare('delete from push_subscriptions where endpoint = ? and user_id = ?')
       .bind(endpoint, c.get('user').id)
       .run()
@@ -73,12 +73,11 @@ export const reminderRoutes = new Hono<AppEnv>()
     }))
     return c.json(reminders)
   })
-  .put('/', async (c) => {
-    const parsed = reminderSchema.safeParse(await c.req.json().catch(() => null))
-    if (!parsed.success) return c.json({ error: 'invalid' }, 400)
-    const { babyId, kind, intervalMinutes, enabled } = parsed.data
+  .put('/', json(reminderSchema), async (c) => {
+    const reminder = c.req.valid('json')
+    const { babyId, kind, intervalMinutes, enabled } = reminder
     const userId = c.get('user').id
-    if (!(await canSeeBaby(c.env.DB, userId, babyId))) return c.json({ error: 'forbidden' }, 403)
+    if (!(await canSeeBaby(c.env.DB, userId, babyId))) fail('forbidden')
     const now = Date.now()
     // A gap that is already longer than the interval doesn't notify right away; the next one does.
     await c.env.DB.prepare(
@@ -93,5 +92,5 @@ export const reminderRoutes = new Hono<AppEnv>()
     )
       .bind(userId, babyId, kind, intervalMinutes, enabled ? 1 : 0, now)
       .run()
-    return c.json(parsed.data)
+    return c.json(reminder)
   })

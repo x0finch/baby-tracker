@@ -11,43 +11,7 @@ import {
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { createTestApp } from './app'
-
-const T0 = Date.UTC(2026, 9, 13, 8)
-
-function baby(familyId: string, overrides: Partial<Baby> = {}): Baby {
-  return {
-    id: newId(),
-    familyId,
-    name: '小宝',
-    birthDate: '2026-09-30',
-    sex: 'unspecified',
-    avatarColor: 'green',
-    archivedAt: null,
-    createdAt: T0,
-    updatedAt: T0,
-    deletedAt: null,
-    createdBy: null,
-    ...overrides,
-  }
-}
-
-function diaper(babyId: string, familyId: string, overrides: Partial<Event> = {}): Event {
-  return {
-    id: newId(),
-    babyId,
-    familyId,
-    type: 'diaper',
-    startAt: T0,
-    endAt: null,
-    note: null,
-    data: { contents: 'wet' },
-    createdAt: T0,
-    updatedAt: T0,
-    deletedAt: null,
-    createdBy: null,
-    ...overrides,
-  } as Event
-}
+import { T0, baby, diaper } from './fixtures'
 
 type Member = { id: string; headers: Headers }
 
@@ -60,11 +24,7 @@ describe('roles, baby scope and member management', () => {
   let ownerEvent: Event
 
   const send = (method: string, path: string, who: Member, body?: unknown) =>
-    t.request(path, {
-      method,
-      headers: { ...Object.fromEntries(who.headers), 'Content-Type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    })
+    t.send(method, path, who.headers, body)
   const push = async (who: Member, body: { babies?: unknown[]; events?: unknown[] }) => {
     const res = await send('POST', '/api/sync/push', who, { babies: [], events: [], ...body })
     expect(res.status).toBe(200)

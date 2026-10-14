@@ -54,9 +54,6 @@ export interface FamilySummary {
   babyIds: string[] | null
 }
 
-/** Roles that may manage babies, members and invites. */
-export const MANAGE_ROLES: readonly FamilyRole[] = ['owner', 'admin']
-
 export const createFamilyRequestSchema = z.object({
   name: z.string().trim().min(1).max(40),
 })
