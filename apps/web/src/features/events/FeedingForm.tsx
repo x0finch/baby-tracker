@@ -3,16 +3,15 @@ import { MINUTE, isRunning } from '@bobo/shared'
 import { type FormEvent, type ReactNode, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
-import { Input } from '../../components/ui/Input'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { useLocalStore } from '../../db'
-import { getUnits, quantityInputProps, unitLabel } from '../../lib/units'
 import { useNow } from '../../lib/use-now'
 import { m } from '../../paraglide/messages.js'
 import { addEvent } from './actions'
-import { type Milk, parseBottle } from './bottle-input'
+import { emptyBottle, parseBottleDraft, parseSolids } from './event-draft'
+import { BottleFields, SolidsField } from './EventFields'
 import { FeedDurationField } from './FeedDurationField'
-import { MixedAmounts } from './MixedAmounts'
+import { sideLabel } from './labels'
 import { AgoChips } from './QuickTimeField'
 import { logBottle, logSolids, startBreastFeed, suggestedBreastSide } from './records'
 import { toDateTimeLocal } from './time'
@@ -21,8 +20,10 @@ import { validateTime } from './validation'
 
 type Kind = 'breast' | 'bottle' | 'solids'
 
-/** One-tap bottle amounts in display units. */
-const QUICK_AMOUNTS = { ml: [60, 90, 120, 150], oz: [2, 3, 4, 5] } as const
+const splitOf = (data: { breastMl?: number; formulaMl?: number }) =>
+  data.breastMl === undefined || data.formulaMl === undefined
+    ? undefined
+    : { breastMl: data.breastMl, formulaMl: data.formulaMl }
 
 export function FeedingForm({
   babyIds,
@@ -42,10 +43,7 @@ export function FeedingForm({
   // Time the sheet opened; the form defaults and the max selectable time derive from it.
   const now = useNow(60_000)
   const [time, setTime] = useState(() => toDateTimeLocal(now))
-  const [amount, setAmount] = useState('')
-  const [milk, setMilk] = useState<Milk>('formula')
-  const [breastPart, setBreastPart] = useState('')
-  const [formulaPart, setFormulaPart] = useState('')
+  const [bottle, setBottle] = useState(emptyBottle)
   const [food, setFood] = useState('')
   // The start is worked out from when the feed ended and how long it took, until it is edited
   // by hand (endedAgo null).
@@ -84,11 +82,9 @@ export function FeedingForm({
     event.preventDefault()
     const current = Date.now()
     const timeResult = validateTime(time, current)
-    const nextErrors: typeof errors = {}
+    const parsed = kind === 'bottle' ? parseBottleDraft(bottle) : parseSolids(food)
+    const nextErrors: typeof errors = 'errors' in parsed ? { ...parsed.errors } : {}
     if ('error' in timeResult) nextErrors.time = timeResult.error
-    const bottle = parseBottle({ milk, amount, breast: breastPart, formula: formulaPart })
-    if (kind === 'bottle' && 'error' in bottle) nextErrors.amount = bottle.error
-    if (kind === 'solids' && !food.trim()) nextErrors.food = m.solidsFoodRequired()
     const durationMs = duration === null ? null : duration * MINUTE
     if (
       'at' in timeResult &&
@@ -98,15 +94,16 @@ export function FeedingForm({
       nextErrors.time = m.feedEndFuture()
     }
     setErrors(nextErrors)
-    if (Object.keys(nextErrors).length > 0 || !('at' in timeResult)) return
+    if (Object.keys(nextErrors).length > 0 || !('at' in timeResult) || 'errors' in parsed) return
 
     const at = timeResult.at
+    const { data } = parsed
     for (const id of babyIds) {
       addEvent(
         store,
-        kind === 'bottle' && 'amountMl' in bottle
-          ? logBottle(id, at, bottle.amountMl, milk, current, bottle.split, durationMs)
-          : logSolids(id, at, food, current, durationMs),
+        data.kind === 'bottle'
+          ? logBottle(id, at, data.amountMl, data.milk, current, splitOf(data), durationMs)
+          : logSolids(id, at, data.food, current, durationMs),
       )
     }
     onDone()
@@ -141,7 +138,7 @@ export function FeedingForm({
                   className="relative min-h-24"
                   onClick={() => startBreast(side)}
                 >
-                  {side === 'left' ? m.sideLeft() : m.sideRight()}
+                  {sideLabel[side]()}
                   {side === suggested && (
                     <span className="absolute top-2 right-2 rounded-full bg-on-accent px-2 text-caption text-feeding-text">
                       {m.sideSuggested()}
@@ -156,63 +153,9 @@ export function FeedingForm({
       {kind !== 'breast' && (
         <form noValidate onSubmit={submit} className="flex flex-col gap-4">
           {kind === 'bottle' && (
-            <>
-              <SegmentedControl<Milk>
-                labelStyle="field"
-                label={m.bottleMilk()}
-                options={[
-                  { value: 'formula', label: m.milkFormula() },
-                  { value: 'breast', label: m.milkBreast() },
-                  { value: 'mixed', label: m.milkMixed() },
-                ]}
-                value={milk}
-                onChange={setMilk}
-              />
-              {milk === 'mixed' ? (
-                <MixedAmounts
-                  breast={breastPart}
-                  formula={formulaPart}
-                  error={errors.amount}
-                  onBreast={setBreastPart}
-                  onFormula={setFormulaPart}
-                />
-              ) : (
-                <>
-                  <Input
-                    label={m.bottleAmount({ unit: unitLabel('volume') })}
-                    {...quantityInputProps('volume')}
-                    min={0}
-                    value={amount}
-                    error={errors.amount}
-                    onChange={(event) => setAmount(event.target.value)}
-                  />
-                  <div className="grid grid-cols-4 gap-2">
-                    {QUICK_AMOUNTS[getUnits().volume].map((value) => (
-                      <Button
-                        key={value}
-                        variant={amount === String(value) ? 'solid' : 'soft'}
-                        tone="feeding"
-                        aria-pressed={amount === String(value)}
-                        onClick={() => setAmount(String(value))}
-                      >
-                        {value}
-                      </Button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </>
+            <BottleFields value={bottle} onChange={setBottle} error={errors.amount} />
           )}
-          {kind === 'solids' && (
-            <Input
-              label={m.solidsFood()}
-              placeholder={m.solidsFoodPlaceholder()}
-              value={food}
-              maxLength={100}
-              error={errors.food}
-              onChange={(event) => setFood(event.target.value)}
-            />
-          )}
+          {kind === 'solids' && <SolidsField value={food} onChange={setFood} error={errors.food} />}
           <AgoChips
             legend={m.feedEndedWhen()}
             showLegend

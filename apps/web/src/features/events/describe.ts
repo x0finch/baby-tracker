@@ -2,13 +2,18 @@ import { type Event, breastSideDurations, eventDurationMs, isRunning } from '@bo
 
 import { formatQuantity, unitLabel } from '../../lib/units'
 import { m } from '../../paraglide/messages.js'
-import { amountLabel, poopColorLabel, poopConsistencyLabel } from './diaper-labels'
 import { durationLabel } from './duration-label'
+import {
+  amountLabel,
+  milkLabel,
+  poopColorLabel,
+  poopConsistencyLabel,
+  sideLabel,
+  sleepKindLabel,
+} from './labels'
 
 /** At or above this a temperature is shown as a fever. */
 const FEVER_CELSIUS = 38
-
-const pumpingSides = { left: m.sideLeft, right: m.sideRight, both: m.pumpingBoth }
 
 function growthDetail(data: {
   weightKg: number | null
@@ -44,7 +49,6 @@ function temperatureText(celsius: number): string {
   })
 }
 
-const milkLabels = { breast: m.milkBreast, formula: m.milkFormula, mixed: m.milkMixed }
 const diaperLabels = { wet: m.diaperWet, dirty: m.diaperDirty, mixed: m.diaperMixed }
 
 /** Title and one-line detail for an event in lists and the timeline. */
@@ -81,7 +85,7 @@ export function describeEvent(event: Event, now: number): { title: string; detai
               : m.bottleDetail({
                   amount: formatQuantity('volume', data.amountMl),
                   unit: unitLabel('volume'),
-                  milk: milkLabels[data.milk](),
+                  milk: milkLabel[data.milk](),
                 }),
             ...took,
           ].join(' · '),
@@ -91,7 +95,7 @@ export function describeEvent(event: Event, now: number): { title: string; detai
     }
     case 'sleep':
       return {
-        title: event.data.kind === 'night' ? m.sleepNight() : m.sleepNap(),
+        title: sleepKindLabel[event.data.kind](),
         detail: running ? m.inProgress() : durationLabel(eventDurationMs(event, now)),
       }
     case 'diaper': {
@@ -112,7 +116,7 @@ export function describeEvent(event: Event, now: number): { title: string; detai
       return {
         title: m.categoryPumping(),
         detail: m.pumpingDetail({
-          side: pumpingSides[event.data.side](),
+          side: sideLabel[event.data.side](),
           amount: formatQuantity('volume', event.data.amountMl),
           unit: unitLabel('volume'),
         }),

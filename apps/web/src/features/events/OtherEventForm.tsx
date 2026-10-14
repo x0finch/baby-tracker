@@ -1,27 +1,32 @@
+import type { Event } from '@bobo/shared'
 import { type FormEvent, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
 import { FormError } from '../../components/ui/FormError'
 import { Input } from '../../components/ui/Input'
-import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { useLocalStore } from '../../db'
-import { inputValue, quantityInputProps, unitLabel } from '../../lib/units'
 import { useNow } from '../../lib/use-now'
 import { m } from '../../paraglide/messages.js'
-import { type GrowthErrors, parseGrowth } from '../growth/growth-input'
+import { type GrowthErrors, emptyGrowth, parseGrowth } from '../growth/growth-input'
 import { addEvent } from './actions'
 import { type OtherCategory, categoryTone } from './category'
-import { parseTemperature, parseVolume } from './measure-input'
+import {
+  emptyMedication,
+  emptyPumping,
+  parseCelsius,
+  parseMedication,
+  parsePumping,
+} from './event-draft'
+import { GrowthFields, MedicationFields, PumpingFields, TemperatureField } from './EventFields'
 import { QuickTimeField } from './QuickTimeField'
 import { logGrowth, logMedication, logNote, logPumping, logTemperature } from './records'
 import { toDateTimeLocal } from './time'
 import { validateTime } from './validation'
 
-type PumpingSide = 'left' | 'right' | 'both'
 type Errors = Partial<Record<'time' | 'amount' | 'celsius' | 'name' | 'text', string>> &
   GrowthErrors
 
-/** Form for the less frequent event types (pumping, temperature, medication, notes). */
+/** Form for the less frequent event types (pumping, temperature, medication, notes, growth). */
 export function OtherEventForm({
   category,
   babyIds,
@@ -34,45 +39,54 @@ export function OtherEventForm({
   const store = useLocalStore()
   const now = useNow(60_000)
   const [time, setTime] = useState(() => toDateTimeLocal(now))
-  const [side, setSide] = useState<PumpingSide>('both')
-  const [amount, setAmount] = useState('')
+  const [pumping, setPumping] = useState(emptyPumping)
   const [celsius, setCelsius] = useState('')
-  const [name, setName] = useState('')
-  const [dose, setDose] = useState('')
+  const [medication, setMedication] = useState(emptyMedication)
   const [text, setText] = useState('')
-  const [weight, setWeight] = useState('')
-  const [length, setLength] = useState('')
-  const [head, setHead] = useState('')
+  const [growth, setGrowth] = useState(emptyGrowth)
   const [errors, setErrors] = useState<Errors>({})
+
+  /** The record for one baby, or the field errors that block saving. */
+  function build(at: number, current: number): ((babyId: string) => Event) | Errors {
+    switch (category) {
+      case 'pumping': {
+        const parsed = parsePumping(pumping)
+        return 'errors' in parsed
+          ? parsed.errors
+          : (id) => logPumping(id, at, parsed.data.side, parsed.data.amountMl, current)
+      }
+      case 'temperature': {
+        const parsed = parseCelsius(celsius)
+        return 'errors' in parsed
+          ? parsed.errors
+          : (id) => logTemperature(id, at, parsed.data.celsius, current)
+      }
+      case 'medication': {
+        const parsed = parseMedication(medication)
+        return 'errors' in parsed
+          ? parsed.errors
+          : (id) => logMedication(id, at, parsed.data.name, parsed.data.dose ?? '', current)
+      }
+      case 'growth': {
+        const parsed = parseGrowth(growth)
+        return 'errors' in parsed ? parsed.errors : (id) => logGrowth(id, at, parsed.data, current)
+      }
+      case 'note':
+        return text.trim() ? (id) => logNote(id, at, text, current) : { text: m.noteRequired() }
+      default:
+        return category satisfies never
+    }
+  }
 
   function submit(formEvent: FormEvent) {
     formEvent.preventDefault()
     const current = Date.now()
-    const next: Errors = {}
     const timeResult = validateTime(time, current)
+    const record = build('at' in timeResult ? timeResult.at : current, current)
+    const next: Errors = typeof record === 'function' ? {} : record
     if ('error' in timeResult) next.time = timeResult.error
-    const pumping = category === 'pumping' ? parseVolume(amount) : undefined
-    if (pumping && 'error' in pumping) next.amount = pumping.error
-    const temperature = category === 'temperature' ? parseTemperature(celsius) : undefined
-    if (temperature && 'error' in temperature) next.celsius = temperature.error
-    if (category === 'medication' && !name.trim()) next.name = m.medicationNameRequired()
-    if (category === 'note' && !text.trim()) next.text = m.noteRequired()
-    const growth = category === 'growth' ? parseGrowth({ weight, length, head }) : undefined
-    if (growth && 'errors' in growth) Object.assign(next, growth.errors)
     setErrors(next)
-    if (Object.keys(next).length > 0 || !('at' in timeResult)) return
-
-    const at = timeResult.at
-    const record = (babyId: string) =>
-      growth && 'data' in growth
-        ? logGrowth(babyId, at, growth.data, current)
-        : pumping && 'amountMl' in pumping
-          ? logPumping(babyId, at, side, pumping.amountMl, current)
-          : temperature && 'celsius' in temperature
-            ? logTemperature(babyId, at, temperature.celsius, current)
-            : category === 'medication'
-              ? logMedication(babyId, at, name, dose, current)
-              : logNote(babyId, at, text, current)
+    if (typeof record !== 'function' || Object.keys(next).length > 0) return
     for (const babyId of babyIds) addEvent(store, record(babyId))
     onDone()
   }
@@ -80,79 +94,19 @@ export function OtherEventForm({
   return (
     <form noValidate onSubmit={submit} className="flex flex-col gap-4">
       {category === 'pumping' && (
-        <>
-          <SegmentedControl<PumpingSide>
-            label={m.pumpingSide()}
-            options={[
-              { value: 'left', label: m.sideLeft() },
-              { value: 'right', label: m.sideRight() },
-              { value: 'both', label: m.pumpingBoth() },
-            ]}
-            value={side}
-            onChange={setSide}
-          />
-          <Input
-            label={m.pumpingAmount({ unit: unitLabel('volume') })}
-            {...quantityInputProps('volume')}
-            value={amount}
-            error={errors.amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-        </>
+        <PumpingFields value={pumping} onChange={setPumping} error={errors.amount} />
       )}
       {category === 'growth' && (
         <>
-          <Input
-            label={m.growthWeight({ unit: unitLabel('weight') })}
-            {...quantityInputProps('weight')}
-            value={weight}
-            error={errors.weight}
-            onChange={(e) => setWeight(e.target.value)}
-          />
-          <Input
-            label={m.growthLength({ unit: unitLabel('length') })}
-            {...quantityInputProps('length')}
-            value={length}
-            error={errors.length}
-            onChange={(e) => setLength(e.target.value)}
-          />
-          <Input
-            label={m.growthHead({ unit: unitLabel('length') })}
-            {...quantityInputProps('length')}
-            value={head}
-            error={errors.head}
-            onChange={(e) => setHead(e.target.value)}
-          />
+          <GrowthFields value={growth} onChange={setGrowth} errors={errors} />
           {errors.form && <FormError>{errors.form}</FormError>}
         </>
       )}
       {category === 'temperature' && (
-        <Input
-          label={m.temperatureLabel({ unit: unitLabel('temperature') })}
-          {...quantityInputProps('temperature')}
-          placeholder={inputValue('temperature', 36.8)}
-          value={celsius}
-          error={errors.celsius}
-          onChange={(e) => setCelsius(e.target.value)}
-        />
+        <TemperatureField value={celsius} onChange={setCelsius} error={errors.celsius} />
       )}
       {category === 'medication' && (
-        <>
-          <Input
-            label={m.medicationName()}
-            value={name}
-            maxLength={100}
-            error={errors.name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <Input
-            label={m.medicationDose()}
-            placeholder={m.medicationDosePlaceholder()}
-            value={dose}
-            maxLength={50}
-            onChange={(e) => setDose(e.target.value)}
-          />
-        </>
+        <MedicationFields value={medication} onChange={setMedication} error={errors.name} />
       )}
       {category === 'note' && (
         <Input
