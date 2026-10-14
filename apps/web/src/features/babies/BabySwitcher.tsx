@@ -12,7 +12,7 @@ import { ageLabel } from './age-label'
 import { BabyAvatar } from './BabyAvatar'
 import { BabyForm } from './BabyForm'
 import { nextAvatarColor } from './records'
-import { useBabies, useSelectedBaby } from './use-babies'
+import { selectBaby, useBabies, useSelectedBaby } from './use-babies'
 
 /** Top bar showing the selected baby; tapping it opens the baby picker. */
 export function BabySwitcher() {
@@ -106,7 +106,7 @@ export function BabySwitcher() {
             submitLabel={m.addBabyTitle()}
             onCancel={close}
             onSubmit={(input) => {
-              createBaby(store, input)
+              selectBaby(createBaby(store, input).id)
               close()
             }}
           />

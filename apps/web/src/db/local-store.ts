@@ -6,11 +6,25 @@ import {
   indexedDBCollectionOptions,
   localOnlyCollectionOptions,
 } from '@tanstack/db'
+import { z } from 'zod'
 
 const DB_NAME = 'bobo'
 /** Bump when adding object stores. */
-const DB_VERSION = 1
-const STORES = ['babies', 'events'] as const
+const DB_VERSION = 2
+const STORES = ['babies', 'events', 'outbox', 'meta'] as const
+
+/** A local change waiting to be pushed; `updatedAt` is the version that was changed. */
+export const outboxEntrySchema = z.object({
+  key: z.string(),
+  table: z.enum(['babies', 'events']),
+  id: z.string(),
+  updatedAt: z.number(),
+})
+export type OutboxEntry = z.infer<typeof outboxEntrySchema>
+
+/** Small key-value records, e.g. the sync cursor and the signed-in account. */
+export const metaEntrySchema = z.object({ key: z.string(), value: z.unknown() })
+export type MetaEntry = z.infer<typeof metaEntrySchema>
 
 /**
  * - `persistent`: IndexedDB, and the browser agreed not to evict it under storage pressure.
@@ -44,6 +58,22 @@ function createIndexedDBCollections(db: Awaited<ReturnType<typeof createIndexedD
         getKey: (event) => event.id,
       }),
     ),
+    outbox: createCollection(
+      indexedDBCollectionOptions({
+        db,
+        name: 'outbox',
+        schema: outboxEntrySchema,
+        getKey: (entry) => entry.key,
+      }),
+    ),
+    meta: createCollection(
+      indexedDBCollectionOptions({
+        db,
+        name: 'meta',
+        schema: metaEntrySchema,
+        getKey: (entry) => entry.key,
+      }),
+    ),
   }
 }
 
@@ -55,6 +85,12 @@ function createMemoryCollections() {
     events: createCollection(
       localOnlyCollectionOptions({ schema: eventSchema, getKey: (event) => event.id }),
     ),
+    outbox: createCollection(
+      localOnlyCollectionOptions({ schema: outboxEntrySchema, getKey: (entry) => entry.key }),
+    ),
+    meta: createCollection(
+      localOnlyCollectionOptions({ schema: metaEntrySchema, getKey: (entry) => entry.key }),
+    ),
   }
 }
 
@@ -62,6 +98,8 @@ function createMemoryCollections() {
 export interface LocalStore {
   babies: Collection<Baby, string>
   events: Collection<Event, string>
+  outbox: Collection<OutboxEntry, string>
+  meta: Collection<MetaEntry, string>
   mode: StorageMode
 }
 
@@ -91,6 +129,24 @@ export async function openLocalStore(options: OpenLocalStoreOptions = {}): Promi
     return { ...createMemoryCollections(), mode: 'memory' }
   }
 
-  const persisted = await (options.requestPersistence ?? requestPersistentStorage)()
-  return { ...createIndexedDBCollections(db), mode: persisted ? 'persistent' : 'best-effort' }
+  const [persisted, collections] = await Promise.all([
+    (options.requestPersistence ?? requestPersistentStorage)(),
+    loadAll(createIndexedDBCollections(db)),
+  ])
+  return { ...collections, mode: persisted ? 'persistent' : 'best-effort' }
+}
+
+/**
+ * Collections load lazily, but sync and claiming read them directly (`get`, `toArray`), so
+ * an unloaded collection would look empty and pending changes could be dropped. Load
+ * everything before the store is handed out; the pages need all of it anyway.
+ */
+async function loadAll<T extends Omit<LocalStore, 'mode'>>(collections: T): Promise<T> {
+  await Promise.all([
+    collections.babies.preload(),
+    collections.events.preload(),
+    collections.outbox.preload(),
+    collections.meta.preload(),
+  ])
+  return collections
 }

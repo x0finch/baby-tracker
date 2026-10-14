@@ -5,6 +5,7 @@ import { useLocalStore } from '../../db'
 import { m } from '../../paraglide/messages.js'
 import { createBaby } from './actions'
 import { BabyForm } from './BabyForm'
+import { selectBaby } from './use-babies'
 
 /** First-run flow: shown instead of a page's content until a baby exists. */
 export function BabyOnboarding() {
@@ -23,7 +24,7 @@ export function BabyOnboarding() {
             avatarColor: 'green',
           }}
           submitLabel={m.onboardingSubmit()}
-          onSubmit={(input) => createBaby(store, input)}
+          onSubmit={(input) => selectBaby(createBaby(store, input).id)}
         />
       </Card>
     </section>

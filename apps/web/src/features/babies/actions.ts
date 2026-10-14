@@ -1,16 +1,26 @@
 import type { LocalStore } from '../../db'
+import { currentFamilyId, markDirty } from '../../sync/local'
 import { type BabyInput, buildBaby } from './records'
-import { selectBaby } from './use-babies'
 
 export function createBaby(store: LocalStore, input: BabyInput) {
-  const baby = buildBaby(input)
+  const baby = { ...buildBaby(input), familyId: currentFamilyId(store) }
   store.babies.insert(baby)
-  selectBaby(baby.id)
+  markDirty(store, 'babies', baby)
   return baby
 }
 
+function updateAndMark(
+  store: LocalStore,
+  id: string,
+  change: (draft: { updatedAt: number }) => void,
+) {
+  store.babies.update(id, change)
+  const updated = store.babies.get(id)
+  if (updated) markDirty(store, 'babies', updated)
+}
+
 export function updateBaby(store: LocalStore, id: string, input: BabyInput) {
-  store.babies.update(id, (draft) => {
+  updateAndMark(store, id, (draft) => {
     Object.assign(draft, input)
     draft.updatedAt = Date.now()
   })
@@ -18,8 +28,8 @@ export function updateBaby(store: LocalStore, id: string, input: BabyInput) {
 
 export function setBabyArchived(store: LocalStore, id: string, archived: boolean) {
   const now = Date.now()
-  store.babies.update(id, (draft) => {
-    draft.archivedAt = archived ? now : null
+  updateAndMark(store, id, (draft) => {
+    Object.assign(draft, { archivedAt: archived ? now : null })
     draft.updatedAt = now
   })
 }
