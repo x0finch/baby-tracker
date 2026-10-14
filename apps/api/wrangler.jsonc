@@ -15,7 +15,7 @@
     {
       "binding": "DB",
       "database_name": "bobo-db",
-      // Replace with the id from `wrangler d1 create bobo-db` before the first deploy.
+      // Placeholder: the deploy workflow creates bobo-db if needed and fills in its id.
       "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations",
     },
