@@ -59,6 +59,9 @@ describe('eventSchema', () => {
     expect(instant('medication', { name: ' ', dose: null })).toBe(false)
     expect(instant('pumping', { side: 'left', amountMl: 0 })).toBe(false)
     expect(instant('note', {})).toBe(false)
+    expect(instant('growth', { weightKg: 5.2, lengthCm: null, headCm: 38 })).toBe(true)
+    expect(instant('growth', { weightKg: null, lengthCm: null, headCm: null })).toBe(false)
+    expect(instant('growth', { weightKg: 500, lengthCm: null, headCm: null })).toBe(false)
   })
 
   it('rejects data that does not match the type', () => {

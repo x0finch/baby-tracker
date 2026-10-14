@@ -14,12 +14,31 @@ export const categoryTitle: Record<Category, () => string> = {
   temperature: m.categoryTemperature,
   medication: m.categoryMedication,
   note: m.categoryNote,
+  growth: m.categoryGrowth,
 }
 
 /** At or above this a temperature is shown as a fever. */
 export const FEVER_CELSIUS = 38
 
 const pumpingSides = { left: m.sideLeft, right: m.sideRight, both: m.pumpingBoth }
+
+const oneDecimal = (value: number) =>
+  formatNumber(value, { minimumFractionDigits: 0, maximumFractionDigits: 1 })
+
+export function growthDetail(data: {
+  weightKg: number | null
+  lengthCm: number | null
+  headCm: number | null
+}): string {
+  return [
+    data.weightKg !== null &&
+      m.growthWeightValue({ value: formatNumber(data.weightKg, { maximumFractionDigits: 2 }) }),
+    data.lengthCm !== null && m.growthLengthValue({ value: oneDecimal(data.lengthCm) }),
+    data.headCm !== null && m.growthHeadValue({ value: oneDecimal(data.headCm) }),
+  ]
+    .filter((part) => typeof part === 'string')
+    .join(' · ')
+}
 
 export function formatCelsius(celsius: number): string {
   return formatNumber(celsius, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
@@ -86,6 +105,8 @@ export function describeEvent(event: Event, now: number): { title: string; detai
       }
     case 'note':
       return { title: m.categoryNote(), detail: event.note ?? '' }
+    case 'growth':
+      return { title: m.categoryGrowth(), detail: growthDetail(event.data) }
     default:
       return event satisfies never
   }

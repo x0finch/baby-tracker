@@ -5,6 +5,7 @@ import { z } from 'zod'
 
 import { PageHeader } from '../components/PageHeader'
 import { Button } from '../components/ui/Button'
+import { SegmentedControl } from '../components/ui/SegmentedControl'
 import { Sheet } from '../components/ui/Sheet'
 import { RequireBaby } from '../features/babies/RequireBaby'
 import { useSelectedBaby } from '../features/babies/use-babies'
@@ -12,12 +13,16 @@ import { DaySummaryCards } from '../features/events/DaySummaryCards'
 import { DayTimeline } from '../features/events/DayTimeline'
 import { EditEventForm } from '../features/events/EditEventSheet'
 import { useBabyEvents, useNow } from '../features/events/use-events'
+import { GrowthView } from '../features/growth/GrowthView'
 import { formatDate } from '../lib/i18n'
 import { m } from '../paraglide/messages.js'
 
 const searchSchema = z.object({
   day: z.iso.date().optional().catch(undefined),
+  view: z.enum(['growth']).optional().catch(undefined),
 })
+
+type View = 'day' | 'growth'
 
 export const Route = createFileRoute('/stats')({
   validateSearch: searchSchema,
@@ -25,12 +30,33 @@ export const Route = createFileRoute('/stats')({
 })
 
 function StatsPage() {
+  const { view = 'day' } = Route.useSearch()
+  const navigate = useNavigate({ from: Route.fullPath })
   return (
     <RequireBaby>
       <PageHeader title={m.statsTitle()} />
-      <DayView />
+      <div className="mb-4">
+        <SegmentedControl<View>
+          label={m.statsTitle()}
+          options={[
+            { value: 'day', label: m.statsViewDay() },
+            { value: 'growth', label: m.statsViewGrowth() },
+          ]}
+          value={view}
+          onChange={(next) =>
+            void navigate({ search: { view: next === 'day' ? undefined : next }, replace: true })
+          }
+        />
+      </div>
+      {view === 'growth' ? <Growth /> : <DayView />}
     </RequireBaby>
   )
+}
+
+function Growth() {
+  const { baby } = useSelectedBaby()
+  const events = useBabyEvents(baby?.id ?? '')
+  return baby ? <GrowthView key={baby.id} baby={baby} events={events} /> : null
 }
 
 /** Local midnight of a "YYYY-MM-DD" day and of the next day (DST-safe). */
@@ -56,7 +82,10 @@ function DayView() {
   const [dayStart, dayEnd] = dayBounds(day)
   const isToday = day >= today
   const goTo = (next: string) =>
-    void navigate({ search: { day: next >= today ? undefined : next }, replace: true })
+    void navigate({
+      search: (prev) => ({ ...prev, day: next >= today ? undefined : next }),
+      replace: true,
+    })
 
   return (
     <div className="flex flex-col gap-6">

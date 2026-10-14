@@ -3,6 +3,7 @@ import {
   type DiaperEvent,
   type Event,
   type FeedingEvent,
+  type GrowthEvent,
   type MedicationEvent,
   type NoteEvent,
   type PumpingEvent,
@@ -150,6 +151,15 @@ export function logMedication(
     endAt: null,
     data: { name: name.trim(), dose: dose.trim() || null },
   }
+}
+
+export function logGrowth(
+  babyId: string,
+  at: number,
+  data: GrowthEvent['data'],
+  now: number = at,
+): GrowthEvent {
+  return { ...base(babyId, now), type: 'growth', startAt: at, endAt: null, data }
 }
 
 export function logNote(babyId: string, at: number, text: string, now: number = at): NoteEvent {
