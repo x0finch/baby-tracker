@@ -74,7 +74,7 @@ const W = '#ffffff'
 type PoopColor = PoopDetails['color']
 
 /** The wet patch on the diaper's pad. */
-const WET_PAD = 'M20 15 H28 L26 25 Q25 27 26 29 L28 36 H20 L22 29 Q23 27 22 25 Z'
+const WET_PAD = 'M15.5 14 H32.5 L28.5 24 Q27 27 28.5 30 L32.5 37.5 H15.5 L19.5 30 Q21 27 19.5 24 Z'
 
 const DIAPER_BODY =
   'M10 12 H38 Q42 12 40 16 L33 24 Q31 27 33 30 L38 35 Q40 39 36 39 H12 Q8 39 10 35 L15 30 Q17 27 15 24 L8 16 Q6 12 10 12 Z'
@@ -174,7 +174,7 @@ function glyph(kind: IconKind, tone: string, poop: PoopColor): ReactNode {
       return (
         <>
           <path d={DIAPER_BODY} fill={W} />
-          <path d={WET_PAD} className={tone} opacity="0.3" />
+          <path d={WET_PAD} className={tone} opacity="0.35" />
         </>
       )
     case 'diaperDirty':
@@ -188,7 +188,7 @@ function glyph(kind: IconKind, tone: string, poop: PoopColor): ReactNode {
       return (
         <>
           <path d={DIAPER_BODY} fill={W} />
-          <path d={WET_PAD} className={tone} opacity="0.3" />
+          <path d={WET_PAD} className={tone} opacity="0.35" />
           <Poop x={24} y={25} color={poop} />
         </>
       )
