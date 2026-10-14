@@ -1,0 +1,50 @@
+import { Hono } from 'hono'
+
+import type { AppEnv } from '../types'
+
+/**
+ * Deletes the signed-in account and its data in one D1 transaction (App Store guideline
+ * 5.1.1(v), Google Play). Families the user shares keep their data; if the user owned one,
+ * the longest-standing other member becomes the owner.
+ */
+const SESSION_COOKIES = ['better-auth.session_token', 'better-auth.session_data']
+
+export const accountRoutes = new Hono<AppEnv>().delete('/', async (c) => {
+  const db = c.env.DB
+  const userId = c.get('user').id
+
+  // Families where the user is the only member: everything in them goes.
+  const soleFamilies = `select m.family_id from memberships m where m.user_id = ?1
+    and not exists (select 1 from memberships o where o.family_id = m.family_id and o.user_id <> ?1)`
+
+  await db.batch([
+    db.prepare(`delete from events where family_id in (${soleFamilies})`).bind(userId),
+    db.prepare(`delete from babies where family_id in (${soleFamilies})`).bind(userId),
+    db.prepare(`delete from families where id in (${soleFamilies})`).bind(userId),
+    // Shared families the user owned: promote the longest-standing other member.
+    db
+      .prepare(
+        `update memberships set role = 'owner'
+         where (family_id, user_id) in (
+           select o.family_id, (select o2.user_id from memberships o2
+               where o2.family_id = o.family_id and o2.user_id <> ?1
+               order by o2.created_at, o2.user_id limit 1)
+           from memberships o where o.user_id = ?1 and o.role = 'owner'
+         )`,
+      )
+      .bind(userId),
+    db.prepare('delete from memberships where user_id = ?').bind(userId),
+    db.prepare('delete from session where user_id = ?').bind(userId),
+    db.prepare('delete from account where user_id = ?').bind(userId),
+    db.prepare('delete from user where id = ?').bind(userId),
+  ])
+
+  // The signed cookie cache could otherwise keep the session looking valid for a few minutes.
+  for (const name of SESSION_COOKIES) {
+    c.header('Set-Cookie', `${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`, { append: true })
+    c.header('Set-Cookie', `__Secure-${name}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`, {
+      append: true,
+    })
+  }
+  return c.body(null, 204)
+})

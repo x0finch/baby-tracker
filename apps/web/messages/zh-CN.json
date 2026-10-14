@@ -175,5 +175,9 @@
   "claimMerge": "合并到「{name}」",
   "claimNew": "新建一个家庭",
   "defaultFamilyName": "我的家庭",
-  "pendingChanges": "{count} 条改动待上传"
+  "pendingChanges": "{count} 条改动待上传",
+  "deleteAccount": "删除账号",
+  "deleteAccountBody": "你的账号，以及只有你一个人的家庭里的所有宝宝和记录，都会被永久删除，无法恢复。和家人共享的家庭会保留，并交给其他成员管理。这台设备上的记录也会被清除。",
+  "deleteAccountConfirm": "永久删除",
+  "deleteAccountFailed": "删除失败，请联网后再试。"
 }
