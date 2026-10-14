@@ -1,7 +1,8 @@
+import type { MemberRole } from '@bobo/shared'
 import { clsx } from 'clsx'
 
 import { m } from '../../paraglide/messages.js'
-import { type MemberRole, roleHint, roleLabel } from './roles'
+import { roleHint, roleLabel } from './roles'
 
 /** Role cards with a one-line explanation of what each role may do. */
 export function RolePicker({

@@ -53,5 +53,13 @@ export async function createTestApp(overrides: Partial<Env> = {}) {
   const request = (path: string, init: RequestInit = {}) =>
     app.request(new URL(path, TEST_ORIGIN).toString(), init, env)
 
-  return { app, env, auth, request, signIn, queries, dispose }
+  /** A JSON request as the app makes it, signed in when `headers` carry a session. */
+  const send = (method: string, path: string, headers?: Headers, body?: unknown) =>
+    request(path, {
+      method,
+      headers: { ...Object.fromEntries(headers ?? []), 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+
+  return { app, env, auth, request, send, signIn, queries, dispose }
 }

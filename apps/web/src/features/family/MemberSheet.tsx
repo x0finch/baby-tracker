@@ -1,4 +1,10 @@
-import type { Baby, FamilyMember, FamilySummary } from '@bobo/shared'
+import {
+  type Baby,
+  type FamilyMember,
+  type FamilySummary,
+  type MemberRole,
+  assignableRoles,
+} from '@bobo/shared'
 import { useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
 
@@ -9,7 +15,6 @@ import { m } from '../../paraglide/messages.js'
 import { familyApi } from './api'
 import { BabyScopePicker } from './BabyScopePicker'
 import { RolePicker } from './RolePicker'
-import { type MemberRole, assignableRoles } from './roles'
 
 export function MemberSheet({
   family,

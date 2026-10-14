@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { decodeCursor, encodeCursor } from '../src/sync'
+import { decodeCursor, encodeCursor } from '../src/sync/protocol'
 
 describe('sync cursor', () => {
   it('round-trips and restarts on garbage', () => {

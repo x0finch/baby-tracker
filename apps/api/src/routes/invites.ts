@@ -5,12 +5,19 @@ import {
   type InvitePreview,
   type InviteStatus,
   base64UrlEncode,
+  canManageMember,
   createInviteRequestSchema,
 } from '@bobo/shared'
 import { Hono } from 'hono'
 
-import { parseStringList } from '../access'
-import { babiesInFamily, canManageMember, roleOf } from '../members'
+import {
+  type FamilyEnv,
+  babiesInFamily,
+  familyManager,
+  familyMember,
+  parseStringList,
+} from '../access'
+import { fail, json } from '../http'
 import type { AppEnv } from '../types'
 
 type InviteRole = Exclude<FamilyRole, 'owner'>
@@ -53,19 +60,15 @@ function toInvite(row: InviteRow): Invite {
 }
 
 /** Mounted at /families/:familyId/invites; managers create, list and revoke invites. */
-export const familyInviteRoutes = new Hono<AppEnv>()
-  .post('/', async (c) => {
+export const familyInviteRoutes = new Hono<FamilyEnv>()
+  .use(familyMember)
+  .post('/', json(createInviteRequestSchema), async (c) => {
     const db = c.env.DB
     const familyId = c.req.param('familyId') ?? ''
-    const parsed = createInviteRequestSchema.safeParse(await c.req.json().catch(() => null))
-    if (!parsed.success) return c.json({ error: 'invalid' }, 400)
-    const { role, babyIds } = parsed.data
-    const actor = await roleOf(db, familyId, c.get('user').id)
+    const { role, babyIds } = c.req.valid('json')
     // Inviting someone is like managing a member who holds the invited role.
-    if (!actor || !canManageMember(actor, role, role)) return c.json({ error: 'forbidden' }, 403)
-    if (babyIds && !(await babiesInFamily(db, familyId, babyIds))) {
-      return c.json({ error: 'invalid' }, 400)
-    }
+    if (!canManageMember(c.var.role, role, role)) fail('forbidden')
+    if (babyIds && !(await babiesInFamily(db, familyId, babyIds))) fail('invalid')
 
     const now = Date.now()
     const invite: Invite = {
@@ -93,13 +96,9 @@ export const familyInviteRoutes = new Hono<AppEnv>()
       .run()
     return c.json(invite, 201)
   })
-  .get('/', async (c) => {
+  .get('/', familyManager, async (c) => {
     const db = c.env.DB
     const familyId = c.req.param('familyId') ?? ''
-    const actor = await roleOf(db, familyId, c.get('user').id)
-    if (!actor || actor === 'caregiver' || actor === 'viewer') {
-      return c.json({ error: 'forbidden' }, 403)
-    }
     const { results } = await db
       .prepare(
         `select ${INVITE_COLUMNS} from invites i
@@ -110,13 +109,9 @@ export const familyInviteRoutes = new Hono<AppEnv>()
       .all<InviteRow>()
     return c.json(results.map(toInvite))
   })
-  .delete('/:code', async (c) => {
+  .delete('/:code', familyManager, async (c) => {
     const db = c.env.DB
     const familyId = c.req.param('familyId') ?? ''
-    const actor = await roleOf(db, familyId, c.get('user').id)
-    if (!actor || actor === 'caregiver' || actor === 'viewer') {
-      return c.json({ error: 'forbidden' }, 403)
-    }
     await db
       .prepare(
         'update invites set revoked_at = ? where code = ? and family_id = ? and revoked_at is null',
@@ -139,7 +134,7 @@ export const invitePreviewRoutes = new Hono<AppEnv>().get('/:code', async (c) =>
   )
     .bind(c.req.param('code'))
     .first<InviteRow & { familyName: string; inviterName: string; babyNames: string }>()
-  if (!row) return c.json({ error: 'not_found' }, 404)
+  if (!row) fail('not_found')
   const preview: InvitePreview = {
     familyName: row.familyName,
     inviterName: row.inviterName,

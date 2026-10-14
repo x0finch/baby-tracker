@@ -1,4 +1,4 @@
-import type { FamilySummary } from '@bobo/shared'
+import { type FamilySummary, canManageMember, isManager } from '@bobo/shared'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
@@ -15,14 +15,14 @@ import { scopeLabel } from './BabyScopePicker'
 import { InviteSheet } from './InviteSheet'
 import { MemberSheet } from './MemberSheet'
 import { RenameSheet } from './RenameSheet'
-import { canManage, roleLabel } from './roles'
+import { roleLabel } from './roles'
 
 function FamilyCard({ family, userId }: { family: FamilySummary; userId: string | undefined }) {
   const { active, archived } = useBabies()
   const babies = [...active, ...archived].filter((baby) => baby.familyId === family.id)
   const queryClient = useQueryClient()
   const members = useMembers(family.id)
-  const managing = family.role === 'owner' || family.role === 'admin'
+  const managing = isManager(family.role)
   const { data: invites = [] } = useQuery({ ...invitesQuery(family.id), enabled: managing })
   const [sheet, setSheet] = useState<'invite' | 'rename' | 'leave' | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -59,7 +59,7 @@ function FamilyCard({ family, userId }: { family: FamilySummary; userId: string 
       ) : (
         <ul className="m-0 flex list-none flex-col p-0">
           {members.map((member) => {
-            const editable = member.userId !== userId && canManage(family.role, member.role)
+            const editable = member.userId !== userId && canManageMember(family.role, member.role)
             return (
               <li key={member.userId}>
                 <button

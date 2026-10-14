@@ -10,6 +10,7 @@ import {
 import { Hono } from 'hono'
 
 import { checkBabyWrite, checkEventWrite, loadAccess, readScope, toSummaries } from '../access'
+import { json } from '../http'
 import {
   type ExistingRow,
   type SyncCursor,
@@ -19,7 +20,8 @@ import {
   parseBaby,
   parseEvent,
   planWrites,
-} from '../sync'
+  idsOf,
+} from '../sync/protocol'
 import {
   bumpSeq,
   selectBabiesPage,
@@ -27,7 +29,7 @@ import {
   selectExisting,
   upsertBabies,
   upsertEvents,
-} from '../sync-sql'
+} from '../sync/sql'
 import type { AppEnv } from '../types'
 
 type BabyRow = Baby & { seq: number }
@@ -51,19 +53,9 @@ function toEvent({ seq: _seq, data, ...event }: EventRow): Event {
   return Object.assign(event, { data: JSON.parse(data) as unknown }) as Event
 }
 
-function idsOf(items: unknown[]): string[] {
-  return items.flatMap((item) =>
-    typeof item === 'object' && item !== null && 'id' in item && typeof item.id === 'string'
-      ? [item.id]
-      : [],
-  )
-}
-
 export const syncRoutes = new Hono<AppEnv>()
-  .post('/push', async (c) => {
-    const parsed = pushRequestSchema.safeParse(await c.req.json().catch(() => null))
-    if (!parsed.success) return c.json({ error: 'invalid' }, 400)
-    const { babies, events } = parsed.data
+  .post('/push', json(pushRequestSchema), async (c) => {
+    const { babies, events } = c.req.valid('json')
     if (babies.length + events.length > SYNC_PUSH_LIMIT) return c.json({ error: 'too_large' }, 413)
 
     const db = c.env.DB

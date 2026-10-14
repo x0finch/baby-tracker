@@ -1,6 +1,6 @@
 import type { Baby, Event } from '@bobo/shared'
 
-import type { TableCursor } from './sync'
+import type { TableCursor } from './protocol'
 
 // All statements take record lists as a single JSON parameter expanded with json_each, so a
 // push or pull costs a handful of D1 queries regardless of size (the free plan allows 50

@@ -1,25 +1,7 @@
-import { type Baby, newId } from '@bobo/shared'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { createTestApp } from './app'
-
-const T0 = Date.UTC(2026, 9, 13, 8)
-
-function baby(familyId: string): Baby {
-  return {
-    id: newId(),
-    familyId,
-    name: '小宝',
-    birthDate: '2026-09-30',
-    sex: 'unspecified',
-    avatarColor: 'green',
-    archivedAt: null,
-    createdAt: T0,
-    updatedAt: T0,
-    deletedAt: null,
-    createdBy: null,
-  }
-}
+import { baby } from './fixtures'
 
 describe('account deletion', () => {
   let t: Awaited<ReturnType<typeof createTestApp>>
@@ -30,11 +12,7 @@ describe('account deletion', () => {
   afterAll(() => t.dispose())
 
   const post = (path: string, body: unknown, headers: Headers) =>
-    t.request(path, {
-      method: 'POST',
-      headers: { ...Object.fromEntries(headers), 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
+    t.send('POST', path, headers, body)
 
   async function familyWithBaby(headers: Headers) {
     const res = await post('/api/families', { name: '我们家' }, headers)

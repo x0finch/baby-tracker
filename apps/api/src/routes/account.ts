@@ -2,13 +2,13 @@ import { Hono } from 'hono'
 
 import type { AppEnv } from '../types'
 
+const SESSION_COOKIES = ['better-auth.session_token', 'better-auth.session_data']
+
 /**
  * Deletes the signed-in account and its data in one D1 transaction (App Store guideline
  * 5.1.1(v), Google Play). Families the user shares keep their data; if the user owned one,
  * the longest-standing other member becomes the owner.
  */
-const SESSION_COOKIES = ['better-auth.session_token', 'better-auth.session_data']
-
 export const accountRoutes = new Hono<AppEnv>().delete('/', async (c) => {
   const db = c.env.DB
   const userId = c.get('user').id

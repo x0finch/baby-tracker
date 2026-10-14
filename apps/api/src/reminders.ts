@@ -1,45 +1,14 @@
 import { MINUTE, type PushMessage, type ReminderKind } from '@bobo/shared'
 
+import { memberSeesBaby } from './access'
 import type { Env } from './env'
-import {
-  type PushResult,
-  type PushTarget,
-  type VapidKeys,
-  generateVapidKeys,
-  sendPush,
-} from './web-push'
+import { getVapidKeys, removeGone, subscriptionsOf } from './push'
+import { type PushResult, type PushTarget, sendPush } from './web-push'
 
 /** Reminders not sent within this long after they were due are skipped (e.g. after an outage). */
 const LATE_LIMIT = 3 * 60 * MINUTE
 /** Bounded so one cron run stays well within the free plan's CPU limit. */
 const BATCH = 20
-
-const VAPID_KEY_NAME = 'vapid'
-
-/** The VAPID key pair, created and stored on first use so deploys need no extra secret. */
-export async function getVapidKeys(db: D1Database): Promise<VapidKeys> {
-  const read = () =>
-    db
-      .prepare('select value from server_keys where name = ?')
-      .bind(VAPID_KEY_NAME)
-      .first<{ value: string }>()
-  let row = await read()
-  if (!row) {
-    const keys = await generateVapidKeys()
-    // Concurrent first uses race here; whichever insert lands first wins and both read it.
-    await db
-      .prepare('insert or ignore into server_keys (name, value, created_at) values (?, ?, ?)')
-      .bind(VAPID_KEY_NAME, JSON.stringify(keys), Date.now())
-      .run()
-    row = await read()
-  }
-  if (!row) throw new Error('VAPID keys unavailable')
-  const keys: VapidKeys = JSON.parse(row.value)
-  return keys
-}
-
-/** VAPID subject: a contact URL for push services. */
-export const vapidSubject = (env: Pick<Env, 'BETTER_AUTH_URL'>) => env.BETTER_AUTH_URL
 
 export interface DueReminder {
   userId: string
@@ -67,9 +36,7 @@ export async function dueReminders(db: D1Database, now: number): Promise<DueRemi
          from reminders r
          join babies b on b.id = r.baby_id and b.deleted_at is null and b.archived_at is null
          join memberships m on m.family_id = b.family_id and m.user_id = r.user_id
-         where r.enabled = 1 and (m.baby_scope = 'all' or exists (
-           select 1 from membership_babies mb
-           where mb.family_id = m.family_id and mb.user_id = m.user_id and mb.baby_id = r.baby_id))
+         where r.enabled = 1 and ${memberSeesBaby('r.baby_id')}
        )
        where lastAt is not null
          and lastAt + intervalMinutes * 60000 <= ?1
@@ -104,47 +71,6 @@ export function reminderMessage(reminder: DueReminder, now: number): PushMessage
   }
 }
 
-type SubscriptionRow = PushTarget & { userId: string }
-
-async function subscriptionsOf(db: D1Database, userIds: string[]): Promise<SubscriptionRow[]> {
-  if (userIds.length === 0) return []
-  const { results } = await db
-    .prepare(
-      `select endpoint, p256dh, auth, user_id as userId from push_subscriptions
-       where user_id in (select value from json_each(?))`,
-    )
-    .bind(JSON.stringify(userIds))
-    .all<SubscriptionRow>()
-  return results
-}
-
-/** Sends a message to every device of a user; expired subscriptions are removed. */
-export async function notifyUser(
-  env: Pick<Env, 'DB' | 'BETTER_AUTH_URL'>,
-  userId: string,
-  message: PushMessage,
-  now: number,
-  fetcher?: typeof fetch,
-): Promise<PushResult[]> {
-  const targets = await subscriptionsOf(env.DB, [userId])
-  if (targets.length === 0) return []
-  const keys = await getVapidKeys(env.DB)
-  const results = await Promise.all(
-    targets.map((target) => sendPush(target, message, keys, vapidSubject(env), now, fetcher)),
-  )
-  await removeGone(env.DB, targets, results)
-  return results
-}
-
-async function removeGone(db: D1Database, targets: PushTarget[], results: PushResult[]) {
-  const gone = targets.filter((_, i) => results[i] === 'gone').map((target) => target.endpoint)
-  if (gone.length === 0) return
-  await db
-    .prepare('delete from push_subscriptions where endpoint in (select value from json_each(?))')
-    .bind(JSON.stringify(gone))
-    .run()
-}
-
 /** Cron entry point: sends due reminders and marks them sent. */
 export async function dispatchReminders(
   env: Pick<Env, 'DB' | 'BETTER_AUTH_URL'>,
@@ -164,7 +90,7 @@ export async function dispatchReminders(
     for (const target of targets) {
       if (target.userId !== reminder.userId || !keys) continue
       sentTo.push(target)
-      sends.push(sendPush(target, message, keys, vapidSubject(env), now, fetcher))
+      sends.push(sendPush(target, message, keys, env.BETTER_AUTH_URL, now, fetcher))
     }
   }
   const results = await Promise.all(sends)

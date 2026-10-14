@@ -1,4 +1,16 @@
-import type { Baby, Event, FamilyRole, FamilySummary, PushRejectReason } from '@bobo/shared'
+import {
+  type Baby,
+  type Event,
+  type FamilyRole,
+  type FamilySummary,
+  type PushRejectReason,
+  inBabyScope,
+  isManager,
+} from '@bobo/shared'
+import { createMiddleware } from 'hono/factory'
+
+import { fail } from './http'
+import type { AppEnv } from './types'
 
 export interface FamilyAccess {
   id: string
@@ -24,13 +36,20 @@ export function parseStringList(json: string): string[] {
   return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : []
 }
 
+/** JSON array of the babies a membership `m` is scoped to (empty for every baby). */
+export const MEMBER_BABY_IDS = `(select json_group_array(mb.baby_id) from membership_babies mb
+  where mb.family_id = m.family_id and mb.user_id = m.user_id)`
+
+/** SQL condition: membership `m` can see the baby with id `babyIdColumn`. */
+export const memberSeesBaby = (babyIdColumn: string) =>
+  `(m.baby_scope = 'all' or exists (select 1 from membership_babies mb
+    where mb.family_id = m.family_id and mb.user_id = m.user_id and mb.baby_id = ${babyIdColumn}))`
+
 /** Everything the user can access, in one query. */
 export async function loadAccess(db: D1Database, userId: string): Promise<Access> {
   const { results } = await db
     .prepare(
-      `select f.id, f.name, m.role, m.baby_scope as babyScope,
-         (select json_group_array(mb.baby_id) from membership_babies mb
-          where mb.family_id = m.family_id and mb.user_id = m.user_id) as babyIds
+      `select f.id, f.name, m.role, m.baby_scope as babyScope, ${MEMBER_BABY_IDS} as babyIds
        from memberships m join families f on f.id = m.family_id
        where m.user_id = ? order by m.created_at`,
     )
@@ -69,8 +88,7 @@ export function readScope(access: Access): { familyIds: string[]; babyIds: strin
   return { familyIds, babyIds }
 }
 
-const canSee = (family: FamilyAccess, babyId: string) =>
-  family.babyIds === null || family.babyIds.has(babyId)
+const canSee = (family: FamilyAccess, babyId: string) => inBabyScope(family.babyIds, babyId)
 
 export interface ExistingBaby {
   familyId: string | null
@@ -85,7 +103,7 @@ export function checkBabyWrite(
   const family = baby.familyId ? access.get(baby.familyId) : undefined
   if (!family) return 'forbidden'
   if (existing && existing.familyId !== baby.familyId) return 'family_mismatch'
-  if (family.role !== 'owner' && family.role !== 'admin') return 'forbidden'
+  if (!isManager(family.role)) return 'forbidden'
   // Scoped admins can edit their babies but not add new ones.
   if (!canSee(family, baby.id)) return 'forbidden'
   return null
@@ -116,3 +134,48 @@ export function checkEventWrite(
   if (family.role === 'caregiver' && existing && existing.createdBy !== userId) return 'forbidden'
   return null
 }
+
+/** The user's role in the family, or null when they are not a member. */
+export async function roleOf(
+  db: D1Database,
+  familyId: string,
+  userId: string,
+): Promise<FamilyRole | null> {
+  const row = await db
+    .prepare('select role from memberships where family_id = ? and user_id = ?')
+    .bind(familyId, userId)
+    .first<{ role: FamilyRole }>()
+  return row?.role ?? null
+}
+
+/** Whether every id names a baby of the family (duplicates allowed). */
+export async function babiesInFamily(
+  db: D1Database,
+  familyId: string,
+  babyIds: readonly string[],
+): Promise<boolean> {
+  const row = await db
+    .prepare(
+      'select count(*) as n from babies where family_id = ? and id in (select value from json_each(?))',
+    )
+    .bind(familyId, JSON.stringify(babyIds))
+    .first<{ n: number }>()
+  return row?.n === new Set(babyIds).size
+}
+
+export type FamilyEnv = AppEnv & { Variables: { role: FamilyRole } }
+
+/** For routes under /families/:familyId: members only, with their role in `c.var.role`. */
+export const familyMember = createMiddleware<FamilyEnv>(async (c, next) => {
+  const familyId = c.req.param('familyId')
+  const role = familyId ? await roleOf(c.env.DB, familyId, c.get('user').id) : null
+  if (!role) fail('forbidden')
+  c.set('role', role)
+  await next()
+})
+
+/** After `familyMember`: owners and admins only. */
+export const familyManager = createMiddleware<FamilyEnv>(async (c, next) => {
+  if (!isManager(c.get('role'))) fail('forbidden')
+  await next()
+})

@@ -100,3 +100,12 @@ export function planWrites<T extends Baby | Event>(
 
 export const parseBaby = (item: unknown): Baby | undefined => babySchema.safeParse(item).data
 export const parseEvent = (item: unknown): Event | undefined => eventSchema.safeParse(item).data
+
+/** Ids of raw pushed items, read before validation to look up what they would replace. */
+export function idsOf(items: unknown[]): string[] {
+  return items.flatMap((item) =>
+    typeof item === 'object' && item !== null && 'id' in item && typeof item.id === 'string'
+      ? [item.id]
+      : [],
+  )
+}

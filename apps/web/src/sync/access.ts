@@ -1,10 +1,16 @@
-import type { Baby, Event, FamilyRole, FamilySummary } from '@bobo/shared'
+import {
+  type Baby,
+  type Event,
+  type FamilyRole,
+  type FamilySummary,
+  inBabyScope,
+  isManager,
+} from '@bobo/shared'
 
 import type { LocalStore } from '../db'
 import { getAccess, getAccount, removeLocal, setAccess, setAccount } from './local'
 
-const canSeeBaby = (family: FamilySummary, babyId: string) =>
-  family.babyIds === null || family.babyIds.includes(babyId)
+const canSeeBaby = (family: FamilySummary, babyId: string) => inBabyScope(family.babyIds, babyId)
 
 /** Whether `next` grants anything `previous` did not (a family, or babies in one). */
 export function accessGrew(previous: FamilySummary[], next: FamilySummary[]): boolean {
@@ -81,7 +87,7 @@ export function babyPermissions(
   // Unknown families (signed out, or not pulled yet) are the user's own.
   const family = baby ? familyOf(access, baby.familyId) : undefined
   if (!family) return FULL
-  const manages = family.role === 'owner' || family.role === 'admin'
+  const manages = isManager(family.role)
   return {
     role: family.role,
     canLog: family.role !== 'viewer',
@@ -108,5 +114,5 @@ export function canAddBaby(store: LocalStore): boolean {
   const account = getAccount(store)
   if (!account) return true
   const family = familyOf(getAccess(store), account.familyId)
-  return !family || ((family.role === 'owner' || family.role === 'admin') && !family.babyIds)
+  return !family || (isManager(family.role) && !family.babyIds)
 }

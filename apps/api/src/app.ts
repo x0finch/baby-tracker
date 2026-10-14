@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 
 import { getAuth, trustedOrigins } from './auth'
+import { errorResponse } from './http'
 import { requireUser } from './middleware'
 import { authRateLimit } from './rate-limit'
 import { accountRoutes } from './routes/account'
@@ -63,10 +64,7 @@ export function createApp(options: AppOptions = {}) {
   app.route('/reminders', reminderRoutes)
 
   app.notFound((c) => c.json({ error: 'not_found' }, 404))
-  app.onError((error, c) => {
-    console.error(error)
-    return c.json({ error: 'internal_error' }, 500)
-  })
+  app.onError(errorResponse)
 
   return app
 }
