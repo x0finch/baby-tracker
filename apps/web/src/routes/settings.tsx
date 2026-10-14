@@ -6,15 +6,15 @@ import { StorageStatus } from '../components/StorageStatus'
 import { Card } from '../components/ui/Card'
 import { SegmentedControl } from '../components/ui/SegmentedControl'
 import { UnitsCard } from '../components/UnitsCard'
+import { AccountCard } from '../features/account/AccountCard'
 import { BabyList } from '../features/babies/BabyList'
 import { ExportCard } from '../features/export/ExportCard'
 import { FamilySection } from '../features/family/FamilyCard'
+import { RemindersCard } from '../features/reminders/RemindersCard'
 import { type Locale, getLocale, localeDisplayName, locales, setLocale } from '../lib/i18n'
 import type { ThemePreference } from '../lib/theme'
 import { useTheme } from '../lib/use-theme'
 import { m } from '../paraglide/messages.js'
-import { AccountCard } from '../sync/AccountCard'
-import { RemindersCard } from '../sync/RemindersCard'
 
 export const Route = createFileRoute('/settings')({
   component: SettingsPage,

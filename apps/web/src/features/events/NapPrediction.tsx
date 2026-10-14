@@ -2,10 +2,10 @@ import type { Baby, Event } from '@bobo/shared'
 
 import { Card } from '../../components/ui/Card'
 import { formatTime } from '../../lib/i18n'
+import { useNow } from '../../lib/use-now'
 import { m } from '../../paraglide/messages.js'
 import { durationLabel } from './duration-label'
 import { predictNextSleep } from './nap-prediction'
-import { useNow } from './use-events'
 
 /** Suggested time for the next sleep; hidden while the baby sleeps. */
 export function NapPrediction({ baby, events }: { baby: Baby; events: readonly Event[] }) {

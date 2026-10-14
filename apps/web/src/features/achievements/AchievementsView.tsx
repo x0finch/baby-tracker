@@ -2,8 +2,8 @@ import type { Baby, Event } from '@bobo/shared'
 import { clsx } from 'clsx'
 
 import { Card } from '../../components/ui/Card'
+import { useNow } from '../../lib/use-now'
 import { m } from '../../paraglide/messages.js'
-import { useNow } from '../events/use-events'
 import { type BadgeGroup, computeBadges, computeStreak } from './achievements'
 import { badgeLabel } from './badge-labels'
 

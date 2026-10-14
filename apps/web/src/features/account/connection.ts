@@ -1,8 +1,10 @@
 import { type FamilySummary } from '@bobo/shared'
 
-import type { LocalStore } from '../db'
-import { createStore, useStore } from '../lib/store'
-import { m } from '../paraglide/messages.js'
+import type { LocalStore } from '../../db'
+import { createStore, useStore } from '../../lib/store'
+import { m } from '../../paraglide/messages.js'
+import { getAccount } from '../../sync/local'
+import { requestSync } from '../../sync/runner'
 import {
   type SessionUser,
   completeConnect,
@@ -10,8 +12,6 @@ import {
   httpAccountApi,
   unclaimedCount,
 } from './account'
-import { getAccount } from './local'
-import { requestSync } from './runner'
 
 /** Pending "where should this device's records go?" decision after signing in. */
 export interface ClaimChoice {

@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/react-query'
 
-import { HttpError } from '../sync/api'
+import { HttpError } from './api'
 
 /**
  * Server state that isn't part of local-first sync (members, invites, reminders, passkeys).

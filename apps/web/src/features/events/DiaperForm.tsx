@@ -2,16 +2,16 @@ import { type FormEvent, type ReactNode, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
 import { useLocalStore } from '../../db'
+import { useNow } from '../../lib/use-now'
 import { m } from '../../paraglide/messages.js'
 import { addEvent } from './actions'
 import { DEFAULT_PEE, type DiaperData, DiaperFields } from './DiaperFields'
 import { QuickTimeField } from './QuickTimeField'
 import { logDiaper } from './records'
 import { toDateTimeLocal } from './time'
-import { useNow } from './use-events'
 import { validateTime } from './validation'
 
-export function DiaperSheetContent({
+export function DiaperForm({
   babyIds,
   targets,
   onDone,

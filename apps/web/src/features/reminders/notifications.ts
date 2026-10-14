@@ -1,7 +1,7 @@
 import { type PushSubscriptionInput, type Reminder, base64UrlDecode } from '@bobo/shared'
 
-import { isIos, isStandalone } from '../lib/pwa'
-import { apiFetch } from './api'
+import { apiFetch } from '../../lib/api'
+import { isIos, isStandalone } from '../../lib/pwa'
 
 /**
  * Whether this device can receive reminders:

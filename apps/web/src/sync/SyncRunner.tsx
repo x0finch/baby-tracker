@@ -4,8 +4,12 @@ import { Button } from '../components/ui/Button'
 import { Sheet } from '../components/ui/Sheet'
 import { Toast } from '../components/ui/Toast'
 import { useLocalStore } from '../db'
+import {
+  connectIfSignedIn,
+  resolveClaimChoice,
+  useClaimChoice,
+} from '../features/account/connection'
 import { m } from '../paraglide/messages.js'
-import { connectIfSignedIn, resolveClaimChoice, useClaimChoice } from './connection'
 import { startSync, useSyncState } from './runner'
 
 const REJECTED_TOAST_MS = 5000

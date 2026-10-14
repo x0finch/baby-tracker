@@ -1,7 +1,4 @@
-import type { PullResponse, PushRequest, PushResponse } from '@bobo/shared'
-
-import type { SyncApi } from './engine'
-
+/** Same-origin JSON client for the Bobo API. */
 export class HttpError extends Error {
   constructor(readonly status: number) {
     super(`HTTP ${status}`)
@@ -18,11 +15,4 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   // The API always answers with JSON; shapes are shared with the server via @bobo/shared.
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion
   return (await res.json()) as T
-}
-
-export const httpSyncApi: SyncApi = {
-  push: (request: PushRequest) =>
-    apiFetch<PushResponse>('/api/sync/push', { method: 'POST', body: JSON.stringify(request) }),
-  pull: (cursor: string) =>
-    apiFetch<PullResponse>(`/api/sync/pull?cursor=${encodeURIComponent(cursor)}`),
 }

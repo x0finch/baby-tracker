@@ -4,11 +4,10 @@ import { useState } from 'react'
 
 import { Card } from '../../components/ui/Card'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
-import { Sheet } from '../../components/ui/Sheet'
 import { formatDate, formatNumber } from '../../lib/i18n'
 import { convertToDisplay, formatQuantity, unitLabel } from '../../lib/units'
 import { m } from '../../paraglide/messages.js'
-import { EditEventForm } from '../events/EditEventSheet'
+import { EditEventSheet } from '../events/EditEventSheet'
 import {
   type GrowthMeasure,
   type GrowthSex,
@@ -230,7 +229,6 @@ export function GrowthView({ baby, events }: { baby: Baby; events: readonly Even
   const [chosenSex, setChosenSex] = useState<GrowthSex>('female')
   const sex: GrowthSex = baby.sex === 'unspecified' ? chosenSex : baby.sex
   const [editingId, setEditingId] = useState<string | null>(null)
-  const editing = events.find((event) => event.id === editingId)
   // Ages are measured from the birth date; "now" only sets how far the chart extends.
   // oxlint-disable-next-line react/purity
   const monthsNow = ageInMonths(baby.birthDate, Date.now())
@@ -322,21 +320,7 @@ export function GrowthView({ baby, events }: { baby: Baby; events: readonly Even
         )}
       </section>
 
-      <Sheet
-        open={editing !== undefined}
-        onClose={() => setEditingId(null)}
-        title={m.editEventTitle()}
-      >
-        {editing && (
-          <EditEventForm
-            key={editing.id}
-            event={editing}
-            events={events}
-            onDone={() => setEditingId(null)}
-            onDeleted={() => undefined}
-          />
-        )}
-      </Sheet>
+      <EditEventSheet eventId={editingId} events={events} onClose={() => setEditingId(null)} />
     </div>
   )
 }

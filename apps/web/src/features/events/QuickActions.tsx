@@ -1,22 +1,24 @@
 import type { Baby, Event } from '@bobo/shared'
-import { type ReactNode, useState } from 'react'
+import { useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
 import { Sheet } from '../../components/ui/Sheet'
 import { m } from '../../paraglide/messages.js'
 import { useAccess } from '../../sync/use-access'
 import { useBabies } from '../babies/use-babies'
-import { OTHER_CATEGORIES, type OtherCategory, categoryTone } from './category'
-import { type Category, categoryTitle } from './describe'
-import { DiaperSheetContent } from './DiaperSheet'
+import { type Category, OTHER_CATEGORIES, categoryTitle, categoryTone } from './category'
+import { DiaperForm } from './DiaperForm'
 import { EventIcon, categoryIconKind } from './EventIcon'
-import { FeedingSheetContent } from './FeedingSheet'
+import { FeedingForm } from './FeedingForm'
 import { useLogTogether } from './log-targets'
 import { LogTargets } from './LogTargets'
-import { OtherEventForm } from './OtherEventSheet'
-import { SleepSheetContent } from './SleepSheet'
+import { OtherEventForm } from './OtherEventForm'
+import { SleepForm } from './SleepForm'
 
 const MAIN_CATEGORIES = ['feeding', 'sleep', 'diaper'] as const
+
+const sheetTitle = (category: Category | undefined) =>
+  category === 'diaper' ? m.diaperSheetTitle() : category ? categoryTitle[category]() : ''
 
 /**
  * The three big logging buttons plus a menu for the other types; each opens its sheet. With
@@ -43,6 +45,7 @@ export function QuickActions({ baby, events }: { baby: Baby; events: readonly Ev
     ) : null
   const [open, setOpen] = useState<Category | 'more' | null>(null)
   const close = () => setOpen(null)
+  const logging = open === 'more' ? undefined : (open ?? undefined)
   const other = OTHER_CATEGORIES.find((category) => category === open)
 
   return (
@@ -66,29 +69,21 @@ export function QuickActions({ baby, events }: { baby: Baby; events: readonly Ev
           {m.moreRecords()}
         </Button>
       </div>
-      {MAIN_CATEGORIES.map((category) => (
-        <Sheet
-          key={category}
-          open={open === category}
-          onClose={close}
-          title={category === 'diaper' ? m.diaperSheetTitle() : categoryTitle[category]()}
-        >
-          {open === category && category === 'feeding' && (
-            <FeedingSheetContent
-              babyIds={babyIds}
-              events={events}
-              targets={targets}
-              onDone={close}
-            />
-          )}
-          {open === category && category === 'sleep' && (
-            <SleepSheetContent babyIds={babyIds} events={events} targets={targets} onDone={close} />
-          )}
-          {open === category && category === 'diaper' && (
-            <DiaperSheetContent babyIds={babyIds} targets={targets} onDone={close} />
-          )}
-        </Sheet>
-      ))}
+      <Sheet open={logging !== undefined} onClose={close} title={sheetTitle(logging)}>
+        {logging === 'feeding' && (
+          <FeedingForm babyIds={babyIds} events={events} targets={targets} onDone={close} />
+        )}
+        {logging === 'sleep' && (
+          <SleepForm babyIds={babyIds} events={events} targets={targets} onDone={close} />
+        )}
+        {logging === 'diaper' && <DiaperForm babyIds={babyIds} targets={targets} onDone={close} />}
+        {other && (
+          <div className="flex flex-col gap-4">
+            {targets}
+            <OtherEventForm key={other} category={other} babyIds={babyIds} onDone={close} />
+          </div>
+        )}
+      </Sheet>
       <Sheet open={open === 'more'} onClose={close} title={m.moreRecords()}>
         <div className="grid grid-cols-2 gap-3">
           {OTHER_CATEGORIES.map((category) => (
@@ -106,34 +101,6 @@ export function QuickActions({ baby, events }: { baby: Baby; events: readonly Ev
           ))}
         </div>
       </Sheet>
-      <OtherSheet category={other} babyIds={babyIds} targets={targets} onClose={close} />
     </>
-  )
-}
-
-function OtherSheet({
-  category,
-  babyIds,
-  targets,
-  onClose,
-}: {
-  category: OtherCategory | undefined
-  babyIds: readonly string[]
-  targets: ReactNode
-  onClose: () => void
-}) {
-  return (
-    <Sheet
-      open={category !== undefined}
-      onClose={onClose}
-      title={category ? categoryTitle[category]() : ''}
-    >
-      {category && (
-        <div className="flex flex-col gap-4">
-          {targets}
-          <OtherEventForm key={category} category={category} babyIds={babyIds} onDone={onClose} />
-        </div>
-      )}
-    </Sheet>
   )
 }

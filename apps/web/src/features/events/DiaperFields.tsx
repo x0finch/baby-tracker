@@ -5,7 +5,7 @@ import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { ToggleChip } from '../../components/ui/ToggleChip'
 import { m } from '../../paraglide/messages.js'
 import { amountLabel, poopColorLabel, poopConsistencyLabel } from './diaper-labels'
-import { DiaperIcon } from './DiaperIcon'
+import { DiaperIcon } from './DiaperArt'
 
 export type DiaperData = DiaperEvent['data']
 type Contents = DiaperData['contents']

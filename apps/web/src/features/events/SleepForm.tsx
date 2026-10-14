@@ -5,15 +5,16 @@ import { type FormEvent, type ReactNode, useState } from 'react'
 import { Button } from '../../components/ui/Button'
 import { FormError } from '../../components/ui/FormError'
 import { useLocalStore } from '../../db'
+import { useNow } from '../../lib/use-now'
 import { m } from '../../paraglide/messages.js'
 import { addEvent } from './actions'
 import { logSleep, startSleep } from './records'
 import { toDateTimeLocal } from './time'
 import { TimeField } from './TimeField'
-import { useEventsByBaby, useNow } from './use-events'
+import { useEventsByBaby } from './use-events'
 import { overlapsSleep, validateTime } from './validation'
 
-export function SleepSheetContent({
+export function SleepForm({
   babyIds,
   events,
   targets,

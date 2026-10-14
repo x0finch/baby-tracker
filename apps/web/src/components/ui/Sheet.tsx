@@ -25,6 +25,8 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
     if (!dialog) return
     if (open && !dialog.open) {
       dialog.showModal()
+      // A reused sheet starts at the top, not where its previous content was scrolled to.
+      dialog.scrollTop = 0
       // showModal() focuses the first input, which would pop the keyboard on phones.
       dialog.focus()
     }

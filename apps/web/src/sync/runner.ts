@@ -1,7 +1,8 @@
 import type { LocalStore } from '../db'
+import { HttpError } from '../lib/api'
 import { createStore, useStore } from '../lib/store'
-import { HttpError, httpSyncApi } from './api'
 import { type SyncApi, syncOnce } from './engine'
+import { httpSyncApi } from './http'
 import { getAccount } from './local'
 
 export type SyncPhase = 'signed-out' | 'idle' | 'syncing' | 'offline' | 'error' | 'unauthorized'

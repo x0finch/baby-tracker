@@ -5,19 +5,6 @@ import { m } from '../../paraglide/messages.js'
 import { amountLabel, poopColorLabel, poopConsistencyLabel } from './diaper-labels'
 import { durationLabel } from './duration-label'
 
-export type Category = Event['type']
-
-export const categoryTitle: Record<Category, () => string> = {
-  feeding: m.categoryFeeding,
-  sleep: m.categorySleep,
-  diaper: m.categoryDiaper,
-  pumping: m.categoryPumping,
-  temperature: m.categoryTemperature,
-  medication: m.categoryMedication,
-  note: m.categoryNote,
-  growth: m.categoryGrowth,
-}
-
 /** At or above this a temperature is shown as a fever. */
 const FEVER_CELSIUS = 38
 

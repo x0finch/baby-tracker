@@ -6,17 +6,17 @@ import { z } from 'zod'
 import { PageHeader } from '../components/PageHeader'
 import { Button } from '../components/ui/Button'
 import { SegmentedControl } from '../components/ui/SegmentedControl'
-import { Sheet } from '../components/ui/Sheet'
 import { AchievementsView } from '../features/achievements/AchievementsView'
 import { RequireBaby } from '../features/babies/RequireBaby'
 import { useSelectedBaby } from '../features/babies/use-babies'
 import { DaySummaryCards } from '../features/events/DaySummaryCards'
 import { DayTimeline } from '../features/events/DayTimeline'
-import { EditEventForm } from '../features/events/EditEventSheet'
-import { useBabyEvents, useNow } from '../features/events/use-events'
+import { EditEventSheet } from '../features/events/EditEventSheet'
+import { useBabyEvents } from '../features/events/use-events'
 import { GrowthView } from '../features/growth/GrowthView'
 import { TrendsView } from '../features/trends/TrendsView'
 import { formatDate } from '../lib/i18n'
+import { useNow } from '../lib/use-now'
 import { m } from '../paraglide/messages.js'
 
 const searchSchema = z.object({
@@ -91,7 +91,6 @@ function DayView() {
   const { day = today } = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
   const [editingId, setEditingId] = useState<string | null>(null)
-  const editing = events.find((event) => event.id === editingId)
   const dayStart = localMidnight(day)
   const dayEnd = localMidnight(day, 1)
   const isToday = day >= today
@@ -120,21 +119,7 @@ function DayView() {
         now={now}
         onSelect={(event) => setEditingId(event.id)}
       />
-      <Sheet
-        open={editing !== undefined}
-        onClose={() => setEditingId(null)}
-        title={m.editEventTitle()}
-      >
-        {editing && (
-          <EditEventForm
-            key={editing.id}
-            event={editing}
-            events={events}
-            onDone={() => setEditingId(null)}
-            onDeleted={() => undefined}
-          />
-        )}
-      </Sheet>
+      <EditEventSheet eventId={editingId} events={events} onClose={() => setEditingId(null)} />
     </div>
   )
 }
