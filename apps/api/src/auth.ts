@@ -10,9 +10,16 @@ import { passwordResetEmail, sendEmail } from './email'
 import type { Env } from './env'
 import { hashPassword, verifyPassword } from './password'
 
-/** The app origin plus the future Capacitor shell (#45), which calls the API cross-origin. */
+/**
+ * The app origin, other origins serving the same app (e.g. workers.dev next to a custom
+ * domain), and the future Capacitor shell (#45), which calls the API cross-origin.
+ */
 export function trustedOrigins(env: Env): string[] {
-  return [env.BETTER_AUTH_URL, 'capacitor://localhost', 'https://localhost']
+  const extra = (env.TRUSTED_ORIGINS ?? '')
+    .split(',')
+    .map((origin) => origin.trim().replace(/\/+$/, ''))
+    .filter(Boolean)
+  return [env.BETTER_AUTH_URL, ...extra, 'capacitor://localhost', 'https://localhost']
 }
 
 /**

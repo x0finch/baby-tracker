@@ -76,18 +76,21 @@ jobs:
         env:
           APP_URL: ${{ vars.APP_URL }}
         run: |
-          if [ -n "$APP_URL" ]; then
-            echo "url=${APP_URL%/}" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
           subdomain=$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain" \
             | jq -r '.result.subdomain // empty')
-          if [ -z "$subdomain" ]; then
+          workers_dev=${subdomain:+https://$WORKER_NAME.$subdomain.workers.dev}
+          # A custom domain (APP_URL) is canonical; workers.dev keeps working as an extra origin.
+          url=${APP_URL%/}
+          url=${url:-$workers_dev}
+          if [ -z "$url" ]; then
             echo "::error::No workers.dev subdomain yet. Open Workers & Pages in the Cloudflare dashboard once to create it, or set the APP_URL variable."
             exit 1
           fi
-          echo "url=https://$WORKER_NAME.$subdomain.workers.dev" >> "$GITHUB_OUTPUT"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          if [ -n "$workers_dev" ] && [ "$workers_dev" != "$url" ]; then
+            echo "extra=$workers_dev" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Create the database if needed
         if: steps.config.outputs.ready == 'true'
@@ -119,6 +122,7 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           EMAIL_FROM: ${{ vars.EMAIL_FROM }}
           APP_URL: ${{ steps.url.outputs.url }}
+          TRUSTED_ORIGINS: ${{ steps.url.outputs.extra }}
         run: |
           # Secrets are uploaded with the new version; unset optional ones are left out.
           secrets="$RUNNER_TEMP/secrets.json"
@@ -128,6 +132,7 @@ jobs:
             require("node:fs").writeFileSync(process.argv[1], JSON.stringify(set), { mode: 0o600 })
           ' "$secrets"
           vars=(--var "BETTER_AUTH_URL:$APP_URL")
+          if [ -n "$TRUSTED_ORIGINS" ]; then vars+=(--var "TRUSTED_ORIGINS:$TRUSTED_ORIGINS"); fi
           if [ -n "$EMAIL_FROM" ]; then vars+=(--var "EMAIL_FROM:$EMAIL_FROM"); fi
           pnpm exec wrangler deploy --secrets-file "$secrets" "${vars[@]}"
           rm -f "$secrets"

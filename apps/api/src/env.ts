@@ -6,6 +6,8 @@ export interface Env {
   BETTER_AUTH_URL: string
   /** Secret used to sign session cookies (wrangler secret put BETTER_AUTH_SECRET). */
   BETTER_AUTH_SECRET: string
+  /** Comma-separated extra origins serving the app, e.g. the workers.dev URL. */
+  TRUSTED_ORIGINS?: string
   GOOGLE_CLIENT_ID?: string
   GOOGLE_CLIENT_SECRET?: string
   /** Cloudflare Email Service binding (Workers Paid plan); preferred when present. */
