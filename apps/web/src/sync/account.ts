@@ -40,6 +40,22 @@ export async function signInWithGoogle(returnTo = '/settings') {
   window.location.assign(url)
 }
 
+/** Emails a one-time sign-in code; new addresses get an account when they sign in. */
+export async function sendEmailCode(email: string) {
+  await apiFetch('/api/auth/email-otp/send-verification-otp', {
+    method: 'POST',
+    body: JSON.stringify({ email, type: 'sign-in' }),
+  })
+}
+
+/** Signs in with an emailed code; the session cookie is set by the response. */
+export async function signInWithEmailCode(email: string, otp: string) {
+  await apiFetch('/api/auth/sign-in/email-otp', {
+    method: 'POST',
+    body: JSON.stringify({ email, otp }),
+  })
+}
+
 export async function signOutRemote() {
   await apiFetch('/api/auth/sign-out', { method: 'POST', body: '{}' })
 }

@@ -20,5 +20,21 @@
       "migrations_dir": "migrations",
     },
   ],
+  // Sign-in code limits (src/rate-limit.ts). namespace_id must be unique in the account.
+  "ratelimits": [
+    {
+      "name": "AUTH_EMAIL_RATE_LIMIT",
+      "namespace_id": "1001",
+      "simple": { "limit": 3, "period": 60 },
+    },
+    {
+      "name": "AUTH_IP_RATE_LIMIT",
+      "namespace_id": "1002",
+      "simple": { "limit": 20, "period": 60 },
+    },
+  ],
+  // To send email with Cloudflare Email Service (Workers Paid plan), add:
+  //   "send_email": [{ "name": "EMAIL" }]
+  // On the free plan, set the RESEND_API_KEY secret instead. Both need EMAIL_FROM.
   "observability": { "enabled": true },
 }

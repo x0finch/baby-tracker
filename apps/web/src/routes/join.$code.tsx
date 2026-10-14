@@ -14,6 +14,7 @@ import { HttpError } from '../sync/api'
 import { connectIfSignedIn } from '../sync/connection'
 import { getAccount } from '../sync/local'
 import { requestSync } from '../sync/runner'
+import { SignInOptions } from '../sync/SignInOptions'
 
 export const Route = createFileRoute('/join/$code')({
   component: JoinPage,
@@ -109,7 +110,7 @@ function JoinPage() {
         {phase.name === 'loading' && <p className="m-0 text-fg-muted">{m.joinLoading()}</p>}
         {phase.name === 'missing' && <p className="m-0">{m.joinNotFound()}</p>}
         {phase.name !== 'loading' && phase.name !== 'missing' && (
-          <InviteBody phase={phase} onJoin={(preview) => void join(preview)} />
+          <InviteBody code={code} phase={phase} onJoin={(preview) => void join(preview)} />
         )}
       </Card>
     </section>
@@ -117,9 +118,11 @@ function JoinPage() {
 }
 
 function InviteBody({
+  code,
   phase,
   onJoin,
 }: {
+  code: string
   phase: Exclude<Phase, { name: 'loading' } | { name: 'missing' }>
   onJoin: (preview: InvitePreview) => void
 }) {
@@ -157,17 +160,26 @@ function InviteBody({
         </>
       )}
       {(phase.name === 'ready' || phase.name === 'joining' || phase.name === 'failed') &&
-        (preview.status === 'active' ? (
+        (preview.status !== 'active' ? (
+          <p className="m-0 font-bold text-danger-text">{statusMessage[preview.status]()}</p>
+        ) : signedIn ? (
           <Button
             size="lg"
             block
             disabled={phase.name === 'joining'}
             onClick={() => onJoin(preview)}
           >
-            {signedIn ? m.joinAccept() : m.joinSignIn()}
+            {m.joinAccept()}
           </Button>
         ) : (
-          <p className="m-0 font-bold text-danger-text">{statusMessage[preview.status]()}</p>
+          <>
+            <p className="m-0 text-fg-muted">{m.joinSignIn()}</p>
+            <SignInOptions
+              returnTo={`/join/${code}`}
+              onGoogle={() => writePending(code)}
+              onSignedIn={() => onJoin(preview)}
+            />
+          </>
         ))}
       {phase.name === 'failed' && (
         <p className="m-0 font-bold text-danger-text">{m.actionFailed()}</p>

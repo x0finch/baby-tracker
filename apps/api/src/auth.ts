@@ -2,9 +2,11 @@ import { newId } from '@bobo/shared'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { betterAuth } from 'better-auth/minimal'
 import { bearer } from 'better-auth/plugins/bearer'
+import { emailOTP } from 'better-auth/plugins/email-otp'
 import { drizzle } from 'drizzle-orm/d1'
 
 import * as schema from './db/schema'
+import { sendEmail, signInCodeEmail } from './email'
 import type { Env } from './env'
 
 /** The app origin plus the future Capacitor shell (#45), which calls the API cross-origin. */
@@ -17,8 +19,13 @@ export function trustedOrigins(env: Env): string[] {
  * - `better-auth/minimal` (no Kysely) and only the bearer plugin, to keep the bundle small
  * - signed cookie cache (compact HMAC, not JWE) so most requests validate the session
  *   without a D1 read, and a long `updateAge` so sessions are rarely rewritten
- * - no email/password (avoids scrypt) and no DB-backed rate limiting (Cloudflare handles it)
+ * - no email/password (avoids scrypt); email sign-in uses one-time codes, stored hashed with
+ *   SHA-256, which costs microseconds
+ * - no DB-backed rate limiting: sending codes is limited by a Workers rate limiter (app.ts)
  */
+/** Sign-in codes stay valid for 10 minutes. */
+export const OTP_TTL_SECONDS = 10 * 60
+
 export function createAuthOptions(env: Env) {
   const google =
     env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
@@ -44,7 +51,30 @@ export function createAuthOptions(env: Env) {
     telemetry: { enabled: false },
     trustedOrigins: trustedOrigins(env),
     advanced: { database: { generateId: () => newId() } },
-    plugins: [bearer()],
+    databaseHooks: {
+      user: {
+        create: {
+          // Email sign-up has no profile name; start with the address's local part.
+          before: async (user: { name?: string | null; email: string }) => ({
+            data: { ...user, name: user.name?.trim() || user.email.split('@')[0] || user.email },
+          }),
+        },
+      },
+    },
+    plugins: [
+      bearer(),
+      emailOTP({
+        otpLength: 6,
+        expiresIn: OTP_TTL_SECONDS,
+        allowedAttempts: 5,
+        storeOTP: 'hashed',
+        sendVerificationOTP: async ({ email, otp, type }) => {
+          // Only sign-in codes are used; other flows (password reset, ...) are disabled.
+          if (type !== 'sign-in') return
+          await sendEmail(env, signInCodeEmail(email, otp, OTP_TTL_SECONDS / 60))
+        },
+      }),
+    ],
   }
 }
 
