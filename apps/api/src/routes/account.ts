@@ -43,6 +43,11 @@ export const accountRoutes = new Hono<AppEnv>().delete('/', async (c) => {
          )`,
       )
       .bind(userId),
+    db
+      .prepare(
+        'update invites set revoked_at = ?2 where created_by = ?1 and used_at is null and revoked_at is null',
+      )
+      .bind(userId, Date.now()),
     db.prepare('delete from memberships where user_id = ?').bind(userId),
     db.prepare('delete from session where user_id = ?').bind(userId),
     db.prepare('delete from account where user_id = ?').bind(userId),

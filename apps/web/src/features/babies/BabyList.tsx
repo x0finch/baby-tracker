@@ -5,16 +5,18 @@ import { Button } from '../../components/ui/Button'
 import { Sheet } from '../../components/ui/Sheet'
 import { useLocalStore } from '../../db'
 import { m } from '../../paraglide/messages.js'
+import { useAccess } from '../../sync/use-access'
 import { setBabyArchived, updateBaby } from './actions'
 import { ageLabel } from './age-label'
 import { BabyAvatar } from './BabyAvatar'
 import { BabyForm } from './BabyForm'
 import { useBabies } from './use-babies'
 
-function BabyRow({ baby, onClick }: { baby: Baby; onClick: () => void }) {
+function BabyRow({ baby, onClick }: { baby: Baby; onClick?: () => void }) {
   return (
     <button
       type="button"
+      disabled={!onClick}
       onClick={onClick}
       className="flex min-h-touch w-full items-center gap-3 rounded-lg py-1 text-left active:bg-surface"
     >
@@ -31,6 +33,8 @@ function BabyRow({ baby, onClick }: { baby: Baby; onClick: () => void }) {
 export function BabyList() {
   const store = useLocalStore()
   const { active, archived } = useBabies()
+  const access = useAccess()
+  const manageable = (baby: Baby) => access.forBaby(baby).canManageBaby
   const [editingId, setEditingId] = useState<string | null>(null)
   const editing = [...active, ...archived].find((baby) => baby.id === editingId)
   const close = () => setEditingId(null)
@@ -39,7 +43,11 @@ export function BabyList() {
     <div className="flex flex-col gap-2">
       {active.length === 0 && <p className="text-fg-muted">{m.babyListEmpty()}</p>}
       {active.map((baby) => (
-        <BabyRow key={baby.id} baby={baby} onClick={() => setEditingId(baby.id)} />
+        <BabyRow
+          key={baby.id}
+          baby={baby}
+          onClick={manageable(baby) ? () => setEditingId(baby.id) : undefined}
+        />
       ))}
       {archived.length > 0 && (
         <>
@@ -47,15 +55,20 @@ export function BabyList() {
           {archived.map((baby) => (
             <div key={baby.id} className="flex items-center gap-3">
               <div className="min-w-0 flex-1 opacity-70">
-                <BabyRow baby={baby} onClick={() => setEditingId(baby.id)} />
+                <BabyRow
+                  baby={baby}
+                  onClick={manageable(baby) ? () => setEditingId(baby.id) : undefined}
+                />
               </div>
-              <Button
-                variant="ghost"
-                tone="diaper"
-                onClick={() => setBabyArchived(store, baby.id, false)}
-              >
-                {m.babyRestore()}
-              </Button>
+              {manageable(baby) && (
+                <Button
+                  variant="ghost"
+                  tone="diaper"
+                  onClick={() => setBabyArchived(store, baby.id, false)}
+                >
+                  {m.babyRestore()}
+                </Button>
+              )}
             </div>
           ))}
         </>

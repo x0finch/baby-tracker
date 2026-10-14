@@ -4,6 +4,7 @@ import { clsx } from 'clsx'
 import { Button } from '../../components/ui/Button'
 import { useLocalStore } from '../../db'
 import { m } from '../../paraglide/messages.js'
+import { useAccess } from '../../sync/use-access'
 import { saveEvent } from './actions'
 import { currentBreastSide, stopEvent, switchBreastSide } from './records'
 import { formatClock } from './time'
@@ -13,6 +14,7 @@ const sideLabel = (side: 'left' | 'right') => (side === 'left' ? m.sideLeft() : 
 
 function BreastTimer({ event, now }: { event: FeedingEvent; now: number }) {
   const store = useLocalStore()
+  const canEdit = useAccess().canEditEvent(event)
   if (event.data.kind !== 'breast') return null
   const side = currentBreastSide(event) ?? 'left'
   const totals = breastSideDurations(event.data.segments, now)
@@ -44,24 +46,27 @@ function BreastTimer({ event, now }: { event: FeedingEvent; now: number }) {
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Button
-          variant="outline"
-          tone="feeding"
-          onClick={() => saveEvent(store, switchBreastSide(event, Date.now()))}
-        >
-          {m.timerSwitchSide({ side: sideLabel(other) })}
-        </Button>
-        <Button tone="feeding" onClick={() => saveEvent(store, stopEvent(event, Date.now()))}>
-          {m.timerStop()}
-        </Button>
-      </div>
+      {canEdit && (
+        <div className="grid grid-cols-2 gap-3">
+          <Button
+            variant="outline"
+            tone="feeding"
+            onClick={() => saveEvent(store, switchBreastSide(event, Date.now()))}
+          >
+            {m.timerSwitchSide({ side: sideLabel(other) })}
+          </Button>
+          <Button tone="feeding" onClick={() => saveEvent(store, stopEvent(event, Date.now()))}>
+            {m.timerStop()}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
 
 function SleepTimer({ event, now }: { event: Event; now: number }) {
   const store = useLocalStore()
+  const canEdit = useAccess().canEditEvent(event)
   return (
     <div className="flex items-center gap-4 rounded-xl border-2 border-b-4 border-sleep/40 bg-sleep-soft p-4">
       <div className="flex flex-1 flex-col">
@@ -70,9 +75,15 @@ function SleepTimer({ event, now }: { event: Event; now: number }) {
           {formatClock(now - event.startAt)}
         </span>
       </div>
-      <Button tone="sleep" size="lg" onClick={() => saveEvent(store, stopEvent(event, Date.now()))}>
-        {m.timerWake()}
-      </Button>
+      {canEdit && (
+        <Button
+          tone="sleep"
+          size="lg"
+          onClick={() => saveEvent(store, stopEvent(event, Date.now()))}
+        >
+          {m.timerWake()}
+        </Button>
+      )}
     </div>
   )
 }

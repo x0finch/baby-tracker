@@ -10,6 +10,8 @@ export type SyncPhase = 'signed-out' | 'idle' | 'syncing' | 'offline' | 'error' 
 export interface SyncState {
   phase: SyncPhase
   lastSyncedAt?: number
+  /** The latest round in which the server refused changes (they were rolled back). */
+  rejected?: { count: number; at: number }
 }
 
 const LOCAL_CHANGE_DELAY_MS = 3_000
@@ -71,8 +73,13 @@ async function runRound() {
   setState({ ...state, phase: 'syncing' })
   try {
     const result = await syncOnce(store, api)
+    const at = Date.now()
     if (result.rejected.length > 0) console.warn('Sync rejected changes', result.rejected)
-    setState({ phase: 'idle', lastSyncedAt: Date.now() })
+    setState({
+      phase: 'idle',
+      lastSyncedAt: at,
+      rejected: result.rejected.length > 0 ? { count: result.rejected.length, at } : state.rejected,
+    })
   } catch (error) {
     if (error instanceof HttpError && error.status === 401) {
       setState({ ...state, phase: 'unauthorized' })

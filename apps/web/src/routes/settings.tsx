@@ -6,6 +6,7 @@ import { StorageStatus } from '../components/StorageStatus'
 import { Card } from '../components/ui/Card'
 import { SegmentedControl } from '../components/ui/SegmentedControl'
 import { BabyList } from '../features/babies/BabyList'
+import { FamilySection } from '../features/family/FamilyCard'
 import { type Locale, getLocale, localeDisplayName, locales, setLocale } from '../lib/i18n'
 import type { ThemePreference } from '../lib/theme'
 import { useTheme } from '../lib/use-theme'
@@ -32,6 +33,7 @@ function SettingsPage() {
     <section className="flex flex-col gap-4">
       <PageHeader title={m.settingsTitle()} />
       <AccountCard />
+      <FamilySection />
       <Card className="flex flex-col gap-3">
         <h2 className="text-title font-extrabold">{m.settingsTheme()}</h2>
         <SegmentedControl

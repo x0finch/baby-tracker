@@ -1,6 +1,7 @@
 import {
   type Baby,
   type Event,
+  type FamilySummary,
   type PullResponse,
   type PushItemResult,
   type PushRequest,
@@ -15,9 +16,10 @@ import { createBaby, updateBaby } from '../features/babies/actions'
 import { addEvent, saveEvent } from '../features/events/actions'
 import { logDiaper } from '../features/events/records'
 import { type SyncApi, syncOnce } from './engine'
-import { markDirty, setAccount } from './local'
+import { getAccount, getCursor, markDirty, setAccount } from './local'
 
 const FAMILY = newId()
+const OWNER: FamilySummary = { id: FAMILY, name: '家', role: 'owner', babyIds: null }
 
 /** In-memory server with the same semantics as the real API: LWW, seq-ordered pulls. */
 function createFakeServer(pageSize = 1000) {
@@ -27,6 +29,7 @@ function createFakeServer(pageSize = 1000) {
     events: new Map<string, { seq: number; record: Event }>(),
   }
   const rejectIds = new Set<string>()
+  const state = { access: [OWNER], pulls: [] as string[] }
 
   function write<T extends Baby | Event>(
     map: Map<string, { seq: number; record: T }>,
@@ -51,6 +54,7 @@ function createFakeServer(pageSize = 1000) {
       }
     },
     async pull(cursor: string): Promise<PullResponse> {
+      state.pulls.push(cursor)
       const after = Number(cursor || 0)
       const page = <T>(map: Map<string, { seq: number; record: T }>) =>
         [...map.values()].filter((row) => row.seq > after).toSorted((a, b) => a.seq - b.seq)
@@ -71,13 +75,13 @@ function createFakeServer(pageSize = 1000) {
       return {
         babies: babies.filter((row) => row.seq <= last).map((row) => structuredClone(row.record)),
         events: events.filter((row) => row.seq <= last).map((row) => structuredClone(row.record)),
-        access: [],
+        access: structuredClone(state.access),
         cursor: String(last),
         hasMore: seqs.some((s) => s > last),
       }
     },
   }
-  return { api, rows, rejectIds, pushes: () => seq }
+  return { api, rows, rejectIds, state, pushes: () => seq }
 }
 
 async function device(): Promise<LocalStore> {
@@ -193,7 +197,7 @@ describe('syncOnce', () => {
       pull: async () => ({
         babies: [{ ...baby, name: '旧的远端' }],
         events: [],
-        access: [],
+        access: [OWNER],
         cursor: '1',
         hasMore: false,
       }),
@@ -237,14 +241,75 @@ describe('syncOnce', () => {
     expect(a.outbox.has(`babies:${unclaimed.id}`)).toBe(true)
   })
 
-  it('reports and clears rejected changes', async () => {
+  it('reports rejected changes and rolls them back to the server version', async () => {
     const server = createFakeServer()
     const a = await device()
     const baby = createBaby(a, input)
+    const refused = createBaby(a, { ...input, name: '不允许' })
+    server.rejectIds.add(refused.id)
+    await syncOnce(a, server.api)
+    expect(a.babies.has(refused.id)).toBe(false)
+
     server.rejectIds.add(baby.id)
+    updateBaby(a, baby.id, { ...input, name: '没有权限改' })
     const result = await syncOnce(a, server.api)
     expect(result.rejected).toEqual([{ table: 'babies', id: baby.id, reason: 'forbidden' }])
+    expect(a.babies.get(baby.id)?.name).toBe(input.name)
     expect(a.outbox.size).toBe(0)
+  })
+
+  it('removes local data the user lost access to', async () => {
+    const server = createFakeServer()
+    const a = await device()
+    const kept = createBaby(a, input)
+    const hidden = createBaby(a, { ...input, name: '老二' })
+    addEvent(a, logDiaper(hidden.id, Date.now(), 'wet'))
+    addEvent(a, logDiaper(kept.id, Date.now(), 'wet'))
+    await syncOnce(a, server.api)
+
+    server.state.access = [{ ...OWNER, role: 'caregiver', babyIds: [kept.id] }]
+    await syncOnce(a, server.api)
+    expect(a.babies.toArray.map((b) => b.id)).toEqual([kept.id])
+    expect(a.events.toArray.every((event) => event.babyId === kept.id)).toBe(true)
+
+    // Removed from the family: its data leaves the device, local-only records stay.
+    setAccount(a, undefined)
+    const local = createBaby(a, { ...input, name: '本地' })
+    setAccount(a, { userId: 'user-1', familyId: FAMILY })
+    server.state.access = []
+    await syncOnce(a, server.api)
+    expect(a.babies.toArray.map((b) => b.id)).toEqual([local.id])
+    expect(a.events.size).toBe(0)
+  })
+
+  it('pulls from the start when access grows', async () => {
+    const server = createFakeServer()
+    const a = await device()
+    const b = await device()
+    const first = createBaby(a, input)
+    const second = createBaby(a, { ...input, name: '老二' })
+    await syncOnce(a, server.api)
+
+    server.state.access = [{ ...OWNER, role: 'viewer', babyIds: [first.id] }]
+    // The fake server does not filter by scope; drop the hidden baby like the real one would.
+    await syncOnce(b, server.api)
+    b.babies.delete(second.id)
+    expect(getCursor(b)).not.toBe('')
+
+    server.state.access = [{ ...OWNER, role: 'viewer', babyIds: null }]
+    server.state.pulls.length = 0
+    await syncOnce(b, server.api)
+    expect(server.state.pulls).toContain('')
+    expect(b.babies.has(second.id)).toBe(true)
+  })
+
+  it('moves new records to another family when the account leaves its family', async () => {
+    const server = createFakeServer()
+    const a = await device()
+    const other: FamilySummary = { id: newId(), name: '外婆家', role: 'admin', babyIds: null }
+    server.state.access = [other]
+    await syncOnce(a, server.api)
+    expect(getAccount(a)?.familyId).toBe(other.id)
   })
 
   it('pushes large backlogs in batches and pages through pulls', async () => {

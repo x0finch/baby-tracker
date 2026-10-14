@@ -86,6 +86,27 @@ export const membershipBabies = sqliteTable(
   (table) => [primaryKey({ columns: [table.familyId, table.userId, table.babyId] })],
 )
 
+/** Single-use invite links; the code is the secret, so it is long and random. */
+export const invites = sqliteTable(
+  'invites',
+  {
+    code: text('code').primaryKey(),
+    familyId: text('family_id')
+      .notNull()
+      .references(() => families.id, { onDelete: 'cascade' }),
+    role: text('role', { enum: ['admin', 'caregiver', 'viewer'] }).notNull(),
+    /** JSON array of baby ids, or null for every baby. */
+    babyIds: text('baby_ids'),
+    createdBy: text('created_by').notNull(),
+    createdAt: integer('created_at').notNull(),
+    expiresAt: integer('expires_at').notNull(),
+    usedBy: text('used_by'),
+    usedAt: integer('used_at'),
+    revokedAt: integer('revoked_at'),
+  },
+  (table) => [index('invites_family_idx').on(table.familyId)],
+)
+
 /** Single-row counter; every accepted push increments it inside the same D1 transaction. */
 export const syncSeq = sqliteTable('sync_seq', {
   id: integer('id').primaryKey(),

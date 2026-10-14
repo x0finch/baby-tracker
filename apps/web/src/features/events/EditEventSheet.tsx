@@ -6,6 +6,8 @@ import { Input } from '../../components/ui/Input'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { useLocalStore } from '../../db'
 import { m } from '../../paraglide/messages.js'
+import { useAccess } from '../../sync/use-access'
+import { useMemberName } from '../family/api'
 import { saveEvent } from './actions'
 import { deleteEvent, moveEventStart, setEventNote } from './records'
 import { toDateTimeLocal } from './time'
@@ -29,6 +31,8 @@ export function EditEventForm({
 }) {
   const store = useLocalStore()
   const now = useNow(60_000)
+  const readOnly = !useAccess().canEditEvent(event)
+  const author = useMemberName(event.familyId, event.createdBy)
   const running = isRunning(event)
   const [start, setStart] = useState(() => toDateTimeLocal(event.startAt))
   const [end, setEnd] = useState(() => (event.endAt === null ? '' : toDateTimeLocal(event.endAt)))
@@ -54,6 +58,7 @@ export function EditEventForm({
 
   function submit(formEvent: FormEvent) {
     formEvent.preventDefault()
+    if (readOnly) return
     const current = Date.now()
     const nextErrors: Errors = {}
     const startResult = validateTime(start, current)
@@ -99,90 +104,100 @@ export function EditEventForm({
 
   return (
     <form noValidate onSubmit={submit} className="flex flex-col gap-4">
-      {event.type === 'feeding' && event.data.kind === 'bottle' && (
-        <>
+      {author && (
+        <p className="m-0 text-caption text-fg-muted">{m.eventAuthor({ name: author })}</p>
+      )}
+      {readOnly && <p className="m-0 font-bold text-fg-muted">{m.eventReadOnly()}</p>}
+      <fieldset disabled={readOnly} className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
+        {event.type === 'feeding' && event.data.kind === 'bottle' && (
+          <>
+            <Input
+              label={m.bottleAmount()}
+              type="number"
+              inputMode="numeric"
+              value={amount}
+              error={errors.amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+            <SegmentedControl
+              label={m.bottleMilk()}
+              options={[
+                { value: 'formula', label: m.milkFormula() },
+                { value: 'breast', label: m.milkBreast() },
+                { value: 'mixed', label: m.milkMixed() },
+              ]}
+              value={milk}
+              onChange={setMilk}
+            />
+          </>
+        )}
+        {event.type === 'feeding' && event.data.kind === 'solids' && (
           <Input
-            label={m.bottleAmount()}
-            type="number"
-            inputMode="numeric"
-            value={amount}
-            error={errors.amount}
-            onChange={(e) => setAmount(e.target.value)}
+            label={m.solidsFood()}
+            value={food}
+            maxLength={100}
+            error={errors.food}
+            onChange={(e) => setFood(e.target.value)}
           />
+        )}
+        {event.type === 'diaper' && (
           <SegmentedControl
-            label={m.bottleMilk()}
+            label={m.diaperContents()}
             options={[
-              { value: 'formula', label: m.milkFormula() },
-              { value: 'breast', label: m.milkBreast() },
-              { value: 'mixed', label: m.milkMixed() },
+              { value: 'wet', label: m.diaperWet() },
+              { value: 'dirty', label: m.diaperDirty() },
+              { value: 'mixed', label: m.diaperMixed() },
             ]}
-            value={milk}
-            onChange={setMilk}
+            value={contents}
+            onChange={setContents}
           />
-        </>
-      )}
-      {event.type === 'feeding' && event.data.kind === 'solids' && (
-        <Input
-          label={m.solidsFood()}
-          value={food}
-          maxLength={100}
-          error={errors.food}
-          onChange={(e) => setFood(e.target.value)}
-        />
-      )}
-      {event.type === 'diaper' && (
-        <SegmentedControl
-          label={m.diaperContents()}
-          options={[
-            { value: 'wet', label: m.diaperWet() },
-            { value: 'dirty', label: m.diaperDirty() },
-            { value: 'mixed', label: m.diaperMixed() },
-          ]}
-          value={contents}
-          onChange={setContents}
-        />
-      )}
-      {event.type === 'sleep' && (
-        <SegmentedControl
-          label={m.sleepKindLabel()}
-          options={[
-            { value: 'nap', label: m.sleepNap() },
-            { value: 'night', label: m.sleepNight() },
-          ]}
-          value={sleepKind}
-          onChange={setSleepKind}
-        />
-      )}
-      <TimeField
-        label={isTimed(event) ? m.eventStart() : m.eventTime()}
-        value={start}
-        onChange={setStart}
-        error={errors.start}
-        now={now}
-      />
-      {editableEnd && (
+        )}
+        {event.type === 'sleep' && (
+          <SegmentedControl
+            label={m.sleepKindLabel()}
+            options={[
+              { value: 'nap', label: m.sleepNap() },
+              { value: 'night', label: m.sleepNight() },
+            ]}
+            value={sleepKind}
+            onChange={setSleepKind}
+          />
+        )}
         <TimeField
-          label={m.eventEnd()}
-          value={end}
-          onChange={setEnd}
-          error={errors.end}
+          label={isTimed(event) ? m.eventStart() : m.eventTime()}
+          value={start}
+          onChange={setStart}
+          error={errors.start}
           now={now}
         />
-      )}
-      <Input
-        label={m.eventNote()}
-        placeholder={m.eventNotePlaceholder()}
-        value={note}
-        maxLength={500}
-        onChange={(e) => setNote(e.target.value)}
-      />
+        {editableEnd && (
+          <TimeField
+            label={m.eventEnd()}
+            value={end}
+            onChange={setEnd}
+            error={errors.end}
+            now={now}
+          />
+        )}
+        <Input
+          label={m.eventNote()}
+          placeholder={m.eventNotePlaceholder()}
+          value={note}
+          maxLength={500}
+          onChange={(e) => setNote(e.target.value)}
+        />
+      </fieldset>
       {errors.form && <p className="font-bold text-danger-text">{errors.form}</p>}
-      <Button type="submit" size="lg" block>
-        {m.actionSave()}
-      </Button>
-      <Button variant="ghost" tone="danger" onClick={remove}>
-        {m.eventDelete()}
-      </Button>
+      {!readOnly && (
+        <>
+          <Button type="submit" size="lg" block>
+            {m.actionSave()}
+          </Button>
+          <Button variant="ghost" tone="danger" onClick={remove}>
+            {m.eventDelete()}
+          </Button>
+        </>
+      )}
     </form>
   )
 }

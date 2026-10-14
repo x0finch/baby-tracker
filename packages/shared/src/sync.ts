@@ -81,3 +81,34 @@ export const updateMemberRequestSchema = z
 
 export const renameFamilyRequestSchema = createFamilyRequestSchema
 export const transferOwnershipRequestSchema = z.object({ userId: z.string().min(1) })
+
+/** How long an invite link stays valid. */
+export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000
+
+export const createInviteRequestSchema = z.object({
+  role: familyRoleSchema.exclude(['owner']),
+  /** null: every baby; otherwise only these babies of the family. */
+  babyIds: z.array(z.string()).min(1).max(50).nullable(),
+})
+export type CreateInviteRequest = z.infer<typeof createInviteRequestSchema>
+
+export interface Invite {
+  code: string
+  familyId: string
+  role: Exclude<FamilyRole, 'owner'>
+  babyIds: string[] | null
+  createdAt: number
+  expiresAt: number
+}
+
+export type InviteStatus = 'active' | 'used' | 'revoked' | 'expired'
+
+/** What someone opening an invite link sees before accepting it. */
+export interface InvitePreview {
+  familyName: string
+  inviterName: string
+  role: Exclude<FamilyRole, 'owner'>
+  /** Names of the babies the invite grants, or null for every baby. */
+  babyNames: string[] | null
+  status: InviteStatus
+}
