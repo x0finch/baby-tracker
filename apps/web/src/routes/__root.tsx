@@ -6,6 +6,7 @@ import { TabBar } from '../components/TabBar'
 import { UpdatePrompt } from '../components/UpdatePrompt'
 import { getLocale } from '../lib/i18n'
 import { THEME_COLORS, themeInitScript } from '../lib/theme'
+import { SyncRunner } from '../sync/SyncRunner'
 
 import appCss from '../styles/app.css?url'
 
@@ -74,6 +75,11 @@ function RootLayout() {
       </main>
       <TabBar />
       {hydrated && <UpdatePrompt />}
+      {hydrated && (
+        <Suspense>
+          <SyncRunner />
+        </Suspense>
+      )}
     </div>
   )
 }

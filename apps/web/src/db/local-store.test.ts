@@ -1,5 +1,10 @@
 import { type Baby, newId } from '@bobo/shared'
-import { SchemaValidationError } from '@tanstack/db'
+import {
+  SchemaValidationError,
+  createCollection,
+  createIndexedDB,
+  indexedDBCollectionOptions,
+} from '@tanstack/db'
 import { IDBFactory } from 'fake-indexeddb'
 import { describe, expect, it } from 'vitest'
 
@@ -37,6 +42,29 @@ describe('openLocalStore', () => {
     const second = await openLocalStore({ idbFactory, requestPersistence: granted })
     const babies = await second.babies.toArrayWhenReady()
     expect(babies.map((b) => b.id)).toEqual([record.id])
+  })
+
+  it('keeps existing data when upgrading from the version 1 database', async () => {
+    const idbFactory = new IDBFactory()
+    // Version 1 shipped with only the babies and events stores.
+    const v1 = await createIndexedDB({
+      name: 'bobo',
+      version: 1,
+      stores: ['babies', 'events'],
+      idbFactory,
+    })
+    const babies = createCollection(
+      indexedDBCollectionOptions<Baby, string>({ db: v1, name: 'babies', getKey: (b) => b.id }),
+    )
+    await babies.preload()
+    const record = baby()
+    await babies.insert(record).isPersisted.promise
+    v1.close()
+
+    const upgraded = await openLocalStore({ idbFactory, requestPersistence: granted })
+    expect((await upgraded.babies.toArrayWhenReady()).map((b) => b.id)).toEqual([record.id])
+    await upgraded.outbox.preload()
+    expect(upgraded.outbox.size).toBe(0)
   })
 
   it('rejects records that fail schema validation', async () => {

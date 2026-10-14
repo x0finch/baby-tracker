@@ -1,9 +1,14 @@
 import type { Event } from '@bobo/shared'
 
 import type { LocalStore } from '../../db'
+import { markDirty } from '../../sync/local'
 
+/** New events belong to their baby's family, so they sync to the same people. */
 export function addEvent(store: LocalStore, event: Event) {
-  store.events.insert(event)
+  const familyId = store.babies.get(event.babyId)?.familyId ?? null
+  const stamped = { ...event, familyId }
+  store.events.insert(stamped)
+  markDirty(store, 'events', stamped)
 }
 
 /** Replaces an event with an updated version built by the pure helpers in records.ts. */
@@ -11,4 +16,5 @@ export function saveEvent(store: LocalStore, next: Event) {
   store.events.update(next.id, (draft) => {
     Object.assign(draft, next)
   })
+  markDirty(store, 'events', next)
 }
