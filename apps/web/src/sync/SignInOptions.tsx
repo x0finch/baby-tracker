@@ -11,6 +11,7 @@ import {
   signUpWithEmail,
 } from './account'
 import { HttpError } from './api'
+import { isPasskeyCancel, passkeysSupported, signInWithPasskey } from './passkey'
 import { MIN_PASSWORD_LENGTH } from './password'
 
 type Mode = 'sign-in' | 'sign-up' | 'reset-request' | 'reset'
@@ -63,6 +64,21 @@ export function SignInOptions({
       await signInWithGoogle(returnTo)
     } catch {
       setError(m.signInFailed())
+    }
+  }
+
+  async function passkey() {
+    setError(undefined)
+    setBusy(true)
+    try {
+      await signInWithPasskey()
+      await onSignedIn()
+    } catch (passkeyError) {
+      if (!isPasskeyCancel(passkeyError)) {
+        setError(isStatus(passkeyError, 429) ? m.emailTooMany() : m.passkeySignInFailed())
+      }
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -154,6 +170,11 @@ export function SignInOptions({
       <Button size="lg" block onClick={() => void google()}>
         {m.signInGoogle()}
       </Button>
+      {mode === 'sign-in' && passkeysSupported() && (
+        <Button variant="outline" block disabled={busy} onClick={() => void passkey()}>
+          {m.passkeySignIn()}
+        </Button>
+      )}
       <div aria-hidden className="flex items-center gap-3 text-caption text-fg-muted">
         <span className="h-0.5 flex-1 bg-border" />
         {m.signInOr()}

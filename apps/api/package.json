@@ -12,6 +12,7 @@
     "typecheck": "tsc && tsc -p test"
   },
   "dependencies": {
+    "@better-auth/passkey": "1.7.7",
     "@bobo/shared": "workspace:*",
     "better-auth": "^1.7.7",
     "drizzle-orm": "^0.45.4",

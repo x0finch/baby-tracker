@@ -427,5 +427,16 @@
   "napLate": "已过建议时间，宝宝可能累了",
   "napBasisHistory": "根据月龄和最近 7 天的睡眠推算，仅供参考",
   "napBasisAge": "根据月龄推算，多记录几次睡眠会更准。仅供参考",
-  "napUnknown": "记录一次睡眠后，这里会建议下次入睡的时间"
+  "napUnknown": "记录一次睡眠后，这里会建议下次入睡的时间",
+  "passkeyTitle": "通行密钥",
+  "passkeyIntro": "用面容、指纹或手机锁屏密码登录，不用输入密码。",
+  "passkeyAdd": "在这台设备上添加通行密钥",
+  "passkeyAdded": "已添加，下次可以直接用通行密钥登录",
+  "passkeyAddFailed": "添加失败，请稍后再试",
+  "passkeyNeedsFreshSignIn": "为了安全，请退出后重新登录，再添加通行密钥",
+  "passkeyRemove": "移除",
+  "passkeyRemoveLabel": "移除通行密钥 {name}",
+  "passkeyDefaultName": "Bobo · {date}",
+  "passkeySignIn": "使用通行密钥登录",
+  "passkeySignInFailed": "没有可用的通行密钥，请用其他方式登录"
 }

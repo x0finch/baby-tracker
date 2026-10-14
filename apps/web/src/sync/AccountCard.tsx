@@ -18,6 +18,7 @@ import {
 import { connectIfSignedIn } from './connection'
 import { getAccount } from './local'
 import { disablePush } from './notifications'
+import { PasskeySection } from './PasskeySection'
 import { requestSync, useSyncState } from './runner'
 import { SignInOptions } from './SignInOptions'
 
@@ -118,6 +119,7 @@ export function AccountCard() {
             </Button>
             <p className="m-0 text-center text-caption text-fg-muted">{m.signOutClearHint()}</p>
           </Sheet>
+          <PasskeySection />
           <Button variant="ghost" tone="danger" onClick={() => setDeleting(true)}>
             {m.deleteAccount()}
           </Button>

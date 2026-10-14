@@ -14,7 +14,8 @@ const GUESSES = new Set([
   '/api/auth/email-otp/reset-password',
   '/api/auth/sign-in/email-otp',
 ])
-const SIGN_UP = '/api/auth/sign-up/email'
+/** Limited per IP only: no address in the request. */
+const PER_IP = new Set(['/api/auth/sign-up/email', '/api/auth/passkey/verify-authentication'])
 
 async function emailOf(request: Request): Promise<string | undefined> {
   try {
@@ -45,7 +46,7 @@ export const authRateLimit: MiddlewareHandler<AppEnv> = async (c, next) => {
   const path = c.req.path
   const sends = SENDS_EMAIL.has(path)
   const guesses = GUESSES.has(path)
-  if (c.req.method !== 'POST' || !(sends || guesses || path === SIGN_UP)) return next()
+  if (c.req.method !== 'POST' || !(sends || guesses || PER_IP.has(path))) return next()
 
   const { AUTH_EMAIL_RATE_LIMIT: byEmail, AUTH_IP_RATE_LIMIT: byIp } = c.env
   const ip = c.req.header('cf-connecting-ip')
