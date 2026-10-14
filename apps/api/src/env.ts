@@ -1,7 +1,13 @@
 import type { EmailBinding } from './email'
 
-export interface Env {
-  DB: D1Database
+/** Bindings declared in wrangler.jsonc, typed by `wrangler types` (pnpm codegen). */
+type Declared = Cloudflare.Env
+
+/** Bindings, vars and secrets. Secrets and vars are set at deploy time, so they are listed here. */
+export interface Env
+  extends
+    Pick<Declared, 'DB'>,
+    Partial<Pick<Declared, 'AUTH_EMAIL_RATE_LIMIT' | 'AUTH_IP_RATE_LIMIT'>> {
   /** Public origin of the app, e.g. https://bobo.example.workers.dev */
   BETTER_AUTH_URL: string
   /** Secret used to sign session cookies (wrangler secret put BETTER_AUTH_SECRET). */
@@ -16,7 +22,4 @@ export interface Env {
   RESEND_API_KEY?: string
   /** Sender address, e.g. "Bobo <noreply@yourdomain.com>"; its domain must be verified. */
   EMAIL_FROM?: string
-  /** Workers rate limiters for sign-in codes, per email address and per IP (wrangler.jsonc). */
-  AUTH_EMAIL_RATE_LIMIT?: RateLimit
-  AUTH_IP_RATE_LIMIT?: RateLimit
 }
