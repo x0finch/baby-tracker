@@ -9,6 +9,7 @@ import { useBabies } from '../babies/use-babies'
 import { OTHER_CATEGORIES, type OtherCategory, categoryTone } from './category'
 import { type Category, categoryTitle } from './describe'
 import { DiaperSheetContent } from './DiaperSheet'
+import { EventIcon, categoryIconKind } from './EventIcon'
 import { FeedingSheetContent } from './FeedingSheet'
 import { useLogTogether } from './log-targets'
 import { LogTargets } from './LogTargets'
@@ -53,9 +54,10 @@ export function QuickActions({ baby, events }: { baby: Baby; events: readonly Ev
               key={category}
               tone={categoryTone[category]}
               size="lg"
-              className="min-h-24"
+              className="min-h-24 flex-col gap-1"
               onClick={() => setOpen(category)}
             >
+              <EventIcon kind={categoryIconKind(category)} variant="plain" className="size-11" />
               {categoryTitle[category]()}
             </Button>
           ))}
@@ -95,9 +97,10 @@ export function QuickActions({ baby, events }: { baby: Baby; events: readonly Ev
               variant="soft"
               tone={categoryTone[category]}
               size="lg"
-              className="min-h-20"
+              className="min-h-20 flex-col gap-1.5"
               onClick={() => setOpen(category)}
             >
+              <EventIcon kind={categoryIconKind(category)} className="size-9" />
               {categoryTitle[category]()}
             </Button>
           ))}

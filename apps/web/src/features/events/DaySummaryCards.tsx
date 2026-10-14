@@ -3,6 +3,7 @@ import type { Event } from '@bobo/shared'
 import { formatQuantity, unitLabel } from '../../lib/units'
 import { m } from '../../paraglide/messages.js'
 import { durationLabel } from './duration-label'
+import { EventIcon, type IconKind } from './EventIcon'
 import { summarizeDay } from './summary'
 
 export function DaySummaryCards({
@@ -19,9 +20,16 @@ export function DaySummaryCards({
   const s = summarizeDay(events, dayStart, dayEnd, now)
   const volumeUnit = unitLabel('volume')
   const diaperCount = s.diapers.wet + s.diapers.dirty + s.diapers.mixed
-  const cards: { title: string; value: string; details: string[]; accent: string }[] = [
+  const cards: {
+    title: string
+    icon?: IconKind
+    value: string
+    details: string[]
+    accent: string
+  }[] = [
     {
       title: m.categoryFeeding(),
+      icon: 'bottle',
       value: m.summaryFeedCount({ count: s.feedings }),
       details: [
         m.summaryBottle({ amount: formatQuantity('volume', s.bottleMl), unit: volumeUnit }),
@@ -40,6 +48,7 @@ export function DaySummaryCards({
     },
     {
       title: m.categorySleep(),
+      icon: 'sleep',
       value: m.summarySleepTotal({ duration: durationLabel(s.sleepMs) }),
       details: [
         m.summaryNaps({ count: s.naps }),
@@ -49,6 +58,7 @@ export function DaySummaryCards({
     },
     {
       title: m.categoryDiaper(),
+      icon: 'diaper',
       value: m.summaryDiaperCount({ count: diaperCount }),
       details: [m.summaryDiaperDetail(s.diapers)],
       accent: 'border-diaper/40 bg-diaper-soft text-diaper-text',
@@ -82,8 +92,11 @@ export function DaySummaryCards({
           key={card.title}
           className={`flex flex-col gap-1 rounded-xl border-2 border-b-4 p-4 ${card.accent}`}
         >
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-title font-extrabold">{card.title}</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-title font-extrabold">
+              {card.icon && <EventIcon kind={card.icon} className="size-8" />}
+              {card.title}
+            </h2>
             <span className="text-title font-extrabold text-fg">{card.value}</span>
           </div>
           {card.details.map((detail) => (
