@@ -1,6 +1,5 @@
 import {
   type FamilyMember,
-  type FamilyRole,
   type FamilySummary,
   MANAGE_ROLES,
   createFamilyRequestSchema,
@@ -12,7 +11,7 @@ import {
 import { Hono } from 'hono'
 
 import { loadAccess, toSummaries } from '../access'
-import { canManageMember } from '../members'
+import { babiesInFamily, canManageMember, roleOf } from '../members'
 import type { AppEnv } from '../types'
 
 export const familyRoutes = new Hono<AppEnv>()
@@ -88,13 +87,7 @@ export const familyRoutes = new Hono<AppEnv>()
     const { role, babyIds } = parsed.data
     if (babyIds) {
       // Only babies of this family can be granted.
-      const valid = await db
-        .prepare(
-          'select count(*) as n from babies where family_id = ? and id in (select value from json_each(?))',
-        )
-        .bind(familyId, JSON.stringify(babyIds))
-        .first<{ n: number }>()
-      if (valid?.n !== new Set(babyIds).size) return c.json({ error: 'invalid' }, 400)
+      if (!(await babiesInFamily(db, familyId, babyIds))) return c.json({ error: 'invalid' }, 400)
     }
 
     const statements: D1PreparedStatement[] = []
@@ -148,6 +141,12 @@ export const familyRoutes = new Hono<AppEnv>()
       db
         .prepare('delete from memberships where family_id = ? and user_id = ?')
         .bind(familyId, targetId),
+      // Links handed out by someone who left should not keep letting people in.
+      db
+        .prepare(
+          'update invites set revoked_at = ? where family_id = ? and created_by = ? and used_at is null and revoked_at is null',
+        )
+        .bind(Date.now(), familyId, targetId),
     ])
     return c.body(null, 204)
   })
@@ -180,18 +179,6 @@ export const familyRoutes = new Hono<AppEnv>()
     ])
     return c.body(null, 204)
   })
-
-async function roleOf(
-  db: D1Database,
-  familyId: string,
-  userId: string,
-): Promise<FamilyRole | null> {
-  const row = await db
-    .prepare('select role from memberships where family_id = ? and user_id = ?')
-    .bind(familyId, userId)
-    .first<{ role: FamilyRole }>()
-  return row?.role ?? null
-}
 
 function parseIds(json: string): string[] {
   const value: unknown = JSON.parse(json)
