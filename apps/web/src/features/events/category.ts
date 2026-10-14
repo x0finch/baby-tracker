@@ -16,9 +16,9 @@ export const categoryDot: Record<Category, string> = {
   feeding: 'bg-feeding',
   sleep: 'bg-sleep',
   diaper: 'bg-diaper',
-  pumping: 'bg-feeding',
+  pumping: 'bg-avatar-pink',
   temperature: 'bg-danger',
-  medication: 'bg-primary',
+  medication: 'bg-avatar-yellow',
   note: 'bg-fg-muted',
   growth: 'bg-primary',
 }

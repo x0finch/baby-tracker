@@ -1,5 +1,4 @@
 import type { Event } from '@bobo/shared'
-import { clsx } from 'clsx'
 import { useEffect, useState } from 'react'
 
 import { Sheet } from '../../components/ui/Sheet'
@@ -8,9 +7,9 @@ import { useLocalStore } from '../../db'
 import { formatDate, formatTime } from '../../lib/i18n'
 import { m } from '../../paraglide/messages.js'
 import { saveEvent } from './actions'
-import { categoryDot } from './category'
 import { describeEvent } from './describe'
 import { EditEventForm } from './EditEventSheet'
+import { EventIcon, iconKindOf } from './EventIcon'
 import { restoreEvent } from './records'
 import { startOfLocalDay } from './time'
 import { useNow } from './use-events'
@@ -114,10 +113,7 @@ export function TodayList({ events }: { events: readonly Event[] }) {
                   onClick={() => setEditingId(event.id)}
                   className="flex min-h-touch w-full items-center gap-3 py-3 text-left active:bg-surface"
                 >
-                  <span
-                    aria-hidden
-                    className={clsx('size-3 shrink-0 rounded-full', categoryDot[event.type])}
-                  />
+                  <EventIcon kind={iconKindOf(event)} className="size-7" />
                   <span className="w-12 shrink-0 text-fg-muted tabular-nums">{time}</span>
                   <span className="shrink-0 font-extrabold">{title}</span>
                   <span className="truncate text-fg-muted">{detail}</span>
