@@ -12,9 +12,9 @@ import { addEvent } from './actions'
 import { type Milk, parseBottle } from './bottle-input'
 import { FeedDurationField } from './FeedDurationField'
 import { MixedAmounts } from './MixedAmounts'
+import { QuickTimeField } from './QuickTimeField'
 import { logBottle, logSolids, startBreastFeed, suggestedBreastSide } from './records'
 import { toDateTimeLocal } from './time'
-import { TimeField } from './TimeField'
 import { useNow } from './use-events'
 import { validateTime } from './validation'
 
@@ -49,8 +49,8 @@ export function FeedingSheetContent({
   const [formulaPart, setFormulaPart] = useState('')
   const [food, setFood] = useState('')
   const [duration, setDuration] = useState<number | null>(null)
-  // Until the time is edited by hand, picking a duration means "just finished" and moves the
-  // start back by that much.
+  // While the time is "刚刚", picking a duration means "just finished" and moves the start back
+  // by that much; choosing another time keeps it.
   const [timeEdited, setTimeEdited] = useState(false)
   const [errors, setErrors] = useState<{ time?: string; amount?: string; food?: string }>({})
 
@@ -211,12 +211,13 @@ export function FeedingSheetContent({
             onChange={chooseDuration}
             hint={duration !== null && !timeEdited ? m.feedBackdated() : undefined}
           />
-          <TimeField
+          <QuickTimeField
             label={m.eventStart()}
             value={time}
-            onChange={(value) => {
+            onChange={(value, minutesAgo) => {
               setTime(value)
-              setTimeEdited(true)
+              // "刚刚" still means "just finished"; any other choice sets the start itself.
+              setTimeEdited(minutesAgo !== 0)
             }}
             error={errors.time}
             now={now}

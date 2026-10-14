@@ -5,9 +5,9 @@ import { useLocalStore } from '../../db'
 import { m } from '../../paraglide/messages.js'
 import { addEvent } from './actions'
 import { DEFAULT_PEE, type DiaperData, DiaperFields } from './DiaperFields'
+import { QuickTimeField } from './QuickTimeField'
 import { logDiaper } from './records'
 import { toDateTimeLocal } from './time'
-import { TimeField } from './TimeField'
 import { useNow } from './use-events'
 import { validateTime } from './validation'
 
@@ -42,7 +42,13 @@ export function DiaperSheetContent({
   return (
     <form noValidate onSubmit={submit} className="flex flex-col gap-5">
       {targets}
-      <TimeField label={m.eventTime()} value={time} onChange={setTime} error={error} now={now} />
+      <QuickTimeField
+        label={m.eventTime()}
+        value={time}
+        onChange={setTime}
+        error={error}
+        now={now}
+      />
       <DiaperFields value={diaper} onChange={setDiaper} />
       <Button type="submit" tone="diaper" size="lg" block>
         {m.actionSave()}
