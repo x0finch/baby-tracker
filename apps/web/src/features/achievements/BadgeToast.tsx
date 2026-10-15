@@ -1,8 +1,8 @@
 import type { Baby, Event } from '@bobo/shared'
-import { Link } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
 
-import { Toast, toastActionClass } from '../../components/ui/Toast'
+import { showToast } from '../../components/ui/Toast'
 import { jsonCodec, readStored, stringList, writeStored } from '../../lib/store'
 import { useNow } from '../../lib/use-now'
 import { m } from '../../paraglide/messages.js'
@@ -33,28 +33,32 @@ export function BadgeToast({ baby, events }: { baby: Baby; events: readonly Even
     return new Set(earnedIds)
   })
 
+  const navigate = useNavigate()
   const badge = earned.find((candidate) => !seen.has(candidate.id))
-  if (!badge) return null
+  const title = badge && badgeLabel(badge, baby.name).title
+  const key = earnedIds.join(',')
 
-  const dismiss = () => {
-    writeSeen(baby.id, earnedIds)
-    setSeen(new Set(earnedIds))
-  }
+  useEffect(() => {
+    if (!title) return
+    const markSeen = () => {
+      const ids = key.split(',')
+      writeSeen(baby.id, ids)
+      setSeen(new Set(ids))
+    }
+    // Stays until the user opens the badges or swipes it away; either way it is seen.
+    showToast(m.badgeNew({ title }), {
+      id: 'badge',
+      duration: Infinity,
+      onDismiss: markSeen,
+      action: {
+        label: m.badgeView(),
+        onClick: () => {
+          markSeen()
+          void navigate({ to: '/stats', search: { view: 'achievements' } })
+        },
+      },
+    })
+  }, [baby.id, key, navigate, title])
 
-  return (
-    <Toast
-      action={
-        <Link
-          to="/stats"
-          search={{ view: 'achievements' }}
-          onClick={dismiss}
-          className={toastActionClass}
-        >
-          {m.badgeView()}
-        </Link>
-      }
-    >
-      {m.badgeNew({ title: badgeLabel(badge, baby.name).title })}
-    </Toast>
-  )
+  return null
 }

@@ -1,7 +1,7 @@
 import { type Event, startOfLocalDay } from '@bobo/shared'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
-import { Toast, ToastAction } from '../../components/ui/Toast'
+import { showToast } from '../../components/ui/Toast'
 import { useLocalStore } from '../../db'
 import { formatDate, formatTime } from '../../lib/i18n'
 import { useNow } from '../../lib/use-now'
@@ -37,7 +37,6 @@ export function TodayList({ events }: { events: readonly Event[] }) {
   const store = useLocalStore()
   const now = useNow(60_000)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [deleted, setDeleted] = useState<Event | null>(null)
   const [daysBack, setDaysBack] = useState(0)
   const dayStart = startOfLocalDay(now, -daysBack)
   const dayEnd = startOfLocalDay(now, 1 - daysBack)
@@ -50,11 +49,15 @@ export function TodayList({ events }: { events: readonly Event[] }) {
         : m.dayRecords({ date: formatDate(dayStart) })
   const close = () => setEditingId(null)
 
-  useEffect(() => {
-    if (!deleted) return undefined
-    const id = setTimeout(() => setDeleted(null), UNDO_MS)
-    return () => clearTimeout(id)
-  }, [deleted])
+  const offerUndo = (deleted: Event) =>
+    showToast(m.eventDeleted(), {
+      id: 'event-deleted',
+      duration: UNDO_MS,
+      action: {
+        label: m.undo(),
+        onClick: () => saveEvent(store, restoreEvent(deleted, Date.now())),
+      },
+    })
 
   return (
     <section className="flex flex-col gap-2">
@@ -115,24 +118,7 @@ export function TodayList({ events }: { events: readonly Event[] }) {
         </ul>
       )}
 
-      <EditEventSheet eventId={editingId} events={events} onClose={close} onDeleted={setDeleted} />
-
-      {deleted && (
-        <Toast
-          action={
-            <ToastAction
-              onClick={() => {
-                saveEvent(store, restoreEvent(deleted, Date.now()))
-                setDeleted(null)
-              }}
-            >
-              {m.undo()}
-            </ToastAction>
-          }
-        >
-          {m.eventDeleted()}
-        </Toast>
-      )}
+      <EditEventSheet eventId={editingId} events={events} onClose={close} onDeleted={offerUndo} />
     </section>
   )
 }

@@ -10,6 +10,7 @@ import {
 import { type ReactNode, Suspense, useEffect } from 'react'
 
 import { TabBar } from '../components/TabBar'
+import { Toaster } from '../components/ui/Toast'
 import { UpdatePrompt } from '../components/UpdatePrompt'
 import { getLocale } from '../lib/i18n'
 import { THEME_COLORS, themeInitScript } from '../lib/theme'
@@ -83,6 +84,7 @@ function RootLayout() {
         )}
       </main>
       <TabBar />
+      <Toaster />
       {hydrated && <UpdatePrompt />}
       {hydrated && (
         <Suspense>

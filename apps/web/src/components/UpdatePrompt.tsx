@@ -1,18 +1,26 @@
-import { useLocation } from '@tanstack/react-router'
+import { useEffect } from 'react'
 
 import { useServiceWorker, useWaitingUpdate } from '../lib/pwa'
 import { m } from '../paraglide/messages.js'
-import { Toast, ToastAction } from './ui/Toast'
+import { showToast } from './ui/Toast'
 
+const UPDATE_TOAST = 'update'
+
+/** Offers a waiting update until the user applies it (or swipes the toast away). */
+export function showUpdateToast(apply: () => void) {
+  showToast(m.updateAvailable(), {
+    id: UPDATE_TOAST,
+    duration: Infinity,
+    action: { label: m.updateNow(), onClick: apply },
+  })
+}
+
+/** Registers the service worker and announces updates it finds in the background. */
 export function UpdatePrompt() {
   useServiceWorker()
   const update = useWaitingUpdate()
-  const onAboutPage = useLocation({ select: (location) => location.pathname === '/settings/about' })
-  // An update the user found with "check for updates" already has its button on that page.
-  if (!update || (update.foundBy === 'user' && onAboutPage)) return null
-  return (
-    <Toast action={<ToastAction onClick={update.apply}>{m.updateNow()}</ToastAction>}>
-      {m.updateAvailable()}
-    </Toast>
-  )
+  useEffect(() => {
+    if (update) showUpdateToast(update)
+  }, [update])
+  return null
 }
