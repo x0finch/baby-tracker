@@ -356,12 +356,13 @@ html:active-view-transition-type(tab) {
 }
 
 /*
- * Bottom sheets slide up with a little bounce and glide away when closed: the close eases
- * in and out over a third of a second, so it reads as a slide rather than a jump.
+ * Bottom sheets slide up with a little bounce and glide away when closed. A sheet is most
+ * of the screen tall, so the close takes half a second on an even ease-in-out curve: any
+ * faster and the middle of the move is too quick to see, which reads as a jump.
  */
 .sheet {
-  --sheet-close: 360ms;
-  --ease-sheet-close: cubic-bezier(0.4, 0, 0.2, 1);
+  --sheet-close: 500ms;
+  --ease-sheet-close: cubic-bezier(0.45, 0, 0.55, 1);
   translate: 0 100%;
   /* Fills the gap the overshoot opens under the sheet. */
   box-shadow: 0 4rem 0 var(--color-bg);

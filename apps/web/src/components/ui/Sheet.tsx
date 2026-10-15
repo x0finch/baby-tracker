@@ -12,7 +12,7 @@ export interface SheetProps {
 const CLOSE_DISTANCE = 96
 const CLOSE_VELOCITY = 0.6
 /** The closing slide in styles/app.css (--sheet-close), plus slack for a busy frame. */
-const CLOSE_MS = 360
+const CLOSE_MS = 500
 const CLOSE_SLACK_MS = 120
 
 const prefersReducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches
