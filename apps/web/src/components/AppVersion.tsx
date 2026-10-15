@@ -43,7 +43,12 @@ export function VersionCard() {
     // The update toast may have been swiped away earlier; show it again.
     const apply = getWaitingUpdate()
     if (result === 'ready' && apply) showUpdateToast(apply)
-    else if (result !== 'ready') showToast(resultText[result](), { id: 'update-check' })
+    else if (result !== 'ready') {
+      showToast(resultText[result](), {
+        id: 'update-check',
+        tone: result === 'latest' ? 'success' : 'error',
+      })
+    }
   }
 
   return (

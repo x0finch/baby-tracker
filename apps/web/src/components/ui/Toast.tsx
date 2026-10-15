@@ -7,7 +7,7 @@ const bottom = 'calc(var(--spacing-tab-bar) + 0.75rem + env(safe-area-inset-bott
 // As wide as `max-w-md`, the width the toasts had before.
 const toasterStyle: CSSProperties & Record<'--width', string> = { '--width': '28rem' }
 
-/** Hosts the app's toasts: one dark bar per message above the tab bar, newest in front. */
+/** Hosts the app's toasts above the tab bar; several stack, newest in front. */
 export function Toaster() {
   return (
     <SonnerToaster
@@ -18,16 +18,27 @@ export function Toaster() {
       toastOptions={{
         unstyled: true,
         classNames: {
+          // A card with a solid bottom edge, like the rest of the app; colours come per tone.
           toast:
-            'flex w-full items-center justify-between gap-3 rounded-xl bg-fg px-4 py-2 text-bg',
-          actionButton: 'flex min-h-11 shrink-0 items-center px-2 font-extrabold text-primary',
+            'flex w-full items-center justify-between gap-3 rounded-xl border-2 border-b-4 px-4 py-3 font-bold',
+          actionButton:
+            'press inline-flex min-h-touch shrink-0 items-center rounded-lg border-b-4 border-primary-edge bg-primary px-4 font-extrabold text-on-accent',
         },
       }}
     />
   )
 }
 
+export type ToastTone = 'neutral' | 'success' | 'error'
+
+const tones: Record<ToastTone, string> = {
+  neutral: 'border-border bg-bg text-fg',
+  success: 'border-primary/40 bg-primary-soft text-primary-text',
+  error: 'border-danger/40 bg-danger-soft text-danger-text',
+}
+
 export interface ToastOptions {
+  tone?: ToastTone
   /** Replaces the toast with the same id instead of stacking another. */
   id?: string
   action?: { label: string; onClick: () => void }
@@ -42,6 +53,7 @@ const DEFAULT_DURATION_MS = 4000
 export function showToast(message: string, options: ToastOptions = {}) {
   const external: ExternalToast = {
     id: options.id,
+    className: tones[options.tone ?? 'neutral'],
     duration: options.duration ?? DEFAULT_DURATION_MS,
     onDismiss: options.onDismiss,
     action: options.action,

@@ -21,6 +21,7 @@ function useRejectedToast() {
     if (rejected) {
       showToast(m.syncRejected({ count: rejected.count }), {
         id: 'sync-rejected',
+        tone: 'error',
         duration: REJECTED_TOAST_MS,
       })
     }

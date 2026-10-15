@@ -48,6 +48,7 @@ export function BadgeToast({ baby, events }: { baby: Baby; events: readonly Even
     // Stays until the user opens the badges or swipes it away; either way it is seen.
     showToast(m.badgeNew({ title }), {
       id: 'badge',
+      tone: 'success',
       duration: Infinity,
       onDismiss: markSeen,
       action: {
