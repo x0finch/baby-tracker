@@ -240,3 +240,155 @@
     @apply outline-3 outline-offset-2 outline-diaper;
   }
 }
+
+/*
+ * Motion. Short and springy so logging never waits on an animation; people who ask their
+ * system for less motion get plain fades (or nothing) instead.
+ */
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  /* A little overshoot, for things that arrive (sheets, popping chips). */
+  --ease-spring: cubic-bezier(0.2, 1.15, 0.35, 1);
+}
+
+@keyframes page-in-right {
+  from {
+    translate: 100% 0;
+  }
+}
+@keyframes page-out-right {
+  to {
+    translate: 100% 0;
+  }
+}
+@keyframes page-in-left {
+  from {
+    translate: -25% 0;
+    opacity: 0;
+  }
+}
+@keyframes page-out-left {
+  to {
+    translate: -25% 0;
+    opacity: 0;
+  }
+}
+@keyframes fade-in-up {
+  from {
+    translate: 0 0.5rem;
+    opacity: 0;
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes celebrate {
+  0% {
+    scale: 0.4;
+    rotate: -20deg;
+  }
+  45% {
+    scale: 1.25;
+    rotate: 12deg;
+  }
+  70% {
+    rotate: -6deg;
+  }
+  100% {
+    scale: 1;
+    rotate: 0deg;
+  }
+}
+
+@utility animate-celebrate {
+  animation: celebrate 700ms var(--ease-out) 150ms both;
+}
+
+/* Page changes (router view transitions): only the page moves, the tab bar stays put. */
+::view-transition-old(root),
+::view-transition-new(root),
+::view-transition-group(page) {
+  animation: none;
+}
+html:active-view-transition-type(forward) {
+  &::view-transition-old(page) {
+    animation: 280ms var(--ease-out) both page-out-left;
+  }
+  &::view-transition-new(page) {
+    animation: 280ms var(--ease-out) both page-in-right;
+  }
+}
+html:active-view-transition-type(back) {
+  &::view-transition-old(page) {
+    z-index: 1;
+    animation: 280ms var(--ease-out) both page-out-right;
+  }
+  &::view-transition-new(page) {
+    animation: 280ms var(--ease-out) both page-in-left;
+  }
+}
+html:active-view-transition-type(tab) {
+  &::view-transition-old(page) {
+    animation: 120ms ease-out both fade-out;
+  }
+  &::view-transition-new(page) {
+    animation: 220ms var(--ease-out) 60ms both fade-in-up;
+  }
+}
+
+/* Bottom sheets slide up with a little bounce and drop away when closed. */
+.sheet {
+  translate: 0 100%;
+  /* Fills the gap the overshoot opens under the sheet. */
+  box-shadow: 0 4rem 0 var(--color-bg);
+  transition:
+    translate 220ms ease-in,
+    display 220ms allow-discrete,
+    overlay 220ms allow-discrete;
+
+  &[open] {
+    translate: 0 0;
+    transition-duration: 380ms;
+    transition-timing-function: var(--ease-spring);
+  }
+
+  &::backdrop {
+    background-color: rgb(0 0 0 / 0);
+    transition:
+      background-color 220ms ease-out,
+      display 220ms allow-discrete,
+      overlay 220ms allow-discrete;
+  }
+  &[open]::backdrop {
+    background-color: rgb(0 0 0 / 0.4);
+  }
+}
+@starting-style {
+  .sheet[open] {
+    translate: 0 100%;
+  }
+  .sheet[open]::backdrop {
+    background-color: rgb(0 0 0 / 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:active-view-transition-type(forward, back, tab) {
+    &::view-transition-old(page) {
+      animation: 150ms ease-out both fade-out;
+    }
+    &::view-transition-new(page) {
+      animation: 150ms ease-out reverse both fade-out;
+    }
+  }
+  .sheet,
+  .sheet[open] {
+    translate: 0 0;
+    transition-duration: 0s;
+  }
+  .animate-celebrate {
+    animation: none;
+  }
+}

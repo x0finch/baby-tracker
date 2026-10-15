@@ -1,4 +1,5 @@
 import { type Event, startOfLocalDay } from '@bobo/shared'
+import { AnimatePresence, m as motion } from 'motion/react'
 import { useState } from 'react'
 
 import { showToast } from '../../components/ui/Toast'
@@ -13,6 +14,13 @@ import { EventIcon, eventIconProps } from './EventIcon'
 import { restoreEvent } from './records'
 
 const UNDO_MS = 6000
+
+/** Days slide in from the side the user moved towards (the direction comes in `custom`). */
+const daySlide = {
+  enter: (direction: number) => ({ opacity: 0, x: direction * 32 }),
+  center: { opacity: 1, x: 0 },
+  exit: (direction: number) => ({ opacity: 0, x: direction * -32, transition: { duration: 0.1 } }),
+}
 
 function Chevron({ direction }: { direction: 'left' | 'right' }) {
   return (
@@ -38,6 +46,12 @@ export function TodayList({ events }: { events: readonly Event[] }) {
   const now = useNow(60_000)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [daysBack, setDaysBack] = useState(0)
+  // Which way the last day change went, so the list slides in from that side.
+  const [direction, setDirection] = useState<1 | -1>(1)
+  const showDay = (days: number) => {
+    setDirection(days > daysBack ? -1 : 1)
+    setDaysBack(days)
+  }
   const dayStart = startOfLocalDay(now, -daysBack)
   const dayEnd = startOfLocalDay(now, 1 - daysBack)
   const today = events.filter((event) => event.startAt >= dayStart && event.startAt < dayEnd)
@@ -67,7 +81,7 @@ export function TodayList({ events }: { events: readonly Event[] }) {
           <button
             type="button"
             aria-label={m.dayPrev()}
-            onClick={() => setDaysBack((days) => days + 1)}
+            onClick={() => showDay(daysBack + 1)}
             className="flex size-touch items-center justify-center rounded-full text-fg-muted active:bg-surface"
           >
             <Chevron direction="left" />
@@ -76,7 +90,7 @@ export function TodayList({ events }: { events: readonly Event[] }) {
             type="button"
             aria-label={m.dayNext()}
             disabled={daysBack === 0}
-            onClick={() => setDaysBack((days) => Math.max(0, days - 1))}
+            onClick={() => showDay(Math.max(0, daysBack - 1))}
             className="flex size-touch items-center justify-center rounded-full text-fg-muted active:bg-surface disabled:opacity-30"
           >
             <Chevron direction="right" />
@@ -86,37 +100,65 @@ export function TodayList({ events }: { events: readonly Event[] }) {
       {daysBack > 0 && (
         <button
           type="button"
-          onClick={() => setDaysBack(0)}
+          onClick={() => showDay(0)}
           className="self-start font-bold text-primary-text"
         >
           {m.backToToday()}
         </button>
       )}
-      {today.length === 0 ? (
-        <p className="text-fg-muted">{daysBack === 0 ? m.todayEmpty() : m.dayEmpty()}</p>
-      ) : (
-        <ul className="m-0 flex list-none flex-col p-0">
-          {today.map((event) => {
-            const { title, detail } = describeEvent(event, now)
-            const time = formatTime(event.startAt)
-            return (
-              <li key={event.id} className="border-b-2 border-border">
-                <button
-                  type="button"
-                  aria-label={m.editEventLabel({ time, title })}
-                  onClick={() => setEditingId(event.id)}
-                  className="flex min-h-touch w-full items-center gap-3 py-3 text-left active:bg-surface"
-                >
-                  <EventIcon {...eventIconProps(event)} className="size-7" />
-                  <span className="w-12 shrink-0 text-fg-muted tabular-nums">{time}</span>
-                  <span className="shrink-0 font-extrabold">{title}</span>
-                  <span className="truncate text-fg-muted">{detail}</span>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-      )}
+      <AnimatePresence initial={false} mode="wait" custom={direction}>
+        <motion.div
+          key={daysBack}
+          custom={direction}
+          variants={daySlide}
+          initial="enter"
+          animate="center"
+          exit="exit"
+        >
+          {today.length === 0 && (
+            <p className="text-fg-muted">{daysBack === 0 ? m.todayEmpty() : m.dayEmpty()}</p>
+          )}
+          {/* Always mounted, so the first record of the day animates in like the rest. */}
+          <ul className="m-0 flex list-none flex-col p-0">
+            {/* New records slide in and glow briefly; deleted ones fold away. */}
+            <AnimatePresence initial={false}>
+              {today.map((event) => {
+                const { title, detail } = describeEvent(event, now)
+                const time = formatTime(event.startAt)
+                return (
+                  <motion.li
+                    key={event.id}
+                    layout="position"
+                    initial={{ opacity: 0, y: -12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="relative overflow-hidden border-b-2 border-border"
+                  >
+                    <motion.span
+                      aria-hidden
+                      className="pointer-events-none absolute inset-0 bg-primary-soft"
+                      initial={{ opacity: 1 }}
+                      animate={{ opacity: 0 }}
+                      transition={{ duration: 1.2, delay: 0.3, ease: 'easeOut' }}
+                    />
+                    <button
+                      type="button"
+                      aria-label={m.editEventLabel({ time, title })}
+                      onClick={() => setEditingId(event.id)}
+                      className="relative flex min-h-touch w-full items-center gap-3 py-3 text-left active:bg-surface"
+                    >
+                      <EventIcon {...eventIconProps(event)} className="size-7" />
+                      <span className="w-12 shrink-0 text-fg-muted tabular-nums">{time}</span>
+                      <span className="shrink-0 font-extrabold">{title}</span>
+                      <span className="truncate text-fg-muted">{detail}</span>
+                    </button>
+                  </motion.li>
+                )
+              })}
+            </AnimatePresence>
+          </ul>
+        </motion.div>
+      </AnimatePresence>
 
       <EditEventSheet eventId={editingId} events={events} onClose={close} onDeleted={offerUndo} />
     </section>

@@ -1,6 +1,8 @@
 import { clsx } from 'clsx'
 import type { ButtonHTMLAttributes } from 'react'
 
+import { popElement } from '../../lib/motion'
+
 export type ChipTone = 'primary' | 'feeding' | 'diaper'
 
 const pressedTones: Record<ChipTone, { box: string; text: string }> = {
@@ -23,12 +25,17 @@ export function ToggleChip({
   tintText = true,
   type = 'button',
   className,
+  onClick,
   ...props
 }: ToggleChipProps) {
   return (
     <button
       type={type}
       aria-pressed={pressed}
+      onClick={(event) => {
+        if (!pressed) popElement(event.currentTarget)
+        onClick?.(event)
+      }}
       className={clsx(
         'press border-2 border-b-4',
         pressed ? pressedTones[tone].box : 'border-border bg-surface',

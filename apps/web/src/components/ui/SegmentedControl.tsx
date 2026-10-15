@@ -1,4 +1,5 @@
 import { clsx } from 'clsx'
+import { m as motion } from 'motion/react'
 import { useId } from 'react'
 
 export interface SegmentedOption<T extends string> {
@@ -42,11 +43,19 @@ export function SegmentedControl<T extends string>({
           <label
             key={option.value}
             className={clsx(
-              'flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-md font-extrabold transition-colors',
-              'has-checked:bg-bg has-checked:text-diaper-text has-checked:shadow-segment',
+              'relative flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-md font-extrabold transition-colors',
+              'has-checked:text-diaper-text',
               'text-fg-muted has-focus-visible:outline-3 has-focus-visible:outline-diaper',
             )}
           >
+            {option.value === value && (
+              // One highlight per control, sliding to the chosen option.
+              <motion.span
+                aria-hidden
+                layoutId={name}
+                className="absolute inset-0 rounded-md bg-bg shadow-segment"
+              />
+            )}
             <input
               type="radio"
               name={name}
@@ -55,7 +64,7 @@ export function SegmentedControl<T extends string>({
               onChange={() => onChange(option.value)}
               className="sr-only"
             />
-            {option.label}
+            <span className="relative">{option.label}</span>
           </label>
         ))}
       </div>

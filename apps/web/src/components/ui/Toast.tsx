@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { type ExternalToast, Toaster as SonnerToaster, toast } from 'sonner'
 
 // Above the tab bar, as `bottom-above-tab-bar`; sonner positions the stack itself.
@@ -21,6 +21,8 @@ export function Toaster() {
           // A card with a solid bottom edge, like the rest of the app; colours come per tone.
           toast:
             'flex w-full items-center justify-between gap-3 rounded-xl border-2 border-b-4 px-4 py-3 font-bold',
+          icon: 'shrink-0',
+          content: 'flex-1',
           actionButton:
             'press inline-flex min-h-touch shrink-0 items-center rounded-lg border-b-4 border-primary-edge bg-primary px-4 font-extrabold text-on-accent',
         },
@@ -39,6 +41,8 @@ const tones: Record<ToastTone, string> = {
 
 export interface ToastOptions {
   tone?: ToastTone
+  /** Shown before the message. */
+  icon?: ReactNode
   /** Replaces the toast with the same id instead of stacking another. */
   id?: string
   action?: { label: string; onClick: () => void }
@@ -54,6 +58,7 @@ export function showToast(message: string, options: ToastOptions = {}) {
   const external: ExternalToast = {
     id: options.id,
     className: tones[options.tone ?? 'neutral'],
+    icon: options.icon,
     duration: options.duration ?? DEFAULT_DURATION_MS,
     onDismiss: options.onDismiss,
     action: options.action,

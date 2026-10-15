@@ -9,6 +9,8 @@ import { m } from '../../paraglide/messages.js'
 import { computeBadges } from './achievements'
 import { badgeLabel } from './badge-labels'
 
+const MEDAL = '🏅'
+
 const seenKey = (babyId: string) => `bobo.seenBadges.${babyId}`
 const idList = jsonCodec(stringList)
 
@@ -49,6 +51,11 @@ export function BadgeToast({ baby, events }: { baby: Baby; events: readonly Even
     showToast(m.badgeNew({ title }), {
       id: 'badge',
       tone: 'success',
+      icon: (
+        <span aria-hidden className="inline-block animate-celebrate text-2xl">
+          {MEDAL}
+        </span>
+      ),
       duration: Infinity,
       onDismiss: markSeen,
       action: {

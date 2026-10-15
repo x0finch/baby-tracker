@@ -1,5 +1,5 @@
 import { clsx } from 'clsx'
-import { type ReactNode, useEffect, useRef } from 'react'
+import { type PointerEvent, type ReactNode, useEffect, useRef } from 'react'
 
 export interface SheetProps {
   open: boolean
@@ -7,6 +7,10 @@ export interface SheetProps {
   title: string
   children: ReactNode
 }
+
+/** Pulled down this far (px), or flicked down this fast (px/ms), the sheet closes. */
+const CLOSE_DISTANCE = 96
+const CLOSE_VELOCITY = 0.6
 
 /**
  * Bottom sheet built on the native <dialog> element, which provides focus trapping,
@@ -18,12 +22,15 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
   // parent closing the sheet, which must not call onClose again (e.g. when one sheet
   // hands over to another).
   const openRef = useRef(open)
+  const drag = useRef<{ startY: number; startTime: number; dy: number } | null>(null)
 
   useEffect(() => {
     openRef.current = open
     const dialog = ref.current
     if (!dialog) return
     if (open && !dialog.open) {
+      // A sheet dragged closed last time keeps its inline position until it opens again.
+      dialog.style.translate = ''
       dialog.showModal()
       // A reused sheet starts at the top, not where its previous content was scrolled to.
       dialog.scrollTop = 0
@@ -32,6 +39,34 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
     }
     if (!open && dialog.open) dialog.close()
   }, [open])
+
+  // Dragging the header pulls the sheet down; far or fast enough, it closes.
+  const startDrag = (event: PointerEvent<HTMLDivElement>) => {
+    drag.current = { startY: event.clientY, startTime: event.timeStamp, dy: 0 }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+  const moveDrag = (event: PointerEvent<HTMLDivElement>) => {
+    const dialog = ref.current
+    if (!drag.current || !dialog) return
+    drag.current.dy = Math.max(0, event.clientY - drag.current.startY)
+    dialog.style.transition = 'none'
+    dialog.style.translate = `0 ${drag.current.dy}px`
+  }
+  const endDrag = (event: PointerEvent<HTMLDivElement>) => {
+    const dialog = ref.current
+    const state = drag.current
+    drag.current = null
+    if (!dialog || !state) return
+    dialog.style.transition = ''
+    const velocity = state.dy / Math.max(1, event.timeStamp - state.startTime)
+    if (state.dy > CLOSE_DISTANCE || (state.dy > 24 && velocity > CLOSE_VELOCITY)) {
+      // Carry on down from where the finger let go.
+      dialog.style.translate = '0 100%'
+      onClose()
+    } else {
+      dialog.style.translate = ''
+    }
+  }
 
   return (
     // Backdrop click is a pointer-only convenience; keyboard users close with Escape,
@@ -50,13 +85,20 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
       }}
       className={clsx(
         'fixed inset-x-0 top-auto bottom-0 m-0 mx-auto w-full max-w-app max-h-[85dvh]',
-        'rounded-t-xl border-2 border-b-0 border-border bg-bg p-0 text-fg focus:outline-none',
-        'backdrop:bg-black/40',
+        'sheet rounded-t-xl border-2 border-b-0 border-border bg-bg p-0 text-fg focus:outline-none',
       )}
     >
       <div className="flex flex-col gap-4 px-4 pt-3 pb-safe-4">
-        <div aria-hidden className="mx-auto h-1.5 w-10 rounded-full bg-border" />
-        <h2 className="text-title font-extrabold">{title}</h2>
+        <div
+          className="-mx-4 -mt-3 flex touch-none flex-col gap-4 px-4 pt-3"
+          onPointerDown={startDrag}
+          onPointerMove={moveDrag}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+        >
+          <div aria-hidden className="mx-auto h-1.5 w-10 rounded-full bg-border" />
+          <h2 className="text-title font-extrabold">{title}</h2>
+        </div>
         {children}
       </div>
     </dialog>

@@ -1,5 +1,6 @@
 import { type Event, isRunning } from '@bobo/shared'
 
+import { RollingText } from '../../components/ui/RollingText'
 import { useNow } from '../../lib/use-now'
 import { m } from '../../paraglide/messages.js'
 import { durationLabel } from './duration-label'
@@ -30,10 +31,12 @@ export function SinceLast({ events }: { events: readonly Event[] }) {
             {item.label}
           </dt>
           <dd className="m-0 font-extrabold">
-            {item.override ??
-              (item.at === undefined
-                ? m.neverLogged()
-                : m.ago({ duration: durationLabel(now - item.at) }))}
+            <RollingText>
+              {item.override ??
+                (item.at === undefined
+                  ? m.neverLogged()
+                  : m.ago({ duration: durationLabel(now - item.at) }))}
+            </RollingText>
           </dd>
         </div>
       ))}
