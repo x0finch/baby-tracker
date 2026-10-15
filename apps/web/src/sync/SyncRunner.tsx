@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 
 import { Button } from '../components/ui/Button'
 import { Sheet } from '../components/ui/Sheet'
-import { Toast } from '../components/ui/Toast'
+import { showToast } from '../components/ui/Toast'
 import { useLocalStore } from '../db'
 import {
   connectIfSignedIn,
@@ -15,22 +15,24 @@ import { startSync, useSyncState } from './runner'
 const REJECTED_TOAST_MS = 5000
 
 /** Tells the user when the server refused changes (e.g. their role changed while offline). */
-function RejectedToast() {
+function useRejectedToast() {
   const { rejected } = useSyncState()
-  const [hiddenAt, setHiddenAt] = useState<number | null>(null)
   useEffect(() => {
-    if (!rejected) return undefined
-    const id = setTimeout(() => setHiddenAt(rejected.at), REJECTED_TOAST_MS)
-    return () => clearTimeout(id)
+    if (rejected) {
+      showToast(m.syncRejected({ count: rejected.count }), {
+        id: 'sync-rejected',
+        tone: 'error',
+        duration: REJECTED_TOAST_MS,
+      })
+    }
   }, [rejected])
-  if (!rejected || hiddenAt === rejected.at) return null
-  return <Toast>{m.syncRejected({ count: rejected.count })}</Toast>
 }
 
 /** Mounts background sync and links a fresh sign-in to this device. */
 export function SyncRunner() {
   const store = useLocalStore()
   const choice = useClaimChoice()
+  useRejectedToast()
 
   useEffect(() => {
     const stop = startSync(store)
@@ -43,7 +45,6 @@ export function SyncRunner() {
 
   return (
     <>
-      <RejectedToast />
       {/* Closing without choosing keeps the device unlinked; it asks again on the next start. */}
       <Sheet open={choice !== null} onClose={() => undefined} title={m.claimTitle()}>
         {choice && (

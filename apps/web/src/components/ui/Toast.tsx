@@ -1,18 +1,64 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { CSSProperties } from 'react'
+import { type ExternalToast, Toaster as SonnerToaster, toast } from 'sonner'
 
-/** Classes for a toast's action, for links that act as one. */
-export const toastActionClass = 'flex min-h-11 items-center px-2 font-extrabold text-primary'
+// Above the tab bar, as `bottom-above-tab-bar`; sonner positions the stack itself.
+const bottom = 'calc(var(--spacing-tab-bar) + 0.75rem + env(safe-area-inset-bottom))'
 
-export function ToastAction(props: ButtonHTMLAttributes<HTMLButtonElement>) {
-  return <button type="button" className={toastActionClass} {...props} />
-}
+// As wide as `max-w-md`, the width the toasts had before.
+const toasterStyle: CSSProperties & Record<'--width', string> = { '--width': '28rem' }
 
-/** Bottom toast above the tab bar, announced politely to screen readers (<output> has the status role). */
-export function Toast({ children, action }: { children: ReactNode; action?: ReactNode }) {
+/** Hosts the app's toasts above the tab bar; several stack, newest in front. */
+export function Toaster() {
   return (
-    <output className="fixed inset-x-4 bottom-above-tab-bar z-10 mx-auto flex max-w-md items-center justify-between gap-3 rounded-xl bg-fg px-4 py-2 text-bg">
-      <span>{children}</span>
-      {action}
-    </output>
+    <SonnerToaster
+      position="bottom-center"
+      offset={{ bottom }}
+      mobileOffset={{ bottom, left: '1rem', right: '1rem' }}
+      style={toasterStyle}
+      toastOptions={{
+        unstyled: true,
+        classNames: {
+          // A card with a solid bottom edge, like the rest of the app; colours come per tone.
+          toast:
+            'flex w-full items-center justify-between gap-3 rounded-xl border-2 border-b-4 px-4 py-3 font-bold',
+          actionButton:
+            'press inline-flex min-h-touch shrink-0 items-center rounded-lg border-b-4 border-primary-edge bg-primary px-4 font-extrabold text-on-accent',
+        },
+      }}
+    />
   )
 }
+
+export type ToastTone = 'neutral' | 'success' | 'error'
+
+const tones: Record<ToastTone, string> = {
+  neutral: 'border-border bg-bg text-fg',
+  success: 'border-primary/40 bg-primary-soft text-primary-text',
+  error: 'border-danger/40 bg-danger-soft text-danger-text',
+}
+
+export interface ToastOptions {
+  tone?: ToastTone
+  /** Replaces the toast with the same id instead of stacking another. */
+  id?: string
+  action?: { label: string; onClick: () => void }
+  /** Milliseconds on screen; `Infinity` keeps it until acted on or swiped away. */
+  duration?: number
+  onDismiss?: () => void
+}
+
+const DEFAULT_DURATION_MS = 4000
+
+/** Shows a toast; screen readers hear it through sonner's live region. */
+export function showToast(message: string, options: ToastOptions = {}) {
+  const external: ExternalToast = {
+    id: options.id,
+    className: tones[options.tone ?? 'neutral'],
+    duration: options.duration ?? DEFAULT_DURATION_MS,
+    onDismiss: options.onDismiss,
+    action: options.action,
+  }
+  return toast(message, external)
+}
+
+export const dismissToast = (id: string) => toast.dismiss(id)

@@ -1,10 +1,18 @@
 import { useState } from 'react'
 
 import { formatDate } from '../lib/i18n'
-import { type UpdateCheck, canUpdate, checkForUpdateNow, useWaitingUpdate } from '../lib/pwa'
+import {
+  type UpdateCheck,
+  canUpdate,
+  checkForUpdateNow,
+  getWaitingUpdate,
+  useWaitingUpdate,
+} from '../lib/pwa'
 import { m } from '../paraglide/messages.js'
 import { Button } from './ui/Button'
 import { Card } from './ui/Card'
+import { showToast } from './ui/Toast'
+import { showUpdateToast } from './UpdatePrompt'
 
 /** "版本 2df2dce · 10月14日" */
 export const versionLabel = () =>
@@ -24,52 +32,38 @@ const resultText: Record<Exclude<UpdateCheck, 'ready'>, () => string> = {
   failed: m.updateFailed,
 }
 
-/** The running version, with a button to look for a newer one and apply it. */
+/** The running version, with a button to look for a newer one; the result shows as a toast. */
 export function VersionCard() {
-  const update = useWaitingUpdate()
   const [checking, setChecking] = useState(false)
-  const [result, setResult] = useState<UpdateCheck>()
 
   const check = async () => {
     setChecking(true)
-    setResult(undefined)
-    setResult(await checkForUpdateNow())
+    const result = await checkForUpdateNow()
     setChecking(false)
+    // The update toast may have been swiped away earlier; show it again.
+    const apply = getWaitingUpdate()
+    if (result === 'ready' && apply) showUpdateToast(apply)
+    else if (result !== 'ready') {
+      showToast(resultText[result](), {
+        id: 'update-check',
+        tone: result === 'latest' ? 'success' : 'error',
+      })
+    }
   }
-  const status = update
-    ? m.updateReady()
-    : checking
-      ? m.updateChecking()
-      : result && result !== 'ready'
-        ? resultText[result]()
-        : undefined
 
   return (
     <Card className="flex flex-col gap-3">
       <p className="m-0 font-bold">{versionLabel()}</p>
       {canUpdate() && (
-        <>
-          {status && (
-            <p className="m-0 text-fg-muted" aria-live="polite">
-              {status}
-            </p>
-          )}
-          {update ? (
-            <Button block onClick={update.apply}>
-              {m.updateApply()}
-            </Button>
-          ) : (
-            <Button
-              variant="soft"
-              tone="primary"
-              block
-              disabled={checking}
-              onClick={() => void check()}
-            >
-              {m.updateCheck()}
-            </Button>
-          )}
-        </>
+        <Button
+          variant="soft"
+          tone="primary"
+          block
+          disabled={checking}
+          onClick={() => void check()}
+        >
+          {checking ? m.updateChecking() : m.updateCheck()}
+        </Button>
       )}
     </Card>
   )
