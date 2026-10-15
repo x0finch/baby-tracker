@@ -11,6 +11,10 @@ export interface SheetProps {
 /** Pulled down this far (px), or flicked down this fast (px/ms), the sheet closes. */
 const CLOSE_DISTANCE = 96
 const CLOSE_VELOCITY = 0.6
+/** Matches the closing slide in styles/app.css. */
+const CLOSE_MS = 220
+
+const prefersReducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches
 
 /**
  * Bottom sheet built on the native <dialog> element, which provides focus trapping,
@@ -27,8 +31,11 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
   useEffect(() => {
     openRef.current = open
     const dialog = ref.current
-    if (!dialog) return
-    if (open && !dialog.open) {
+    if (!dialog) return undefined
+    if (open) {
+      // Opening again mid-slide just stops the slide.
+      delete dialog.dataset.closing
+      if (dialog.open) return undefined
       // A sheet dragged closed last time keeps its inline position until it opens again.
       dialog.style.translate = ''
       dialog.showModal()
@@ -36,8 +43,21 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
       dialog.scrollTop = 0
       // showModal() focuses the first input, which would pop the keyboard on phones.
       dialog.focus()
+      return undefined
     }
-    if (!open && dialog.open) dialog.close()
+    if (!dialog.open) return undefined
+    // Slide down first, then close: every way of closing (backdrop, Escape, a drag, the
+    // parent) looks the same, including in browsers without exit transitions (Safari).
+    if (prefersReducedMotion()) {
+      dialog.close()
+      return undefined
+    }
+    dialog.dataset.closing = ''
+    const timer = setTimeout(() => {
+      delete dialog.dataset.closing
+      dialog.close()
+    }, CLOSE_MS)
+    return () => clearTimeout(timer)
   }, [open])
 
   // Dragging the header pulls the sheet down; far or fast enough, it closes.
@@ -76,6 +96,11 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
       ref={ref}
       tabIndex={-1}
       aria-label={title}
+      onCancel={(event) => {
+        // Escape: let the sheet slide away like any other close.
+        event.preventDefault()
+        onClose()
+      }}
       onClose={() => {
         if (openRef.current) onClose()
       }}

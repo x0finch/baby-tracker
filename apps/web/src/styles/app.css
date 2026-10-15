@@ -381,6 +381,16 @@ html:active-view-transition-type(tab) {
   &[open]::backdrop {
     background-color: rgb(0 0 0 / 0.4);
   }
+
+  /* Set by Sheet while it slides away before closing (works without exit transitions). */
+  &[open][data-closing] {
+    translate: 0 100%;
+    transition-duration: 220ms;
+    transition-timing-function: ease-in;
+  }
+  &[open][data-closing]::backdrop {
+    background-color: rgb(0 0 0 / 0);
+  }
 }
 @starting-style {
   .sheet[open] {
