@@ -306,11 +306,28 @@
   animation: celebrate 700ms var(--ease-out) 150ms both;
 }
 
-/* Page changes (router view transitions): only the page moves, the tab bar stays put. */
+/*
+ * Page changes (router view transitions): only the page moves. The tab bar and toasts have
+ * their own layers, painted above the page and left still, so page content never shows
+ * through them mid-animation.
+ */
 ::view-transition-old(root),
 ::view-transition-new(root),
-::view-transition-group(page) {
+::view-transition-group(page),
+::view-transition-group(tab-bar),
+::view-transition-old(tab-bar),
+::view-transition-new(tab-bar),
+::view-transition-group(*.toast),
+::view-transition-new(*.toast) {
   animation: none;
+}
+::view-transition-old(tab-bar),
+::view-transition-old(*.toast) {
+  display: none;
+}
+::view-transition-group(tab-bar),
+::view-transition-group(*.toast) {
+  z-index: 1;
 }
 html:active-view-transition-type(forward) {
   &::view-transition-old(page) {
