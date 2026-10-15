@@ -55,7 +55,7 @@ export function VersionCard() {
             </p>
           )}
           {update ? (
-            <Button block onClick={update}>
+            <Button block onClick={update.apply}>
               {m.updateApply()}
             </Button>
           ) : (

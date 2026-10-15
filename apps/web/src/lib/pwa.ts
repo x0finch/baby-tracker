@@ -54,18 +54,32 @@ const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000
 /** How long a manual check waits for a found update to finish downloading. */
 const INSTALL_TIMEOUT_MS = 30_000
 
-/** Applies the waiting update, once one has been found. */
-const waitingUpdate = createStore<(() => void) | null>(null)
+/** A found update and how it was found; the toast stays out of the way of a manual check. */
+interface WaitingUpdate {
+  worker: ServiceWorker
+  foundBy: 'background' | 'user'
+  apply: () => void
+}
+
+const waitingUpdate = createStore<WaitingUpdate | null>(null)
 // A worker also takes control on the very first visit (clients.claim); reloading then
 // would interrupt onboarding, so only reload after the user asked for the update.
 let accepted = false
+// Workbox reports the worker a manual check finds too, usually before the check returns.
+let userChecking = false
 
-function offerUpdate(worker: ServiceWorker) {
-  waitingUpdate.set(() => {
-    accepted = true
-    // The generated worker skips waiting on this message. Workers take no target origin.
-    // oxlint-disable-next-line unicorn/require-post-message-target-origin
-    worker.postMessage({ type: 'SKIP_WAITING' })
+function offerUpdate(worker: ServiceWorker, foundBy: WaitingUpdate['foundBy']) {
+  const current = waitingUpdate.get()
+  if (current?.worker === worker && current.foundBy === 'user') return
+  waitingUpdate.set({
+    worker,
+    foundBy: userChecking ? 'user' : foundBy,
+    apply: () => {
+      accepted = true
+      // The generated worker skips waiting on this message. Workers take no target origin.
+      // oxlint-disable-next-line unicorn/require-post-message-target-origin
+      worker.postMessage({ type: 'SKIP_WAITING' })
+    },
   })
 }
 
@@ -102,20 +116,23 @@ export const canUpdate = () => !import.meta.env.DEV && 'serviceWorker' in naviga
 /** Looks for a new version now, for the "check for updates" button. */
 export async function checkForUpdateNow(): Promise<UpdateCheck> {
   if (!navigator.onLine) return 'offline'
+  userChecking = true
   try {
     const registration = await navigator.serviceWorker.getRegistration()
     if (!registration) return 'failed'
     await registration.update()
     if (registration.installing) await installed(registration.installing)
     if (!registration.waiting) return 'latest'
-    offerUpdate(registration.waiting)
+    offerUpdate(registration.waiting, 'user')
     return 'ready'
   } catch {
     return navigator.onLine ? 'failed' : 'offline'
+  } finally {
+    userChecking = false
   }
 }
 
-/** Applies a waiting update (reloading the app), or null while there is none. */
+/** The waiting update, or null while there is none. */
 export const useWaitingUpdate = () => useStore(waitingUpdate)
 
 /**
@@ -133,7 +150,7 @@ export function useServiceWorker() {
       if (cancelled) return
       const wb = new Workbox('/sw.js')
       wb.addEventListener('waiting', (event) => {
-        if (!cancelled && event.sw) offerUpdate(event.sw)
+        if (!cancelled && event.sw) offerUpdate(event.sw, 'background')
       })
       // Reload once the new worker takes over after the user accepted the update.
       wb.addEventListener('controlling', () => {
