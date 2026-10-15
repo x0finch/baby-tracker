@@ -8,6 +8,7 @@ export default defineConfig({
   define: {
     // Shown in settings so a report can name the build; CI builds from a commit.
     'import.meta.env.APP_BUILD': JSON.stringify(process.env.GITHUB_SHA?.slice(0, 7) ?? 'dev'),
+    'import.meta.env.APP_BUILT_AT': JSON.stringify(Date.now()),
   },
   server: {
     // In development the API runs in `wrangler dev`; in production both share one origin.

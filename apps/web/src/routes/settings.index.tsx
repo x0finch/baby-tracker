@@ -1,5 +1,6 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 
+import { useVersionSummary } from '../components/AppVersion'
 import { useDisplaySummary } from '../components/DisplaySettings'
 import { PageHeader } from '../components/PageHeader'
 import { SettingsGroup, SettingsRow } from '../components/SettingsLayout'
@@ -69,11 +70,7 @@ function SettingsIndex() {
           title={m.settingsDisplay()}
           summary={useDisplaySummary()}
         />
-        <SettingsRow
-          to="/settings/about"
-          title={m.settingsAbout()}
-          summary={m.settingsVersion({ build: import.meta.env.APP_BUILD })}
-        />
+        <SettingsRow to="/settings/about" title={m.settingsAbout()} summary={useVersionSummary()} />
       </SettingsGroup>
       {import.meta.env.DEV && (
         <Link to="/ui" className="font-bold text-diaper-text underline">

@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 
+import { VersionCard } from '../components/AppVersion'
 import { InstallCard } from '../components/InstallCard'
 import { SettingsPage } from '../components/SettingsLayout'
 import { StorageStatus } from '../components/StorageStatus'
@@ -14,11 +15,7 @@ export const Route = createFileRoute('/settings/about')({
         <h2 className="text-title font-extrabold">{m.storageTitle()}</h2>
         <StorageStatus />
       </Card>
-      <Card>
-        <p className="m-0 text-fg-muted">
-          {m.settingsVersion({ build: import.meta.env.APP_BUILD })}
-        </p>
-      </Card>
+      <VersionCard />
     </SettingsPage>
   ),
 })
