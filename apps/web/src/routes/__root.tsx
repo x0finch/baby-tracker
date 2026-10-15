@@ -13,6 +13,7 @@ import { TabBar } from '../components/TabBar'
 import { Toaster } from '../components/ui/Toast'
 import { UpdatePrompt } from '../components/UpdatePrompt'
 import { getLocale } from '../lib/i18n'
+import { MotionProvider } from '../lib/motion'
 import { THEME_COLORS, themeInitScript } from '../lib/theme'
 import { watchTheme } from '../lib/use-theme'
 import { SyncRunner } from '../sync/SyncRunner'
@@ -74,23 +75,25 @@ function RootLayout() {
   useEffect(watchTheme, [])
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-app flex-col">
-      <main className="flex-1 pt-safe-4 pr-safe-4 pb-above-tab-bar pl-safe-4">
-        {/* Pages suspend while the local store opens (a few ms on startup). */}
+    <MotionProvider>
+      <div className="mx-auto flex min-h-dvh max-w-app flex-col">
+        <main className="flex-1 [view-transition-name:page] pt-safe-4 pr-safe-4 pb-above-tab-bar pl-safe-4">
+          {/* Pages suspend while the local store opens (a few ms on startup). */}
+          {hydrated && (
+            <Suspense>
+              <Outlet />
+            </Suspense>
+          )}
+        </main>
+        <TabBar />
+        <Toaster />
+        {hydrated && <UpdatePrompt />}
         {hydrated && (
           <Suspense>
-            <Outlet />
+            <SyncRunner />
           </Suspense>
         )}
-      </main>
-      <TabBar />
-      <Toaster />
-      {hydrated && <UpdatePrompt />}
-      {hydrated && (
-        <Suspense>
-          <SyncRunner />
-        </Suspense>
-      )}
-    </div>
+      </div>
+    </MotionProvider>
   )
 }

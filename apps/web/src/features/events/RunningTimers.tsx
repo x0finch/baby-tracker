@@ -1,5 +1,6 @@
 import { type Event, type FeedingEvent, breastSideDurations, isRunning } from '@bobo/shared'
 import { clsx } from 'clsx'
+import { AnimatePresence, m as motion } from 'motion/react'
 
 import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
@@ -92,17 +93,28 @@ function SleepTimer({ event, now }: { event: Event; now: number }) {
 export function RunningTimers({ events }: { events: readonly Event[] }) {
   const running = events.filter(isRunning)
   const now = useNow(1000, running.length > 0)
-  if (running.length === 0) return null
 
+  // Each card carries its own spacing (cancelled by the list's negative margin), so a card
+  // growing in or shrinking away moves the page smoothly; the empty list takes no room.
   return (
-    <div className="flex flex-col gap-3">
-      {running.map((event) =>
-        event.type === 'feeding' ? (
-          <BreastTimer key={event.id} event={event} now={now} />
-        ) : (
-          <SleepTimer key={event.id} event={event} now={now} />
-        ),
-      )}
+    <div className="-mb-6 flex flex-col empty:hidden">
+      <AnimatePresence initial={false}>
+        {running.map((event) => (
+          <motion.div
+            key={event.id}
+            initial={{ height: 0, paddingBottom: 0, opacity: 0, scale: 0.96 }}
+            animate={{ height: 'auto', paddingBottom: 24, opacity: 1, scale: 1 }}
+            exit={{ height: 0, paddingBottom: 0, opacity: 0, scale: 0.96 }}
+            className="overflow-hidden"
+          >
+            {event.type === 'feeding' ? (
+              <BreastTimer event={event} now={now} />
+            ) : (
+              <SleepTimer event={event} now={now} />
+            )}
+          </motion.div>
+        ))}
+      </AnimatePresence>
     </div>
   )
 }
