@@ -355,15 +355,20 @@ html:active-view-transition-type(tab) {
   }
 }
 
-/* Bottom sheets slide up with a little bounce and drop away when closed. */
+/*
+ * Bottom sheets slide up with a little bounce and glide away when closed: the close eases
+ * in and out over a third of a second, so it reads as a slide rather than a jump.
+ */
 .sheet {
+  --sheet-close: 360ms;
+  --ease-sheet-close: cubic-bezier(0.4, 0, 0.2, 1);
   translate: 0 100%;
   /* Fills the gap the overshoot opens under the sheet. */
   box-shadow: 0 4rem 0 var(--color-bg);
   transition:
-    translate 220ms ease-in,
-    display 220ms allow-discrete,
-    overlay 220ms allow-discrete;
+    translate var(--sheet-close) var(--ease-sheet-close),
+    display var(--sheet-close) allow-discrete,
+    overlay var(--sheet-close) allow-discrete;
 
   &[open] {
     translate: 0 0;
@@ -374,9 +379,9 @@ html:active-view-transition-type(tab) {
   &::backdrop {
     background-color: rgb(0 0 0 / 0);
     transition:
-      background-color 220ms ease-out,
-      display 220ms allow-discrete,
-      overlay 220ms allow-discrete;
+      background-color var(--sheet-close) var(--ease-sheet-close),
+      display var(--sheet-close) allow-discrete,
+      overlay var(--sheet-close) allow-discrete;
   }
   &[open]::backdrop {
     background-color: rgb(0 0 0 / 0.4);
@@ -385,8 +390,8 @@ html:active-view-transition-type(tab) {
   /* Set by Sheet while it slides away before closing (works without exit transitions). */
   &[open][data-closing] {
     translate: 0 100%;
-    transition-duration: 220ms;
-    transition-timing-function: ease-in;
+    transition-duration: var(--sheet-close);
+    transition-timing-function: var(--ease-sheet-close);
   }
   &[open][data-closing]::backdrop {
     background-color: rgb(0 0 0 / 0);

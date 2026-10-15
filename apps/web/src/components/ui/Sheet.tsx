@@ -11,8 +11,9 @@ export interface SheetProps {
 /** Pulled down this far (px), or flicked down this fast (px/ms), the sheet closes. */
 const CLOSE_DISTANCE = 96
 const CLOSE_VELOCITY = 0.6
-/** Matches the closing slide in styles/app.css. */
-const CLOSE_MS = 220
+/** The closing slide in styles/app.css (--sheet-close), plus slack for a busy frame. */
+const CLOSE_MS = 360
+const CLOSE_SLACK_MS = 120
 
 const prefersReducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -53,11 +54,23 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
       return undefined
     }
     dialog.dataset.closing = ''
-    const timer = setTimeout(() => {
+    // Close once the slide has finished, so a slow frame never cuts it short; the timer
+    // covers a transition that never runs (nothing to move, a hidden tab).
+    const finish = () => {
+      dialog.removeEventListener('transitionend', onEnd)
+      clearTimeout(timer)
       delete dialog.dataset.closing
       dialog.close()
-    }, CLOSE_MS)
-    return () => clearTimeout(timer)
+    }
+    const onEnd = (event: TransitionEvent) => {
+      if (event.target === dialog && event.propertyName === 'translate') finish()
+    }
+    dialog.addEventListener('transitionend', onEnd)
+    const timer = setTimeout(finish, CLOSE_MS + CLOSE_SLACK_MS)
+    return () => {
+      dialog.removeEventListener('transitionend', onEnd)
+      clearTimeout(timer)
+    }
   }, [open])
 
   // Dragging the header pulls the sheet down; far or fast enough, it closes.
