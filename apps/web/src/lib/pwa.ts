@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
-import type { Workbox } from 'workbox-window'
+import { useEffect } from 'react'
 
 import { createStore, useStore } from './store'
 
@@ -52,9 +51,26 @@ export function useInstallPrompt(): (() => Promise<void>) | null {
 }
 
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000
+/** How long a manual check waits for a found update to finish downloading. */
+const INSTALL_TIMEOUT_MS = 30_000
+
+/** Applies the waiting update, once one has been found. */
+const waitingUpdate = createStore<(() => void) | null>(null)
+// A worker also takes control on the very first visit (clients.claim); reloading then
+// would interrupt onboarding, so only reload after the user asked for the update.
+let accepted = false
+
+function offerUpdate(worker: ServiceWorker) {
+  waitingUpdate.set(() => {
+    accepted = true
+    // The generated worker skips waiting on this message. Workers take no target origin.
+    // oxlint-disable-next-line unicorn/require-post-message-target-origin
+    worker.postMessage({ type: 'SKIP_WAITING' })
+  })
+}
 
 /** Asks the browser to look for a new service worker; the "waiting" event follows if there is one. */
-function checkForUpdate() {
+function checkInBackground() {
   if (document.visibilityState !== 'visible' || !navigator.onLine) return
   // Ask the browser directly: Workbox's update() is a no-op until its own register() has
   // resolved, which it may not have in a long-lived page.
@@ -64,18 +80,51 @@ function checkForUpdate() {
     .catch(() => undefined)
 }
 
-/**
- * Registers the service worker in production builds and reports when a new version is
- * waiting. Applying it is left to the user so an update never interrupts logging.
- */
-export function useServiceWorkerUpdate(): (() => void) | null {
-  const [workbox, setWorkbox] = useState<Workbox | null>(null)
-  // A worker also takes control on the very first visit (clients.claim); reloading then
-  // would interrupt onboarding, so only reload after the user asked for the update.
-  const accepted = useRef(false)
+/** Resolves once a newly found worker has installed (or failed to). */
+function installed(worker: ServiceWorker): Promise<void> {
+  return new Promise((resolve) => {
+    const done = () => {
+      if (worker.state === 'installing') return
+      worker.removeEventListener('statechange', done)
+      clearTimeout(timer)
+      resolve()
+    }
+    const timer = setTimeout(done, INSTALL_TIMEOUT_MS)
+    worker.addEventListener('statechange', done)
+  })
+}
 
+export type UpdateCheck = 'latest' | 'ready' | 'offline' | 'failed'
+
+/** Whether this build can update itself: production builds with a service worker. */
+export const canUpdate = () => !import.meta.env.DEV && 'serviceWorker' in navigator
+
+/** Looks for a new version now, for the "check for updates" button. */
+export async function checkForUpdateNow(): Promise<UpdateCheck> {
+  if (!navigator.onLine) return 'offline'
+  try {
+    const registration = await navigator.serviceWorker.getRegistration()
+    if (!registration) return 'failed'
+    await registration.update()
+    if (registration.installing) await installed(registration.installing)
+    if (!registration.waiting) return 'latest'
+    offerUpdate(registration.waiting)
+    return 'ready'
+  } catch {
+    return navigator.onLine ? 'failed' : 'offline'
+  }
+}
+
+/** Applies a waiting update (reloading the app), or null while there is none. */
+export const useWaitingUpdate = () => useStore(waitingUpdate)
+
+/**
+ * Registers the service worker in production builds and offers updates as they are found.
+ * Applying one is left to the user so an update never interrupts logging.
+ */
+export function useServiceWorker() {
   useEffect(() => {
-    if (import.meta.env.DEV || !('serviceWorker' in navigator)) return undefined
+    if (!canUpdate()) return undefined
     let cancelled = false
     let stopChecks: () => void = () => undefined
     // Loaded in the browser only: the package is CommonJS on the server, where the shell
@@ -83,22 +132,22 @@ export function useServiceWorkerUpdate(): (() => void) | null {
     void import('workbox-window').then(({ Workbox }) => {
       if (cancelled) return
       const wb = new Workbox('/sw.js')
-      wb.addEventListener('waiting', () => {
-        if (!cancelled) setWorkbox(wb)
+      wb.addEventListener('waiting', (event) => {
+        if (!cancelled && event.sw) offerUpdate(event.sw)
       })
       // Reload once the new worker takes over after the user accepted the update.
       wb.addEventListener('controlling', () => {
-        if (accepted.current) window.location.reload()
+        if (accepted) window.location.reload()
       })
       void wb.register()
 
       // Browsers only look for a new worker when a page loads. An installed app can stay
       // open in the background for days, so also look when it comes back to the
       // foreground, and every hour while it stays open.
-      document.addEventListener('visibilitychange', checkForUpdate)
-      const interval = setInterval(checkForUpdate, UPDATE_CHECK_INTERVAL_MS)
+      document.addEventListener('visibilitychange', checkInBackground)
+      const interval = setInterval(checkInBackground, UPDATE_CHECK_INTERVAL_MS)
       stopChecks = () => {
-        document.removeEventListener('visibilitychange', checkForUpdate)
+        document.removeEventListener('visibilitychange', checkInBackground)
         clearInterval(interval)
       }
     })
@@ -107,11 +156,4 @@ export function useServiceWorkerUpdate(): (() => void) | null {
       stopChecks()
     }
   }, [])
-
-  return workbox
-    ? () => {
-        accepted.current = true
-        workbox.messageSkipWaiting()
-      }
-    : null
 }
