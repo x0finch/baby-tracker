@@ -5,8 +5,7 @@ import type {
   Invite,
   InvitePreview,
 } from '@bobo/shared'
-import { queryOptions, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { queryOptions } from '@tanstack/react-query'
 
 import { apiFetch } from '../../lib/api'
 
@@ -62,47 +61,9 @@ export const familyKeys = {
   invites: (familyId: string) => ['family', familyId, 'invites'] as const,
 }
 
-// Member names rarely change; one fetch per family per app session is enough.
-export const membersQuery = (familyId: string) =>
-  queryOptions({
-    queryKey: familyKeys.members(familyId),
-    queryFn: () => familyApi.members(familyId),
-    staleTime: Infinity,
-  })
-
-export const invitesQuery = (familyId: string) =>
-  queryOptions({
-    queryKey: familyKeys.invites(familyId),
-    queryFn: () => familyApi.invites(familyId),
-  })
-
 export const invitePreviewQuery = (code: string) =>
   queryOptions({
     queryKey: ['invite', code],
     queryFn: () => familyApi.previewInvite(code),
     staleTime: 0,
   })
-
-/** Members of a family, or undefined while loading, offline or signed out. */
-export function useMembers(familyId: string | null | undefined) {
-  return useQuery({ ...membersQuery(familyId ?? ''), enabled: Boolean(familyId) }).data
-}
-
-// Members already looked up again after a cache miss, so a member who left isn't refetched
-// by every record that mentions them.
-const refetchedFor = new Set<string>()
-
-/** Display name of a family member; refetches once if they joined after the list was cached. */
-export function useMemberName(familyId: string | null, userId: string | null) {
-  const queryClient = useQueryClient()
-  const members = useMembers(familyId)
-  const member = members?.find((item) => item.userId === userId)
-  const missing = familyId !== null && userId !== null && members !== undefined && !member
-  useEffect(() => {
-    const key = `${familyId}:${userId}`
-    if (!missing || !familyId || refetchedFor.has(key)) return
-    refetchedFor.add(key)
-    void queryClient.invalidateQueries({ queryKey: familyKeys.members(familyId) })
-  }, [missing, familyId, userId, queryClient])
-  return member?.name
-}

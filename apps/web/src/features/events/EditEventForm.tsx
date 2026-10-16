@@ -10,7 +10,7 @@ import { inputValue } from '../../lib/units'
 import { useNow } from '../../lib/use-now'
 import { m } from '../../paraglide/messages.js'
 import { useAccess } from '../../sync/use-access'
-import { useMemberName } from '../family/api'
+import { useMemberName } from '../family/collections'
 import {
   type GrowthErrors,
   draftFromGrowth,

@@ -1,5 +1,5 @@
 import { type FamilySummary, canManageMember, familyDisplayName, isManager } from '@bobo/shared'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 
@@ -8,6 +8,7 @@ import { Card } from '../../components/ui/Card'
 import { ConfirmSheet } from '../../components/ui/ConfirmSheet'
 import { FormError } from '../../components/ui/FormError'
 import { Pill } from '../../components/ui/Pill'
+import { toastIfRefused } from '../../lib/server-collection'
 import { m } from '../../paraglide/messages.js'
 import { requestSync } from '../../sync/runner'
 import { ageLabel } from '../babies/age-label'
@@ -15,8 +16,9 @@ import { BabyAvatar } from '../babies/BabyAvatar'
 import { useBabies } from '../babies/use-babies'
 import { useRecordCount } from '../events/use-events'
 import { AliasSheet } from './AliasSheet'
-import { familyApi, invitesQuery, useMembers } from './api'
+import { familyApi } from './api'
 import { scopeLabel } from './BabyScopePicker'
+import { useInvites, useMembers } from './collections'
 import { DeleteFamilySheet } from './DeleteFamilySheet'
 import { InviteSheet } from './InviteSheet'
 import { MemberSheet } from './MemberSheet'
@@ -30,7 +32,7 @@ export function FamilyDetail({ family, userId }: { family: FamilySummary; userId
   const queryClient = useQueryClient()
   const members = useMembers(family.id)
   const managing = isManager(family.role)
-  const { data: invites = [] } = useQuery({ ...invitesQuery(family.id), enabled: managing })
+  const { invites, collection: invitesCollection } = useInvites(family.id, managing)
   const [sheet, setSheet] = useState<'invite' | 'rename' | 'alias' | 'leave' | 'delete' | null>(
     null,
   )
@@ -50,10 +52,9 @@ export function FamilyDetail({ family, userId }: { family: FamilySummary; userId
       await requestSync()
     },
   })
-  const revoke = useMutation({
-    mutationFn: (code: string) => familyApi.revokeInvite(family.id, code),
-    onSuccess: refresh,
-  })
+  const revoke = (code: string) => {
+    if (invitesCollection) toastIfRefused(invitesCollection.delete(code), m.actionFailed())
+  }
 
   const records = useRecordCount({ familyId: family.id })
   const others = (members?.length ?? family.memberCount ?? 1) - 1
@@ -134,12 +135,7 @@ export function FamilyDetail({ family, userId }: { family: FamilySummary; userId
                   <span className="min-w-0 flex-1 truncate">
                     {`${roleLabel[invite.role]()} · ${scopeLabel(invite.babyIds, babies)}`}
                   </span>
-                  <Button
-                    variant="ghost"
-                    tone="danger"
-                    disabled={revoke.isPending}
-                    onClick={() => revoke.mutate(invite.code)}
-                  >
+                  <Button variant="ghost" tone="danger" onClick={() => revoke(invite.code)}>
                     {m.inviteRevoke()}
                   </Button>
                 </li>
@@ -175,7 +171,7 @@ export function FamilyDetail({ family, userId }: { family: FamilySummary; userId
             {m.familyLeave()}
           </Button>
         )}
-        {(leave.isError || revoke.isError) && <FormError>{m.actionFailed()}</FormError>}
+        {leave.isError && <FormError>{m.actionFailed()}</FormError>}
       </Card>
 
       <InviteSheet

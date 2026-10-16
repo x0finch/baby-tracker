@@ -12,9 +12,11 @@ import { useState } from 'react'
 import { Button } from '../../components/ui/Button'
 import { FormError } from '../../components/ui/FormError'
 import { Sheet } from '../../components/ui/Sheet'
+import { toastIfRefused } from '../../lib/server-collection'
 import { m } from '../../paraglide/messages.js'
 import { familyApi } from './api'
 import { BabyScopePicker } from './BabyScopePicker'
+import { useMembersCollection } from './collections'
 import { RolePicker } from './RolePicker'
 
 export function MemberSheet({
@@ -38,7 +40,8 @@ export function MemberSheet({
           family={family}
           member={{ ...member, role: member.role }}
           babies={babies}
-          onDone={() => {
+          onDone={onClose}
+          onTransferred={() => {
             onChanged()
             onClose()
           }}
@@ -53,18 +56,37 @@ function MemberForm({
   member,
   babies,
   onDone,
+  onTransferred,
 }: {
   family: FamilySummary
   member: FamilyMember & { role: MemberRole }
   babies: Baby[]
   onDone: () => void
+  onTransferred: () => void
 }) {
+  const members = useMembersCollection(family.id)
   const [role, setRole] = useState<MemberRole>(member.role)
   const [babyIds, setBabyIds] = useState<string[] | null>(member.babyIds)
   const [confirmingTransfer, setConfirmingTransfer] = useState(false)
-  const change = useMutation({
-    mutationFn: (action: () => Promise<void>) => action(),
-    onSuccess: onDone,
+  // Saving or removing shows at once (rolled back with a toast if the server refuses);
+  // handing over ownership waits for the server, as it changes this user's own role.
+  const save = () => {
+    if (members) {
+      const change = members.update(member.userId, (draft) => {
+        draft.role = role
+        draft.babyIds = babyIds
+      })
+      toastIfRefused(change, m.actionFailed())
+    }
+    onDone()
+  }
+  const remove = () => {
+    if (members) toastIfRefused(members.delete(member.userId), m.actionFailed())
+    onDone()
+  }
+  const transfer = useMutation({
+    mutationFn: () => familyApi.transfer(family.id, member.userId),
+    onSuccess: onTransferred,
   })
 
   return (
@@ -73,22 +95,10 @@ function MemberForm({
       {babies.length > 1 && (
         <BabyScopePicker babies={babies} value={babyIds} onChange={setBabyIds} />
       )}
-      <Button
-        size="lg"
-        block
-        disabled={babyIds?.length === 0 || change.isPending}
-        onClick={() =>
-          change.mutate(() => familyApi.updateMember(family.id, member.userId, { role, babyIds }))
-        }
-      >
+      <Button size="lg" block disabled={babyIds?.length === 0 || transfer.isPending} onClick={save}>
         {m.memberSave()}
       </Button>
-      <Button
-        variant="ghost"
-        tone="danger"
-        disabled={change.isPending}
-        onClick={() => change.mutate(() => familyApi.removeMember(family.id, member.userId))}
-      >
+      <Button variant="ghost" tone="danger" disabled={transfer.isPending} onClick={remove}>
         {m.memberRemove()}
       </Button>
       {family.role === 'owner' &&
@@ -99,10 +109,7 @@ function MemberForm({
               <Button variant="outline" onClick={() => setConfirmingTransfer(false)}>
                 {m.actionCancel()}
               </Button>
-              <Button
-                disabled={change.isPending}
-                onClick={() => change.mutate(() => familyApi.transfer(family.id, member.userId))}
-              >
+              <Button disabled={transfer.isPending} onClick={() => transfer.mutate()}>
                 {m.memberTransferConfirm()}
               </Button>
             </div>
@@ -112,7 +119,7 @@ function MemberForm({
             {m.memberTransfer()}
           </Button>
         ))}
-      {change.isError && <FormError>{m.actionFailed()}</FormError>}
+      {transfer.isError && <FormError>{m.actionFailed()}</FormError>}
     </div>
   )
 }
