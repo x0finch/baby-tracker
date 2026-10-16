@@ -44,3 +44,51 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      # The end-to-end job serves this build (prerendering doesn't work inside its container).
+      - name: Upload web build
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+          retention-days: 1
+
+  e2e:
+    name: End-to-end
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # The Playwright image pins the browser and fonts, so screenshots match the baselines
+    # committed in e2e/tests/*-snapshots (regenerate them with the "E2E screenshots" workflow).
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Download web build
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+
+      - name: Run end-to-end tests
+        run: pnpm --filter @bobo/e2e test:e2e
+
+      - name: Upload report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          retention-days: 7

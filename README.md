@@ -15,7 +15,12 @@ pnpm format        # format with oxfmt
 pnpm lint          # oxlint with type-aware rules
 pnpm typecheck     # tsc (TypeScript 7)
 pnpm test          # vitest
+pnpm test:e2e      # build the web app, then Playwright end-to-end tests (e2e/)
 ```
+
+### End-to-end tests
+
+`e2e/` drives the built app in Chromium against a local API (`wrangler dev` with a throwaway D1 database and seeded sessions, see `e2e/scripts/serve.mjs`). It covers logging and undo, timers, two-device sync, invites and family deletion, the bottom sheet, and screenshots of the key screens. CI runs it in the Playwright container on every pull request. After an intended visual change, run the **E2E screenshots** workflow on the branch to regenerate the baselines in `e2e/tests/*-snapshots`.
 
 Tooling: [oxlint](https://oxc.rs/docs/guide/usage/linter) (type-aware via `oxlint-tsgolint`), [oxfmt](https://oxc.rs/docs/guide/usage/formatter), TypeScript 7 and Vitest. In VS Code, install the recommended Oxc extension for format-on-save and lint fixes.
 
@@ -50,5 +55,6 @@ UI strings live in `apps/web/messages/{locale}.json` and are compiled by [Paragl
 | `apps/web`        | `@bobo/web`    | TanStack Start client (static SPA)      |
 | `apps/api`        | `@bobo/api`    | Hono API on Cloudflare Workers          |
 | `packages/shared` | `@bobo/shared` | Schemas and types shared by web and api |
+| `e2e`             | `@bobo/e2e`    | Playwright end-to-end tests             |
 
 Internal packages export TypeScript source directly; consuming apps compile them with their own bundler.

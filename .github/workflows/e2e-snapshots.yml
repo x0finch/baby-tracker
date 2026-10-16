@@ -1,0 +1,70 @@
+name: E2E screenshots
+
+# Regenerates the screenshot baselines in the same Playwright image CI compares against,
+# and commits them to the branch it was run on. Run it after an intended visual change.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build web
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Prerendering doesn't work inside the Playwright container, so build here.
+      - run: pnpm --filter @bobo/web build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+          retention-days: 1
+
+  update:
+    name: Update screenshots
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+    steps:
+      - name: Install git
+        run: apt-get update && apt-get install -y --no-install-recommends git
+
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+
+      - name: Update screenshots
+        run: pnpm --filter @bobo/e2e exec playwright test tests/visual.spec.ts --update-snapshots
+
+      - name: Commit
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add e2e/tests
+          if git diff --cached --quiet; then echo "Screenshots unchanged"; exit 0; fi
+          git commit -m "Update e2e screenshots"
+          git push
