@@ -1,5 +1,5 @@
 import { clsx } from 'clsx'
-import { type PointerEvent, type ReactNode, useEffect, useRef } from 'react'
+import { type PointerEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 
 export interface SheetProps {
   open: boolean
@@ -38,6 +38,16 @@ function slideThrough(dialog: HTMLDialogElement, dy: number) {
 
 const prefersReducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches
 
+/** The value from the last render while open, held unchanged once `open` turns false. */
+function useLastOpen<T>(open: boolean, value: T): T {
+  const last = useRef(value)
+  // Remembering the previous render is the point here, so the ref is read during render.
+  // oxlint-disable-next-line react/refs
+  if (open) last.current = value
+  // oxlint-disable-next-line react/refs
+  return open ? value : last.current
+}
+
 /**
  * Bottom sheet built on the native <dialog> element, which provides focus trapping,
  * Escape to close and an inert background. Used instead of centered modals for forms.
@@ -51,6 +61,13 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
   const drag = useRef<{ startY: number; startTime: number; dy: number } | null>(null)
   // The current slide; reversing it closes the sheet (or reopens it mid-close).
   const slide = useRef<Animation | null>(null)
+  // Parents usually drop the sheet's content as soon as it closes; keep showing what was
+  // there until the slide away has finished, so the sheet leaves whole instead of
+  // collapsing first. Once closed, the content unmounts.
+  const shown = useLastOpen(open, { title, children })
+  // True from opening until the closing slide has finished (set before any render where
+  // `open` is already false, so the content never drops out for a frame).
+  const [shownInDialog, setShownInDialog] = useState(false)
 
   useEffect(() => {
     openRef.current = open
@@ -64,6 +81,7 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
         return undefined
       }
       dialog.showModal()
+      setShownInDialog(true)
       // A reused sheet starts at the top, not where its previous content was scrolled to.
       dialog.scrollTop = 0
       // showModal() focuses the first input, which would pop the keyboard on phones.
@@ -76,6 +94,7 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
     const current = slide.current
     if (!current) {
       dialog.close()
+      setShownInDialog(false)
       return undefined
     }
     // Every way of closing (backdrop, Escape, a drag, the parent) plays the slide backwards,
@@ -88,6 +107,7 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
         if (cancelled) return
         delete dialog.dataset.closing
         dialog.close()
+        setShownInDialog(false)
       })
       .catch(() => undefined)
     return () => {
@@ -127,7 +147,7 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
     <dialog
       ref={ref}
       tabIndex={-1}
-      aria-label={title}
+      aria-label={shown.title}
       onCancel={(event) => {
         // Escape: let the sheet slide away like any other close.
         event.preventDefault()
@@ -154,9 +174,9 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
           onPointerCancel={endDrag}
         >
           <div aria-hidden className="mx-auto h-1.5 w-10 rounded-full bg-border" />
-          <h2 className="text-title font-extrabold">{title}</h2>
+          <h2 className="text-title font-extrabold">{shown.title}</h2>
         </div>
-        {children}
+        {open || shownInDialog ? shown.children : null}
       </div>
     </dialog>
   )

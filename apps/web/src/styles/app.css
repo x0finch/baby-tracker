@@ -365,6 +365,10 @@ html:active-view-transition-type(tab) {
     background-color: rgb(0 0 0 / 0.4);
     transition: background-color 380ms ease-out;
   }
+  &[data-closing] {
+    /* What it shows is a snapshot of the closed state; nothing in it should react. */
+    pointer-events: none;
+  }
   &[data-closing]::backdrop {
     background-color: rgb(0 0 0 / 0);
   }
