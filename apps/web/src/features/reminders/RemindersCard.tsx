@@ -48,7 +48,7 @@ export function RemindersCard() {
   if (!userId) {
     return (
       <Card>
-        <p className="m-0 text-fg-muted">{m.remindersSignedOut()}</p>
+        <p className="m-0 text-fg-muted">{m.reminderSignedOut()}</p>
       </Card>
     )
   }
@@ -108,7 +108,7 @@ function Reminders({ userId }: { userId: string }) {
 
   return (
     <Card className="flex flex-col gap-4">
-      <p className="m-0 text-fg-muted">{m.remindersIntro()}</p>
+      <p className="m-0 text-fg-muted">{m.reminderIntro()}</p>
 
       {hint ? (
         <p className="m-0 font-bold">{hint()}</p>
@@ -155,7 +155,7 @@ function Reminders({ userId }: { userId: string }) {
                     label:
                       minutes === 0
                         ? m.reminderOff()
-                        : m.reminderHours({ hours: formatNumber(minutes / 60) }),
+                        : m.durationHours({ hours: formatNumber(minutes / 60) }),
                   }))}
                   value={String(value)}
                   onChange={(minutes) => choose(baby, kind, Number(minutes))}

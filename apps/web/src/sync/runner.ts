@@ -17,7 +17,7 @@ import {
 
 /** Name of the family created for a user's own babies, e.g. 王丽的家. */
 export const ownFamilyName = (user: { name: string }) =>
-  m.defaultFamilyName({ name: user.name.trim() || m.familyMemberYou() })
+  m.familyDefaultName({ name: user.name.trim() || m.familyMemberYou() })
 
 export type SyncPhase = 'signed-out' | 'idle' | 'syncing' | 'offline' | 'error' | 'unauthorized'
 

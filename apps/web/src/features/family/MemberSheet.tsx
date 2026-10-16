@@ -96,7 +96,7 @@ function MemberForm({
         <BabyScopePicker babies={babies} value={babyIds} onChange={setBabyIds} />
       )}
       <Button size="lg" block disabled={babyIds?.length === 0 || transfer.isPending} onClick={save}>
-        {m.memberSave()}
+        {m.actionSave()}
       </Button>
       <Button variant="ghost" tone="danger" disabled={transfer.isPending} onClick={remove}>
         {m.memberRemove()}

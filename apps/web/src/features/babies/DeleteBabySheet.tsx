@@ -34,7 +34,7 @@ export function DeleteBabySheet({
       consequences={
         records > 0
           ? {
-              lead: m.babyDeleteLead({ name }),
+              lead: m.deleteLead({ name }),
               items: [
                 m.babyDeleteRecords({ count: records }),
                 others > 0 && m.babyDeleteShared({ count: others }),

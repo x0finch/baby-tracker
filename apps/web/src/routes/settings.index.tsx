@@ -63,7 +63,7 @@ function SettingsIndex() {
         />
         <SettingsRow
           link={{ to: '/settings/reminders' }}
-          title={m.remindersTitle()}
+          title={m.reminderTitle()}
           summary={remindersSummary}
         />
         <SettingsRow

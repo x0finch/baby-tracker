@@ -21,9 +21,9 @@ export const Route = createFileRoute('/ui')({
 })
 
 const categories: { tone: ButtonTone; label: () => string }[] = [
-  { tone: 'feeding', label: m.uiFeeding },
-  { tone: 'sleep', label: m.uiSleep },
-  { tone: 'diaper', label: m.uiDiaper },
+  { tone: 'feeding', label: m.categoryFeeding },
+  { tone: 'sleep', label: m.categorySleep },
+  { tone: 'diaper', label: m.categoryDiaper },
 ]
 
 function UiPreviewPage() {
@@ -34,23 +34,23 @@ function UiPreviewPage() {
 
   return (
     <section className="flex flex-col gap-6">
-      <PageHeader title={m.uiTitle()} />
+      <PageHeader title={m.settingsUiPreview()} />
 
       <div className="flex flex-col gap-3">
         <h2 className="text-title font-extrabold">{m.uiButtons()}</h2>
         <Button size="lg" block>
-          {m.uiSave()}
+          {m.actionSave()}
         </Button>
         <div className="flex gap-3">
           <Button variant="outline" className="flex-1">
-            {m.uiCancel()}
+            {m.actionCancel()}
           </Button>
           <Button tone="danger" className="flex-1">
-            {m.uiDelete()}
+            {m.actionDelete()}
           </Button>
         </div>
         <Button variant="ghost" tone="diaper">
-          {m.uiCancel()}
+          {m.actionCancel()}
         </Button>
       </div>
 
@@ -76,8 +76,8 @@ function UiPreviewPage() {
         <SegmentedControl
           label={m.uiSide()}
           options={[
-            { value: 'left', label: m.uiLeft() },
-            { value: 'right', label: m.uiRight() },
+            { value: 'left', label: m.sideLeft() },
+            { value: 'right', label: m.sideRight() },
           ]}
           value={side}
           onChange={setSide}
@@ -88,8 +88,8 @@ function UiPreviewPage() {
       <div className="flex flex-col gap-3">
         <h2 className="text-title font-extrabold">{m.uiPills()}</h2>
         <div className="flex items-center gap-3">
-          <Pill>{m.uiPillRole()}</Pill>
-          <Pill tone="danger">{m.uiPillRunning()}</Pill>
+          <Pill>{m.roleOwner()}</Pill>
+          <Pill tone="danger">{m.timerRunning()}</Pill>
           <Chevron direction="left" />
           <Chevron />
         </div>
@@ -98,11 +98,11 @@ function UiPreviewPage() {
       <div className="flex flex-col gap-3">
         <h2 className="text-title font-extrabold">{m.uiSettingsList()}</h2>
         <SettingsGroup>
-          <SettingsRow link={{ to: '/ui' }} title={m.uiSave()} summary={m.uiRowSummary()} />
+          <SettingsRow link={{ to: '/ui' }} title={m.actionSave()} summary={m.uiRowSummary()} />
           <SettingsRow
             link={{ to: '/ui' }}
             title={m.uiNameLabel()}
-            badge={<Pill className="shrink-0">{m.uiPillRole()}</Pill>}
+            badge={<Pill className="shrink-0">{m.roleOwner()}</Pill>}
             summary={m.uiRowSummary()}
           />
         </SettingsGroup>
@@ -130,7 +130,7 @@ function UiPreviewPage() {
             variant="outline"
             onClick={() =>
               showToast(m.uiToastMessage(), {
-                action: { label: m.uiSave(), onClick: () => undefined },
+                action: { label: m.actionSave(), onClick: () => undefined },
               })
             }
           >
@@ -160,7 +160,7 @@ function UiPreviewPage() {
         title={m.uiDeleteConfirm()}
         emptyMessage={m.uiDeleteItem()}
         consequences={{
-          lead: m.uiDeleteLead(),
+          lead: m.deleteLead({ name: m.uiDeleteName() }),
           items: [m.uiDeleteItem()],
           name: m.uiDeleteName(),
           typeLabel: m.uiDeleteType(),
@@ -174,7 +174,7 @@ function UiPreviewPage() {
       <Sheet open={sheetOpen} onClose={() => setSheetOpen(false)} title={m.uiSheetTitle()}>
         <Input label={m.uiNameLabel()} inputMode="numeric" />
         <Button size="lg" block onClick={() => setSheetOpen(false)}>
-          {m.uiSave()}
+          {m.actionSave()}
         </Button>
       </Sheet>
     </section>

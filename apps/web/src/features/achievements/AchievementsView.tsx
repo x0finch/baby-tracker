@@ -64,9 +64,9 @@ export function AchievementsView({ baby, events }: { baby: Baby; events: readonl
 
       <Card className="flex flex-col gap-3">
         <div className="flex items-baseline justify-between gap-2">
-          <h2 className="m-0 text-title font-extrabold">{m.badgesTitle()}</h2>
+          <h2 className="m-0 text-title font-extrabold">{m.badgeTitle()}</h2>
           <span className="text-caption font-bold text-fg-muted">
-            {m.badgesEarned({ earned, total: badges.length })}
+            {m.badgeEarned({ earned, total: badges.length })}
           </span>
         </div>
         <ul className="m-0 grid list-none grid-cols-3 gap-x-2 gap-y-4 p-0">

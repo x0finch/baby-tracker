@@ -22,7 +22,7 @@ export function FeedDurationField({
       value={value}
       onChange={onChange}
       optionLabel={(minutes) =>
-        minutes === null ? m.feedDurationNone() : m.feedDurationMinutes({ minutes })
+        minutes === null ? m.feedDurationNone() : m.durationMinutes({ minutes })
       }
       tone="feeding"
     />

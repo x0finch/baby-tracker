@@ -44,7 +44,7 @@ function BabyToday({ baby }: { baby: Baby }) {
         <QuickActions baby={baby} events={events} />
       ) : (
         <Card>
-          <p className="m-0 text-fg-muted">{m.viewerNotice()}</p>
+          <p className="m-0 text-fg-muted">{m.roleViewerNotice()}</p>
         </Card>
       )}
       <TodayList events={events} />

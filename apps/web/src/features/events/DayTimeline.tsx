@@ -42,7 +42,7 @@ export function DayTimeline({
   return (
     <section className="flex flex-col gap-2">
       <h2 className="text-title font-extrabold">{m.timelineTitle()}</h2>
-      {visible.length === 0 && <p className="text-fg-muted">{m.timelineEmpty()}</p>}
+      {visible.length === 0 && <p className="text-fg-muted">{m.dayEmpty()}</p>}
       <div aria-hidden className="flex">
         <div className="w-12 shrink-0" />
         <div className="grid flex-1 grid-cols-4 gap-2 text-center text-caption font-bold text-fg-muted">

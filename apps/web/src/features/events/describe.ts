@@ -60,9 +60,9 @@ export function describeEvent(event: Event, now: number): { title: string; detai
       if (data.kind === 'breast') {
         const sides = breastSideDurations(data.segments, now)
         return {
-          title: m.feedingBreast(),
+          title: m.feedBreast(),
           detail: running
-            ? m.inProgress()
+            ? m.eventInProgress()
             : m.breastDetail({
                 left: durationLabel(sides.left),
                 right: durationLabel(sides.right),
@@ -73,7 +73,7 @@ export function describeEvent(event: Event, now: number): { title: string; detai
       const took = event.endAt === null ? [] : [durationLabel(event.endAt - event.startAt)]
       if (data.kind === 'bottle') {
         return {
-          title: m.feedingBottle(),
+          title: m.feedBottle(),
           detail: [
             data.breastMl !== undefined && data.formulaMl !== undefined
               ? m.bottleSplitDetail({
@@ -91,12 +91,12 @@ export function describeEvent(event: Event, now: number): { title: string; detai
           ].join(' · '),
         }
       }
-      return { title: m.feedingSolids(), detail: [data.food, ...took].join(' · ') }
+      return { title: m.feedSolids(), detail: [data.food, ...took].join(' · ') }
     }
     case 'sleep':
       return {
         title: sleepKindLabel[event.data.kind](),
-        detail: running ? m.inProgress() : durationLabel(eventDurationMs(event, now)),
+        detail: running ? m.eventInProgress() : durationLabel(eventDurationMs(event, now)),
       }
     case 'diaper': {
       const { contents, pee, poop } = event.data

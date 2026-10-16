@@ -27,7 +27,7 @@ export function FamilyList() {
 
   return (
     <Card className="flex flex-col gap-1">
-      <h2 className="mb-1 text-title font-extrabold">{m.familiesTitle()}</h2>
+      <h2 className="mb-1 text-title font-extrabold">{m.familyListTitle()}</h2>
       <ul className="m-0 flex list-none flex-col p-0">
         {sortFamilies(access).map((family) => {
           const babies = active.filter((baby) => baby.familyId === family.id)

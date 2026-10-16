@@ -38,7 +38,7 @@ export function ExportCard() {
   const count = valid
     ? events.filter((event) => event.startAt >= start && event.startAt < end).length
     : 0
-  const title = selected.length === 1 ? selected[0]!.name : m.exportAllBabies()
+  const title = selected.length === 1 ? selected[0]!.name : m.babyAll()
   const pick = (id: string) => {
     setBabyId(id)
     setPicking(false)
@@ -100,9 +100,9 @@ export function ExportCard() {
       <Sheet open={picking} onClose={() => setPicking(false)} title={m.exportPickBaby()}>
         <OptionButton selected={!single} onClick={() => pick(ALL)}>
           <span className="flex flex-col">
-            <span className="font-extrabold">{m.exportAllBabies()}</span>
+            <span className="font-extrabold">{m.babyAll()}</span>
             <span className="text-caption text-fg-muted">
-              {m.exportAllBabiesHint({ count: babies.length })}
+              {m.exportBabyAllHint({ count: babies.length })}
             </span>
           </span>
         </OptionButton>
@@ -111,7 +111,9 @@ export function ExportCard() {
           selectedId={single?.id ?? null}
           onSelect={pick}
           badges={
-            new Map(archived.map((baby) => [baby.id, { label: m.archivedBabies(), tone: 'muted' }]))
+            new Map(
+              archived.map((baby) => [baby.id, { label: m.babyArchivedGroup(), tone: 'muted' }]),
+            )
           }
         />
       </Sheet>

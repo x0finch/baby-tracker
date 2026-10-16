@@ -97,7 +97,7 @@ function DeleteConfirmContent({
         <p>{emptyMessage}</p>
       )}
       <Button tone="danger" size="lg" block disabled={!confirmed || pending} onClick={onConfirm}>
-        {m.familyDeleteConfirm()}
+        {m.actionDeleteForever()}
       </Button>
       <Button variant="outline" block onClick={onCancel}>
         {m.actionCancel()}

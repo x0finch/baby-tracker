@@ -6,7 +6,7 @@ import { m } from '../paraglide/messages.js'
 
 export const Route = createFileRoute('/settings/reminders')({
   component: () => (
-    <SettingsPage title={m.remindersTitle()}>
+    <SettingsPage title={m.reminderTitle()}>
       <RemindersCard />
     </SettingsPage>
   ),

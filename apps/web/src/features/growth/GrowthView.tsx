@@ -137,7 +137,7 @@ function GrowthChart({
             textAnchor="middle"
             className="fill-fg-muted text-[10px] tabular-nums"
           >
-            {m.growthAge({ months: tick })}
+            {m.ageMonths({ months: tick })}
           </text>
         ))}
         {curves.map((curve) => (
@@ -298,7 +298,7 @@ export function GrowthView({ baby, events }: { baby: Baby; events: readonly Even
                       {formatMeasure(measure, point.value)}
                     </span>
                     <span className="text-caption text-fg-muted">
-                      {`${formatDate(point.event.startAt, { year: 'numeric', month: 'short', day: 'numeric' })} · ${m.growthAge({ months: formatNumber(point.months, { maximumFractionDigits: 1 }) })}`}
+                      {`${formatDate(point.event.startAt, { year: 'numeric', month: 'short', day: 'numeric' })} · ${m.ageMonths({ months: formatNumber(point.months, { maximumFractionDigits: 1 }) })}`}
                     </span>
                   </span>
                   {point.percentile !== undefined && (
