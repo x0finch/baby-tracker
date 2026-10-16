@@ -119,6 +119,21 @@ export function setAccess(store: LocalStore, access: FamilySummary[] | undefined
   else if (store.meta.has(ACCESS_KEY)) store.meta.delete(ACCESS_KEY)
 }
 
+/** Changes one family in the local access list (an optimistic rename or alias). */
+export function patchAccessFamily(
+  store: LocalStore,
+  familyId: string,
+  patch: Partial<Pick<FamilySummary, 'name' | 'alias'>>,
+) {
+  if (!store.meta.has(ACCESS_KEY)) return
+  store.meta.update(ACCESS_KEY, (draft) => {
+    const families = Array.isArray(draft.value) ? draft.value.filter(isFamilySummary) : []
+    draft.value = families.map((family) =>
+      family.id === familyId ? Object.assign({}, family, patch) : family,
+    )
+  })
+}
+
 /** Removes a record and its pending change without queueing anything for the server. */
 export function removeLocal(store: LocalStore, table: SyncTable, id: string) {
   const collection = table === 'babies' ? store.babies : store.events

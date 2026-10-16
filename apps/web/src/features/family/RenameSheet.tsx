@@ -1,14 +1,13 @@
 import type { FamilySummary } from '@bobo/shared'
-import { useMutation } from '@tanstack/react-query'
 import { type FormEvent, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
-import { FormError } from '../../components/ui/FormError'
 import { Input } from '../../components/ui/Input'
 import { Sheet } from '../../components/ui/Sheet'
+import { toastIfRefused } from '../../lib/server-collection'
 import { m } from '../../paraglide/messages.js'
-import { requestSync } from '../../sync/runner'
 import { familyApi } from './api'
+import { useUpdateFamily } from './use-update-family'
 
 export function RenameSheet({
   family,
@@ -20,19 +19,19 @@ export function RenameSheet({
   onClose: () => void
 }) {
   const [name, setName] = useState(family.name)
-  const rename = useMutation({
-    mutationFn: (next: string) => familyApi.rename(family.id, next),
-    onSuccess: async () => {
-      onClose()
-      // The new name arrives with the next pull's access list.
-      await requestSync()
-    },
-  })
+  const updateFamily = useUpdateFamily()
 
   function submit(event: FormEvent) {
     event.preventDefault()
     const trimmed = name.trim()
-    if (trimmed) rename.mutate(trimmed)
+    if (!trimmed) return
+    const change = updateFamily({
+      familyId: family.id,
+      patch: { name: trimmed },
+      save: () => familyApi.rename(family.id, trimmed),
+    })
+    toastIfRefused(change, m.actionFailed())
+    onClose()
   }
 
   return (
@@ -44,10 +43,9 @@ export function RenameSheet({
           maxLength={50}
           onChange={(e) => setName(e.target.value)}
         />
-        <Button type="submit" size="lg" block disabled={!name.trim() || rename.isPending}>
+        <Button type="submit" size="lg" block disabled={!name.trim()}>
           {m.actionSave()}
         </Button>
-        {rename.isError && <FormError>{m.actionFailed()}</FormError>}
       </form>
     </Sheet>
   )

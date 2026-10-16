@@ -2,6 +2,7 @@ import { type Baby, type Event, babySchema, eventSchema } from '@bobo/shared'
 import {
   BasicIndex,
   type Collection,
+  type PendingMutation,
   createCollection,
   createIndexedDB,
   indexedDBCollectionOptions,
@@ -104,12 +105,18 @@ function indexEvents(events: Collection<Event, string>) {
   events.createIndex((row) => row.familyId, { indexType: BasicIndex })
 }
 
-/** Backend-agnostic view of the collections; utils differ per storage backend. */
+/** What both storage backends offer: keeping a manual transaction's changes on the device. */
+export interface LocalUtils {
+  [key: string]: unknown
+  acceptMutations: (transaction: { mutations: PendingMutation[] }) => unknown
+}
+
+/** Backend-agnostic view of the collections; other utils differ per storage backend. */
 export interface LocalStore {
-  babies: Collection<Baby, string>
-  events: Collection<Event, string>
-  outbox: Collection<OutboxEntry, string>
-  meta: Collection<MetaEntry, string>
+  babies: Collection<Baby, string, LocalUtils>
+  events: Collection<Event, string, LocalUtils>
+  outbox: Collection<OutboxEntry, string, LocalUtils>
+  meta: Collection<MetaEntry, string, LocalUtils>
   mode: StorageMode
 }
 

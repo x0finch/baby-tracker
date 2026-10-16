@@ -9,13 +9,13 @@ import { formatNumber } from '../../lib/i18n'
 import { m } from '../../paraglide/messages.js'
 import { useAccess } from '../../sync/use-access'
 import { useBabies } from '../babies/use-babies'
+import { reminderKey, useReminders } from './collection'
 import {
   type PushState,
   disablePush,
   enablePush,
   getPushState,
   refreshPushSubscription,
-  reminderApi,
   sendTestNotification,
 } from './notifications'
 
@@ -31,11 +31,7 @@ const KIND_LABEL: Record<ReminderKind, () => string> = {
 /** Interval kept when a reminder is off, so turning it on again restores it. */
 const DEFAULT_MINUTES: Record<ReminderKind, number> = { feeding: 180, diaper: 180 }
 
-const REMINDERS_KEY = ['reminders']
 const PUSH_STATE_KEY = ['push-state']
-
-const sameReminder = (a: Reminder, b: Pick<Reminder, 'babyId' | 'kind'>) =>
-  a.babyId === b.babyId && a.kind === b.kind
 
 const pushHint: Partial<Record<PushState, () => string>> = {
   unsupported: m.pushUnsupported,
@@ -56,16 +52,16 @@ export function RemindersCard() {
       </Card>
     )
   }
-  return <Reminders key={userId} />
+  return <Reminders key={userId} userId={userId} />
 }
 
-function Reminders() {
+function Reminders({ userId }: { userId: string }) {
   const { active } = useBabies()
   // Reminders run on the server, so only babies that have synced to a family can have them.
   const babies = active.filter((baby) => baby.familyId !== null)
   const queryClient = useQueryClient()
   const push = usePushState()
-  const { data: reminders = [] } = useQuery({ queryKey: REMINDERS_KEY, queryFn: reminderApi.list })
+  const { collection } = useReminders(userId)
   const [message, setMessage] = useState<string>()
 
   // Browsers may rotate subscriptions, and the device may have changed hands since.
@@ -91,33 +87,21 @@ function Reminders() {
     onError: () => setMessage(m.pushFailed()),
   })
 
-  // Optimistic: the choice shows at once and rolls back if the server refuses it.
-  const save = useMutation({
-    mutationFn: reminderApi.save,
-    onMutate: async (next: Reminder) => {
-      setMessage(undefined)
-      await queryClient.cancelQueries({ queryKey: REMINDERS_KEY })
-      const previous = queryClient.getQueryData<Reminder[]>(REMINDERS_KEY)
-      queryClient.setQueryData<Reminder[]>(REMINDERS_KEY, (list = []) => [
-        ...list.filter((item) => !sameReminder(item, next)),
-        next,
-      ])
-      return { previous }
-    },
-    onError: (_error, _next, context) => {
-      queryClient.setQueryData(REMINDERS_KEY, context?.previous)
-      setMessage(m.reminderSaveFailed())
-    },
-  })
-
   function choose(baby: Baby, kind: ReminderKind, minutes: number) {
-    const previous = reminders.find((item) => sameReminder(item, { babyId: baby.id, kind }))
-    save.mutate({
+    setMessage(undefined)
+    const key = reminderKey({ babyId: baby.id, kind })
+    const previous = collection.get(key)
+    const next: Reminder = {
       babyId: baby.id,
       kind,
       intervalMinutes: minutes || previous?.intervalMinutes || DEFAULT_MINUTES[kind],
       enabled: minutes > 0,
-    })
+    }
+    // Optimistic: the choice shows at once and rolls back if the server refuses it.
+    const change = previous
+      ? collection.update(key, (draft) => Object.assign(draft, next))
+      : collection.insert(next)
+    change.isPersisted.promise.catch(() => setMessage(m.reminderSaveFailed()))
   }
 
   const hint = push ? pushHint[push] : undefined
@@ -154,7 +138,7 @@ function Reminders() {
         <section key={baby.id} className="flex flex-col gap-3 border-t-2 border-border pt-3">
           <h3 className="m-0 font-extrabold">{baby.name}</h3>
           {(['feeding', 'diaper'] as const).map((kind) => {
-            const reminder = reminders.find((item) => sameReminder(item, { babyId: baby.id, kind }))
+            const reminder = collection.get(reminderKey({ babyId: baby.id, kind }))
             const value = reminder?.enabled ? reminder.intervalMinutes : 0
             const choices = CHOICES[kind].includes(value)
               ? CHOICES[kind]

@@ -1,14 +1,13 @@
 import type { FamilySummary } from '@bobo/shared'
-import { useMutation } from '@tanstack/react-query'
 import { type FormEvent, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
-import { FormError } from '../../components/ui/FormError'
 import { Input } from '../../components/ui/Input'
 import { Sheet } from '../../components/ui/Sheet'
+import { toastIfRefused } from '../../lib/server-collection'
 import { m } from '../../paraglide/messages.js'
-import { requestSync } from '../../sync/runner'
 import { familyApi } from './api'
+import { useUpdateFamily } from './use-update-family'
 
 /** A member's private name for a family; only they see it. */
 export function AliasSheet({
@@ -21,18 +20,19 @@ export function AliasSheet({
   onClose: () => void
 }) {
   const [alias, setAlias] = useState(family.alias ?? '')
-  const save = useMutation({
-    mutationFn: () => familyApi.setAlias(family.id, alias.trim()),
-    onSuccess: async () => {
-      onClose()
-      // The alias arrives with the next pull's access list.
-      await requestSync()
-    },
-  })
+  const updateFamily = useUpdateFamily()
 
   function submit(event: FormEvent) {
     event.preventDefault()
-    save.mutate()
+    const next = alias.trim()
+    const change = updateFamily({
+      familyId: family.id,
+      // An empty alias clears it.
+      patch: { alias: next || null },
+      save: () => familyApi.setAlias(family.id, next),
+    })
+    toastIfRefused(change, m.actionFailed())
+    onClose()
   }
 
   return (
@@ -45,10 +45,9 @@ export function AliasSheet({
           maxLength={40}
           onChange={(e) => setAlias(e.target.value)}
         />
-        <Button type="submit" size="lg" block disabled={save.isPending}>
+        <Button type="submit" size="lg" block>
           {m.actionSave()}
         </Button>
-        {save.isError && <FormError>{m.actionFailed()}</FormError>}
       </form>
     </Sheet>
   )
