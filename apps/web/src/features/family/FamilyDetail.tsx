@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { ConfirmSheet } from '../../components/ui/ConfirmSheet'
 import { FormError } from '../../components/ui/FormError'
+import { Pill } from '../../components/ui/Pill'
 import { useLocalStore } from '../../db'
 import { m } from '../../paraglide/messages.js'
 import { requestSync } from '../../sync/runner'
@@ -67,9 +68,7 @@ export function FamilyDetail({ family, userId }: { family: FamilySummary; userId
           <h1 className="min-w-0 flex-1 truncate text-display font-extrabold">
             {familyDisplayName(family)}
           </h1>
-          <span className="rounded-full bg-surface px-2 text-caption font-bold text-fg-muted">
-            {roleLabel[family.role]()}
-          </span>
+          <Pill>{roleLabel[family.role]()}</Pill>
         </div>
         {family.alias && (
           <p className="text-caption text-fg-muted">{m.familyAliasOf({ name: family.name })}</p>

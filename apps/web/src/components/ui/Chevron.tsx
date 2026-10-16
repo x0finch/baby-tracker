@@ -1,9 +1,24 @@
-/** A bold chevron for rows that open a page (`next`) and links that go back. */
-export function Chevron({ direction = 'next' }: { direction?: 'next' | 'back' }) {
+import { clsx } from 'clsx'
+
+const paths = { left: 'M15 5l-7 7 7 7', right: 'M9 5l7 7-7 7' } as const
+
+/** A bold chevron: `right` on rows that open a page, `left` for going back or earlier. */
+export function Chevron({
+  direction = 'right',
+  className,
+}: {
+  direction?: keyof typeof paths
+  /** Size and colour; muted and 20px by default. */
+  className?: string
+}) {
   return (
-    <svg aria-hidden viewBox="0 0 24 24" className="size-5 shrink-0 text-fg-muted">
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      className={clsx('shrink-0', className ?? 'size-5 text-fg-muted')}
+    >
       <path
-        d={direction === 'next' ? 'M9 5l7 7-7 7' : 'M15 5l-7 7 7 7'}
+        d={paths[direction]}
         fill="none"
         stroke="currentColor"
         strokeWidth="3"

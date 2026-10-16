@@ -48,29 +48,41 @@ function SettingsIndex() {
     <section className="flex flex-col gap-4">
       <PageHeader title={m.settingsTitle()} />
       <SettingsGroup>
-        <SettingsRow to="/settings/account" title={m.accountTitle()} summary={accountSummary} />
+        <SettingsRow
+          link={{ to: '/settings/account' }}
+          title={m.accountTitle()}
+          summary={accountSummary}
+        />
       </SettingsGroup>
       <FamilyList />
       <SettingsGroup title={m.settingsGroupBabies()}>
-        <SettingsRow to="/settings/babies" title={m.settingsBabies()} summary={babiesSummary} />
         <SettingsRow
-          to="/settings/reminders"
+          link={{ to: '/settings/babies' }}
+          title={m.settingsBabies()}
+          summary={babiesSummary}
+        />
+        <SettingsRow
+          link={{ to: '/settings/reminders' }}
           title={m.remindersTitle()}
           summary={remindersSummary}
         />
         <SettingsRow
-          to="/settings/export"
+          link={{ to: '/settings/export' }}
           title={m.exportTitle()}
           summary={m.settingsExportSummary()}
         />
       </SettingsGroup>
       <SettingsGroup title={m.settingsGroupApp()}>
         <SettingsRow
-          to="/settings/display"
+          link={{ to: '/settings/display' }}
           title={m.settingsDisplay()}
           summary={useDisplaySummary()}
         />
-        <SettingsRow to="/settings/about" title={m.settingsAbout()} summary={useVersionSummary()} />
+        <SettingsRow
+          link={{ to: '/settings/about' }}
+          title={m.settingsAbout()}
+          summary={useVersionSummary()}
+        />
       </SettingsGroup>
       {import.meta.env.DEV && (
         <Link to="/ui" className="font-bold text-diaper-text underline">

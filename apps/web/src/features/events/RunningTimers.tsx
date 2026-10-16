@@ -5,6 +5,7 @@ import { AnimatePresence, m as motion } from 'motion/react'
 import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { useLocalStore } from '../../db'
+import { growInOut } from '../../lib/motion'
 import { useNow } from '../../lib/use-now'
 import { m } from '../../paraglide/messages.js'
 import { useAccess } from '../../sync/use-access'
@@ -12,6 +13,9 @@ import { saveEvent } from './actions'
 import { sideLabel } from './labels'
 import { currentBreastSide, stopEvent, switchBreastSide } from './records'
 import { formatClock } from './time'
+
+/** Space under each timer card, matching the page's gap-6 (cancelled by the list's -mb-6). */
+const TIMER_GAP = 24
 
 function BreastTimer({ event, now }: { event: FeedingEvent; now: number }) {
   const store = useLocalStore()
@@ -100,13 +104,7 @@ export function RunningTimers({ events }: { events: readonly Event[] }) {
     <div className="-mb-6 flex flex-col empty:hidden">
       <AnimatePresence initial={false}>
         {running.map((event) => (
-          <motion.div
-            key={event.id}
-            initial={{ height: 0, paddingBottom: 0, opacity: 0, scale: 0.96 }}
-            animate={{ height: 'auto', paddingBottom: 24, opacity: 1, scale: 1 }}
-            exit={{ height: 0, paddingBottom: 0, opacity: 0, scale: 0.96 }}
-            className="overflow-hidden"
-          >
+          <motion.div key={event.id} {...growInOut(TIMER_GAP)} className="overflow-hidden">
             {event.type === 'feeding' ? (
               <BreastTimer event={event} now={now} />
             ) : (
