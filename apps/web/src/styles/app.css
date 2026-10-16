@@ -247,8 +247,6 @@
  */
 :root {
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  /* A little overshoot, for things that arrive (sheets, popping chips). */
-  --ease-spring: cubic-bezier(0.2, 1.15, 0.35, 1);
 }
 
 @keyframes page-in-right {
@@ -356,52 +354,22 @@ html:active-view-transition-type(tab) {
 }
 
 /*
- * Bottom sheets slide up with a little bounce and glide away when closed. A sheet is most
- * of the screen tall, so the close takes half a second on an even ease-in-out curve: any
- * faster and the middle of the move is too quick to see, which reads as a jump.
+ * Bottom sheets: Sheet slides them in with a little bounce and plays the same slide
+ * backwards to close. The backdrop fades along with it.
  */
 .sheet {
-  --sheet-close: 500ms;
-  --ease-sheet-close: cubic-bezier(0.45, 0, 0.55, 1);
-  translate: 0 100%;
   /* Fills the gap the overshoot opens under the sheet. */
   box-shadow: 0 4rem 0 var(--color-bg);
-  transition:
-    translate var(--sheet-close) var(--ease-sheet-close),
-    display var(--sheet-close) allow-discrete,
-    overlay var(--sheet-close) allow-discrete;
-
-  &[open] {
-    translate: 0 0;
-    transition-duration: 380ms;
-    transition-timing-function: var(--ease-spring);
-  }
 
   &::backdrop {
-    background-color: rgb(0 0 0 / 0);
-    transition:
-      background-color var(--sheet-close) var(--ease-sheet-close),
-      display var(--sheet-close) allow-discrete,
-      overlay var(--sheet-close) allow-discrete;
-  }
-  &[open]::backdrop {
     background-color: rgb(0 0 0 / 0.4);
+    transition: background-color 380ms ease-out;
   }
-
-  /* Set by Sheet while it slides away before closing (works without exit transitions). */
-  &[open][data-closing] {
-    translate: 0 100%;
-    transition-duration: var(--sheet-close);
-    transition-timing-function: var(--ease-sheet-close);
-  }
-  &[open][data-closing]::backdrop {
+  &[data-closing]::backdrop {
     background-color: rgb(0 0 0 / 0);
   }
 }
 @starting-style {
-  .sheet[open] {
-    translate: 0 100%;
-  }
   .sheet[open]::backdrop {
     background-color: rgb(0 0 0 / 0);
   }
@@ -415,11 +383,6 @@ html:active-view-transition-type(tab) {
     &::view-transition-new(page) {
       animation: 150ms ease-out reverse both fade-out;
     }
-  }
-  .sheet,
-  .sheet[open] {
-    translate: 0 0;
-    transition-duration: 0s;
   }
   .animate-celebrate {
     animation: none;
