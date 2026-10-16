@@ -114,9 +114,9 @@ export function FeedingForm({
       <SegmentedControl<Kind>
         label={m.categoryFeeding()}
         options={[
-          { value: 'breast', label: m.feedingBreast() },
-          { value: 'bottle', label: m.feedingBottle() },
-          { value: 'solids', label: m.feedingSolids() },
+          { value: 'breast', label: m.feedBreast() },
+          { value: 'bottle', label: m.feedBottle() },
+          { value: 'solids', label: m.feedSolids() },
         ]}
         value={kind}
         onChange={setKind}

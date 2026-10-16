@@ -4,10 +4,10 @@ import { Card } from './ui/Card'
 import { SegmentedControl } from './ui/SegmentedControl'
 
 const rows: { [Q in Quantity]: { label: () => string; options: UnitPreferences[Q][] } } = {
-  volume: { label: m.unitsVolume, options: ['ml', 'oz'] },
-  weight: { label: m.unitsWeight, options: ['kg', 'lb'] },
-  length: { label: m.unitsLength, options: ['cm', 'in'] },
-  temperature: { label: m.unitsTemperature, options: ['c', 'f'] },
+  volume: { label: m.unitKindVolume, options: ['ml', 'oz'] },
+  weight: { label: m.unitKindWeight, options: ['kg', 'lb'] },
+  length: { label: m.unitKindLength, options: ['cm', 'in'] },
+  temperature: { label: m.unitKindTemperature, options: ['c', 'f'] },
 }
 
 const quantities = ['volume', 'weight', 'length', 'temperature'] as const

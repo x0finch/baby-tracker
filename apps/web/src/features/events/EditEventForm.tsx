@@ -149,7 +149,7 @@ export function EditEventForm({
     if ('at' in startResult) next = moveEventStart(next, startResult.at, current)
     if (next.type === 'sleep') {
       if (endResult && 'at' in endResult && 'at' in startResult) {
-        if (endResult.at < startResult.at) nextErrors.end = m.endBeforeStart()
+        if (endResult.at < startResult.at) nextErrors.end = m.eventEndBeforeStart()
         else next = { ...next, endAt: endResult.at }
       }
       next = { ...next, data: { kind: sleepKind } }

@@ -14,7 +14,7 @@ export function BackLink() {
       className="flex min-h-touch items-center gap-1 self-start font-bold text-fg-muted"
     >
       <Chevron direction="left" />
-      {m.familyBack()}
+      {m.actionBack()}
     </Link>
   )
 }

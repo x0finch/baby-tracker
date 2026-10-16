@@ -38,7 +38,7 @@ export function BabySwitcher() {
       <button
         type="button"
         onClick={() => setSheet('pick')}
-        aria-label={m.switcherLabel({ name: baby.name })}
+        aria-label={m.babySwitcherLabel({ name: baby.name })}
         className="mb-4 flex min-h-touch w-full items-center gap-3 rounded-xl border-2 border-b-4 border-border px-3 py-2 text-left active:translate-y-0.5 active:border-b-2"
       >
         <span className="relative">
@@ -66,7 +66,7 @@ export function BabySwitcher() {
         )}
       </button>
 
-      <Sheet open={sheet === 'pick'} onClose={close} title={m.switcherTitle()}>
+      <Sheet open={sheet === 'pick'} onClose={close} title={m.babySwitcherTitle()}>
         <BabyOptions
           babies={active}
           selectedId={baby.id}
@@ -76,16 +76,16 @@ export function BabySwitcher() {
           }}
           badges={
             new Map(
-              [...runningBabies].map((id) => [id, { label: m.runningBadge(), tone: 'danger' }]),
+              [...runningBabies].map((id) => [id, { label: m.timerRunning(), tone: 'danger' }]),
             )
           }
         />
         <Button variant="soft" tone="primary" block onClick={() => setSheet('add')}>
-          {m.addBabyTitle()}
+          {m.babyAddTitle()}
         </Button>
       </Sheet>
 
-      <Sheet open={sheet === 'add'} onClose={close} title={m.addBabyTitle()}>
+      <Sheet open={sheet === 'add'} onClose={close} title={m.babyAddTitle()}>
         {sheet === 'add' && (
           <AddBaby
             choices={babyFamilies.choices}
@@ -146,7 +146,7 @@ function AddBaby({
           sex: 'unspecified',
           avatarColor: nextColor,
         }}
-        submitLabel={m.addBabyTitle()}
+        submitLabel={m.babyAddTitle()}
         onCancel={onCancel}
         onSubmit={(input) => onAdded(createBaby(store, input, familyId).id)}
       />

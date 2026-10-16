@@ -17,7 +17,7 @@ export function SinceLast({ events }: { events: readonly Event[] }) {
       label: m.sinceSleep(),
       at: sleeping ? undefined : lastActivityAt(events, 'sleep', now),
       icon: 'sleep',
-      override: sleeping ? m.sleepingNow() : undefined,
+      override: sleeping ? m.sinceSleepingNow() : undefined,
     },
     { label: m.sinceDiaper(), at: lastActivityAt(events, 'diaper', now), icon: 'diaper' },
   ]
@@ -34,8 +34,8 @@ export function SinceLast({ events }: { events: readonly Event[] }) {
             <RollingText>
               {item.override ??
                 (item.at === undefined
-                  ? m.neverLogged()
-                  : m.ago({ duration: durationLabel(now - item.at) }))}
+                  ? m.sinceNever()
+                  : m.timeAgo({ duration: durationLabel(now - item.at) }))}
             </RollingText>
           </dd>
         </div>

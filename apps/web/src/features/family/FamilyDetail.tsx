@@ -128,7 +128,7 @@ export function FamilyDetail({ family, userId }: { family: FamilySummary; userId
 
         {managing && invites.length > 0 && (
           <>
-            <h3 className="m-0 text-caption font-bold text-fg-muted">{m.invitesPending()}</h3>
+            <h3 className="m-0 text-caption font-bold text-fg-muted">{m.invitePending()}</h3>
             <ul className="m-0 flex list-none flex-col p-0">
               {invites.map((invite) => (
                 <li key={invite.code} className="flex min-h-touch items-center gap-3">

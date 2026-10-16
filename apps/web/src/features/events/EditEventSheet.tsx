@@ -18,7 +18,7 @@ export function EditEventSheet({
 }) {
   const editing = events.find((event) => event.id === eventId)
   return (
-    <Sheet open={editing !== undefined} onClose={onClose} title={m.editEventTitle()}>
+    <Sheet open={editing !== undefined} onClose={onClose} title={m.eventEditTitle()}>
       {editing && (
         <EditEventForm
           key={editing.id}

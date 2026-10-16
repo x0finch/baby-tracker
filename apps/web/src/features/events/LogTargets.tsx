@@ -19,7 +19,7 @@ export function LogTargets({
 }) {
   return (
     <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
-      <legend className="mb-2 p-0 text-caption font-bold text-fg-muted">{m.logFor()}</legend>
+      <legend className="mb-2 p-0 text-caption font-bold text-fg-muted">{m.eventLogFor()}</legend>
       <div className="flex flex-wrap gap-2">
         {[current, ...others].map((baby) => {
           const isCurrent = baby.id === current.id

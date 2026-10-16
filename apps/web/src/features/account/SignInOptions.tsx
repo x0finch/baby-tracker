@@ -200,9 +200,9 @@ export function SignInOptions({
         )}
         {mode === 'sign-up' && (
           <Input
-            label={m.nicknameLabel()}
+            label={m.signUpNickname()}
             autoComplete="nickname"
-            placeholder={m.nicknamePlaceholder()}
+            placeholder={m.signUpNicknamePlaceholder()}
             maxLength={30}
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -238,16 +238,16 @@ export function SignInOptions({
         {mode === 'sign-in' && (
           <>
             <Button variant="ghost" onClick={() => switchMode('sign-up')}>
-              {m.switchToSignUp()}
+              {m.signUpSwitch()}
             </Button>
             <Button variant="ghost" onClick={() => switchMode('reset-request')}>
-              {m.forgotPassword()}
+              {m.passwordForgot()}
             </Button>
           </>
         )}
         {mode === 'sign-up' && (
           <Button variant="ghost" onClick={() => switchMode('sign-in')}>
-            {m.switchToSignIn()}
+            {m.signInSwitch()}
           </Button>
         )}
         {(mode === 'reset-request' || mode === 'reset') && (

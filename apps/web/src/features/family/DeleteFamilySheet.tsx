@@ -49,7 +49,7 @@ export function DeleteFamilySheet({
         empty
           ? undefined
           : {
-              lead: m.familyDeleteLead({ name: family.name }),
+              lead: m.deleteLead({ name: family.name }),
               items: [
                 m.familyDeleteRecords({ babies, records }),
                 members > 0 && m.familyDeleteMembers({ count: members }),

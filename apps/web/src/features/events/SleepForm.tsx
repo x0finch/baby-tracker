@@ -62,7 +62,7 @@ export function SleepForm({
     if ('error' in startResult) nextErrors.start = startResult.error
     if ('error' in endResult) nextErrors.end = endResult.error
     if ('at' in startResult && 'at' in endResult) {
-      if (endResult.at < startResult.at) nextErrors.end = m.endBeforeStart()
+      if (endResult.at < startResult.at) nextErrors.end = m.eventEndBeforeStart()
       else if (overlapsSleep(events, startResult.at, endResult.at, current)) {
         nextErrors.form = m.sleepOverlap()
       } else {

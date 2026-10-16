@@ -66,7 +66,7 @@ export function QuickActions({ baby, events }: { baby: Baby; events: readonly Ev
           ))}
         </div>
         <Button variant="soft" tone="primary" block onClick={() => setOpen('more')}>
-          {m.moreRecords()}
+          {m.eventMoreRecords()}
         </Button>
       </div>
       <Sheet open={logging !== undefined} onClose={close} title={sheetTitle(logging)}>
@@ -84,7 +84,7 @@ export function QuickActions({ baby, events }: { baby: Baby; events: readonly Ev
           </div>
         )}
       </Sheet>
-      <Sheet open={open === 'more'} onClose={close} title={m.moreRecords()}>
+      <Sheet open={open === 'more'} onClose={close} title={m.eventMoreRecords()}>
         <div className="grid grid-cols-2 gap-3">
           {OTHER_CATEGORIES.map((category) => (
             <Button

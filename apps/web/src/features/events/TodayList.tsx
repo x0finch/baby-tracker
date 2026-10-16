@@ -39,7 +39,7 @@ export function TodayList({ events }: { events: readonly Event[] }) {
     daysBack === 0
       ? m.todaySummaryTitle()
       : daysBack === 1
-        ? m.yesterdayRecords()
+        ? m.dayYesterdayRecords()
         : m.dayRecords({ date: formatDate(dayStart) })
   const close = () => setEditingId(null)
 
@@ -48,7 +48,7 @@ export function TodayList({ events }: { events: readonly Event[] }) {
       id: 'event-deleted',
       duration: UNDO_MS,
       action: {
-        label: m.undo(),
+        label: m.actionUndo(),
         onClick: () => saveEvent(store, restoreEvent(deleted, Date.now())),
       },
     })
@@ -83,7 +83,7 @@ export function TodayList({ events }: { events: readonly Event[] }) {
           onClick={() => showDay(0)}
           className="self-start font-bold text-primary-text"
         >
-          {m.backToToday()}
+          {m.dayBackToToday()}
         </button>
       )}
       <AnimatePresence initial={false} mode="wait" custom={direction}>
@@ -112,7 +112,7 @@ export function TodayList({ events }: { events: readonly Event[] }) {
                     />
                     <button
                       type="button"
-                      aria-label={m.editEventLabel({ time, title })}
+                      aria-label={m.eventEditLabel({ time, title })}
                       onClick={() => setEditingId(event.id)}
                       className="relative flex min-h-touch w-full items-center gap-3 py-3 text-left active:bg-surface"
                     >

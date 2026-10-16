@@ -93,7 +93,7 @@ export function AccountCard() {
           <SyncStatusLine />
           {(pending?.length ?? 0) > 0 && (
             <p className="m-0 text-caption text-fg-muted">
-              {m.pendingChanges({ count: pending?.length ?? 0 })}
+              {m.syncPending({ count: pending?.length ?? 0 })}
             </p>
           )}
           <div className="grid grid-cols-2 gap-3">
@@ -115,18 +115,18 @@ export function AccountCard() {
           </Sheet>
           <PasskeySection />
           <Button variant="ghost" tone="danger" onClick={() => setDeleting(true)}>
-            {m.deleteAccount()}
+            {m.accountDelete()}
           </Button>
           <ConfirmSheet
             open={deleting}
             onClose={() => setDeleting(false)}
-            title={m.deleteAccount()}
-            confirmLabel={m.deleteAccountConfirm()}
+            title={m.accountDelete()}
+            confirmLabel={m.actionDeleteForever()}
             onConfirm={() => deleteAccount.mutate()}
             busy={deleteAccount.isPending}
-            error={deleteAccount.isError ? m.deleteAccountFailed() : undefined}
+            error={deleteAccount.isError ? m.accountDeleteFailed() : undefined}
           >
-            {m.deleteAccountBody()}
+            {m.accountDeleteBody()}
           </ConfirmSheet>
         </>
       ) : (

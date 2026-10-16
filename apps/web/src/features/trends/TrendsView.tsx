@@ -258,10 +258,10 @@ export function TrendsView({ events }: { events: readonly Event[] }) {
   return (
     <div className="flex flex-col gap-4">
       <SegmentedControl<`${Range}`>
-        label={m.trendsRange()}
+        label={m.trendRange()}
         options={[
-          { value: '7', label: m.trendsRange7() },
-          { value: '30', label: m.trendsRange30() },
+          { value: '7', label: m.trendRange7() },
+          { value: '30', label: m.trendRange30() },
         ]}
         value={`${range}`}
         onChange={(value) => setRange(value === '30' ? 30 : 7)}

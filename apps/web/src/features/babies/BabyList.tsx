@@ -53,7 +53,7 @@ export function BabyList() {
       ))}
       {archived.length > 0 && (
         <>
-          <h3 className="mt-2 text-caption font-bold text-fg-muted">{m.archivedBabies()}</h3>
+          <h3 className="mt-2 text-caption font-bold text-fg-muted">{m.babyArchivedGroup()}</h3>
           {archived.map((baby) => (
             <div key={baby.id} className="flex items-center gap-3">
               <div className="min-w-0 flex-1 opacity-70">
@@ -76,7 +76,7 @@ export function BabyList() {
         </>
       )}
 
-      <Sheet open={editing !== undefined} onClose={close} title={m.editBabyTitle()}>
+      <Sheet open={editing !== undefined} onClose={close} title={m.babyEditTitle()}>
         {editing && (
           <>
             <BabyForm

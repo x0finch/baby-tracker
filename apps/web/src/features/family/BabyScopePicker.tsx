@@ -27,7 +27,7 @@ export function BabyScopePicker({
           checked={value === null}
           onChange={(e) => onChange(e.target.checked ? null : babies.map((baby) => baby.id))}
         />
-        <span className="font-bold">{m.familyAllBabies()}</span>
+        <span className="font-bold">{m.babyAll()}</span>
       </label>
       {value !== null &&
         babies.map((baby) => (
@@ -48,7 +48,7 @@ export function BabyScopePicker({
 
 /** "全部宝宝" or the names of the babies in scope. */
 export function scopeLabel(babyIds: string[] | null, babies: Baby[]): string {
-  if (babyIds === null) return m.familyAllBabies()
+  if (babyIds === null) return m.babyAll()
   return babies
     .filter((baby) => babyIds.includes(baby.id))
     .map((baby) => baby.name)
