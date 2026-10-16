@@ -45,8 +45,17 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # The end-to-end job serves this build (prerendering doesn't work inside its container).
+      - name: Upload web build
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+          retention-days: 1
+
   e2e:
     name: End-to-end
+    needs: check
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # The Playwright image pins the browser and fonts, so screenshots match the baselines
@@ -65,8 +74,11 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build web
-        run: pnpm --filter @bobo/web build
+      - name: Download web build
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
 
       - name: Run end-to-end tests
         run: pnpm --filter @bobo/e2e test:e2e
