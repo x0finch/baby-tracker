@@ -13,7 +13,8 @@
     "test": "vitest run",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
     "codegen": "pnpm -r --if-present codegen",
-    "postinstall": "pnpm codegen"
+    "postinstall": "pnpm codegen",
+    "test:e2e": "pnpm --filter @bobo/web build && pnpm --filter @bobo/e2e test:e2e"
   },
   "devDependencies": {
     "oxfmt": "^0.72.0",
