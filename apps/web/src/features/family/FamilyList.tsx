@@ -1,8 +1,8 @@
 import { type Baby, type FamilySummary, familyDisplayName } from '@bobo/shared'
-import { Link } from '@tanstack/react-router'
 
+import { SettingsRow } from '../../components/SettingsLayout'
 import { Card } from '../../components/ui/Card'
-import { Chevron } from '../../components/ui/Chevron'
+import { Pill } from '../../components/ui/Pill'
 import { m } from '../../paraglide/messages.js'
 import { useAccess } from '../../sync/use-access'
 import { useBabies } from '../babies/use-babies'
@@ -34,24 +34,13 @@ export function FamilyList() {
           const details = [babiesLabel(babies)]
           if (family.memberCount) details.push(m.familyMembersCount({ count: family.memberCount }))
           return (
-            <li key={family.id} className="border-b-2 border-border last:border-b-0">
-              <Link
-                to="/settings/family/$familyId"
-                params={{ familyId: family.id }}
-                className="flex min-h-touch items-center gap-3 py-3 active:bg-surface"
-              >
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="flex items-center gap-2">
-                    <span className="truncate font-extrabold">{familyDisplayName(family)}</span>
-                    <span className="shrink-0 rounded-full bg-surface px-2 text-caption font-bold text-fg-muted">
-                      {roleLabel[family.role]()}
-                    </span>
-                  </span>
-                  <span className="truncate text-caption text-fg-muted">{details.join(' · ')}</span>
-                </span>
-                <Chevron />
-              </Link>
-            </li>
+            <SettingsRow
+              key={family.id}
+              link={{ to: '/settings/family/$familyId', params: { familyId: family.id } }}
+              title={familyDisplayName(family)}
+              badge={<Pill className="shrink-0">{roleLabel[family.role]()}</Pill>}
+              summary={details.join(' · ')}
+            />
           )
         })}
       </ul>

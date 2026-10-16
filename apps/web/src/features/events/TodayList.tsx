@@ -2,9 +2,11 @@ import { type Event, startOfLocalDay } from '@bobo/shared'
 import { AnimatePresence, m as motion } from 'motion/react'
 import { useState } from 'react'
 
+import { Chevron } from '../../components/ui/Chevron'
 import { showToast } from '../../components/ui/Toast'
 import { useLocalStore } from '../../db'
 import { formatDate, formatTime } from '../../lib/i18n'
+import { glowOnce, rowInOut, slideFromSide } from '../../lib/motion'
 import { useNow } from '../../lib/use-now'
 import { m } from '../../paraglide/messages.js'
 import { saveEvent } from './actions'
@@ -14,28 +16,6 @@ import { EventIcon, eventIconProps } from './EventIcon'
 import { restoreEvent } from './records'
 
 const UNDO_MS = 6000
-
-/** Days slide in from the side the user moved towards (the direction comes in `custom`). */
-const daySlide = {
-  enter: (direction: number) => ({ opacity: 0, x: direction * 32 }),
-  center: { opacity: 1, x: 0 },
-  exit: (direction: number) => ({ opacity: 0, x: direction * -32, transition: { duration: 0.1 } }),
-}
-
-function Chevron({ direction }: { direction: 'left' | 'right' }) {
-  return (
-    <svg aria-hidden viewBox="0 0 24 24" className="size-6">
-      <path
-        d={direction === 'left' ? 'M15 5l-7 7 7 7' : 'M9 5l7 7-7 7'}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
 
 /**
  * A day's events for the selected baby, newest first; tap a row to edit it. Opens on today,
@@ -84,7 +64,7 @@ export function TodayList({ events }: { events: readonly Event[] }) {
             onClick={() => showDay(daysBack + 1)}
             className="flex size-touch items-center justify-center rounded-full text-fg-muted active:bg-surface"
           >
-            <Chevron direction="left" />
+            <Chevron direction="left" className="size-6" />
           </button>
           <button
             type="button"
@@ -93,7 +73,7 @@ export function TodayList({ events }: { events: readonly Event[] }) {
             onClick={() => showDay(Math.max(0, daysBack - 1))}
             className="flex size-touch items-center justify-center rounded-full text-fg-muted active:bg-surface disabled:opacity-30"
           >
-            <Chevron direction="right" />
+            <Chevron direction="right" className="size-6" />
           </button>
         </div>
       </div>
@@ -107,14 +87,7 @@ export function TodayList({ events }: { events: readonly Event[] }) {
         </button>
       )}
       <AnimatePresence initial={false} mode="wait" custom={direction}>
-        <motion.div
-          key={daysBack}
-          custom={direction}
-          variants={daySlide}
-          initial="enter"
-          animate="center"
-          exit="exit"
-        >
+        <motion.div key={daysBack} custom={direction} {...slideFromSide}>
           {today.length === 0 && (
             <p className="text-fg-muted">{daysBack === 0 ? m.todayEmpty() : m.dayEmpty()}</p>
           )}
@@ -129,17 +102,13 @@ export function TodayList({ events }: { events: readonly Event[] }) {
                   <motion.li
                     key={event.id}
                     layout="position"
-                    initial={{ opacity: 0, y: -12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, height: 0 }}
+                    {...rowInOut}
                     className="relative overflow-hidden border-b-2 border-border"
                   >
                     <motion.span
                       aria-hidden
                       className="pointer-events-none absolute inset-0 bg-primary-soft"
-                      initial={{ opacity: 1 }}
-                      animate={{ opacity: 0 }}
-                      transition={{ duration: 1.2, delay: 0.3, ease: 'easeOut' }}
+                      {...glowOnce}
                     />
                     <button
                       type="button"

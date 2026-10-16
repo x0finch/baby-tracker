@@ -2,6 +2,7 @@ import { type Baby, type FamilySummary, familyDisplayName } from '@bobo/shared'
 import { clsx } from 'clsx'
 import type { ReactNode } from 'react'
 
+import { Pill, type PillTone } from '../../components/ui/Pill'
 import { m } from '../../paraglide/messages.js'
 import { useAccess } from '../../sync/use-access'
 import { sortFamilies } from '../family/FamilyList'
@@ -29,20 +30,15 @@ function groupByFamily(babies: readonly Baby[], access: readonly FamilySummary[]
 
 export interface OptionBadge {
   label: string
-  tone: 'danger' | 'muted'
+  tone: PillTone
 }
 
 function Badge({ badge }: { badge: OptionBadge | undefined }) {
   if (!badge) return null
   return (
-    <span
-      className={clsx(
-        'ml-auto rounded-full px-2 text-caption font-bold',
-        badge.tone === 'danger' ? 'bg-danger-soft text-danger-text' : 'bg-surface text-fg-muted',
-      )}
-    >
+    <Pill tone={badge.tone} className="ml-auto">
       {badge.label}
-    </span>
+    </Pill>
   )
 }
 

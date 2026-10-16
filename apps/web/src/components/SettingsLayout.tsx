@@ -13,7 +13,7 @@ export function BackLink() {
       to="/settings"
       className="flex min-h-touch items-center gap-1 self-start font-bold text-fg-muted"
     >
-      <Chevron direction="back" />
+      <Chevron direction="left" />
       {m.familyBack()}
     </Link>
   )
@@ -44,21 +44,31 @@ export function SettingsGroup({ title, children }: { title?: string; children: R
   )
 }
 
-/** One entry of the settings index: a title, a one-line status and a chevron. */
+/** One entry of a settings list: a title (with an optional pill), a one-line status and a chevron. */
 export function SettingsRow({
-  to,
+  link,
   title,
+  badge,
   summary,
 }: {
-  to: LinkProps['to']
+  /** Where the row leads, as `Link` takes it (`to`, and `params` for a path like a family's). */
+  link: LinkProps
   title: string
+  badge?: ReactNode
   summary: string
 }) {
   return (
     <li className="border-b-2 border-border last:border-b-0">
-      <Link to={to} className="flex min-h-touch items-center gap-3 py-3 active:bg-surface">
+      <Link {...link} className="flex min-h-touch items-center gap-3 py-3 active:bg-surface">
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate font-extrabold">{title}</span>
+          {badge ? (
+            <span className="flex items-center gap-2">
+              <span className="truncate font-extrabold">{title}</span>
+              {badge}
+            </span>
+          ) : (
+            <span className="truncate font-extrabold">{title}</span>
+          )}
           <span className="truncate text-caption text-fg-muted">{summary}</span>
         </span>
         <Chevron />

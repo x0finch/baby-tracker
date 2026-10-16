@@ -1,6 +1,8 @@
 import { clsx } from 'clsx'
 import { type PointerEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 
+import { prefersReducedMotion } from '../../lib/motion'
+
 export interface SheetProps {
   open: boolean
   onClose: () => void
@@ -35,8 +37,6 @@ function slideThrough(dialog: HTMLDialogElement, dy: number) {
   animation.currentTime = DRAG_SLIDE_MS / 2
   return animation
 }
-
-const prefersReducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches
 
 /** The value from the last render while open, held unchanged once `open` turns false. */
 function useLastOpen<T>(open: boolean, value: T): T {
