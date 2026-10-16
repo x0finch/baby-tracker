@@ -247,8 +247,6 @@
  */
 :root {
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  /* A little overshoot, for things that arrive (sheets, popping chips). */
-  --ease-spring: cubic-bezier(0.2, 1.15, 0.35, 1);
 }
 
 @keyframes page-in-right {
@@ -355,47 +353,27 @@ html:active-view-transition-type(tab) {
   }
 }
 
-/* Bottom sheets slide up with a little bounce and drop away when closed. */
+/*
+ * Bottom sheets: Sheet slides them in with a little bounce and plays the same slide
+ * backwards to close. The backdrop fades along with it.
+ */
 .sheet {
-  translate: 0 100%;
   /* Fills the gap the overshoot opens under the sheet. */
   box-shadow: 0 4rem 0 var(--color-bg);
-  transition:
-    translate 220ms ease-in,
-    display 220ms allow-discrete,
-    overlay 220ms allow-discrete;
-
-  &[open] {
-    translate: 0 0;
-    transition-duration: 380ms;
-    transition-timing-function: var(--ease-spring);
-  }
 
   &::backdrop {
-    background-color: rgb(0 0 0 / 0);
-    transition:
-      background-color 220ms ease-out,
-      display 220ms allow-discrete,
-      overlay 220ms allow-discrete;
-  }
-  &[open]::backdrop {
     background-color: rgb(0 0 0 / 0.4);
+    transition: background-color 380ms ease-out;
   }
-
-  /* Set by Sheet while it slides away before closing (works without exit transitions). */
-  &[open][data-closing] {
-    translate: 0 100%;
-    transition-duration: 220ms;
-    transition-timing-function: ease-in;
+  &[data-closing] {
+    /* What it shows is a snapshot of the closed state; nothing in it should react. */
+    pointer-events: none;
   }
-  &[open][data-closing]::backdrop {
+  &[data-closing]::backdrop {
     background-color: rgb(0 0 0 / 0);
   }
 }
 @starting-style {
-  .sheet[open] {
-    translate: 0 100%;
-  }
   .sheet[open]::backdrop {
     background-color: rgb(0 0 0 / 0);
   }
@@ -409,11 +387,6 @@ html:active-view-transition-type(tab) {
     &::view-transition-new(page) {
       animation: 150ms ease-out reverse both fade-out;
     }
-  }
-  .sheet,
-  .sheet[open] {
-    translate: 0 0;
-    transition-duration: 0s;
   }
   .animate-celebrate {
     animation: none;

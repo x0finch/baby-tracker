@@ -1,5 +1,5 @@
 import { clsx } from 'clsx'
-import { type PointerEvent, type ReactNode, useEffect, useRef } from 'react'
+import { type PointerEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 
 export interface SheetProps {
   open: boolean
@@ -11,10 +11,42 @@ export interface SheetProps {
 /** Pulled down this far (px), or flicked down this fast (px/ms), the sheet closes. */
 const CLOSE_DISTANCE = 96
 const CLOSE_VELOCITY = 0.6
-/** Matches the closing slide in styles/app.css. */
-const CLOSE_MS = 220
+/** How the sheet slides in, with a little bounce. Closing plays the same slide backwards. */
+const SLIDE: Keyframe[] = [{ translate: '0 100%' }, { translate: '0 0' }]
+const SLIDE_TIMING: KeyframeAnimationOptions = {
+  duration: 380,
+  easing: 'cubic-bezier(0.2, 1.15, 0.35, 1)',
+  fill: 'both',
+}
+/**
+ * After a drag: a slide from hidden through where the finger let go to open, started
+ * halfway. Played forwards it settles back open; reversed it carries on down and away.
+ */
+const DRAG_SLIDE_MS = 400
+function slideThrough(dialog: HTMLDialogElement, dy: number) {
+  const animation = dialog.animate(
+    [
+      { translate: '0 100%', easing: 'ease-in' },
+      { translate: `0 ${dy}px`, easing: 'ease-out' },
+      { translate: '0 0' },
+    ],
+    { duration: DRAG_SLIDE_MS, fill: 'both' },
+  )
+  animation.currentTime = DRAG_SLIDE_MS / 2
+  return animation
+}
 
 const prefersReducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches
+
+/** The value from the last render while open, held unchanged once `open` turns false. */
+function useLastOpen<T>(open: boolean, value: T): T {
+  const last = useRef(value)
+  // Remembering the previous render is the point here, so the ref is read during render.
+  // oxlint-disable-next-line react/refs
+  if (open) last.current = value
+  // oxlint-disable-next-line react/refs
+  return open ? value : last.current
+}
 
 /**
  * Bottom sheet built on the native <dialog> element, which provides focus trapping,
@@ -27,41 +59,66 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
   // hands over to another).
   const openRef = useRef(open)
   const drag = useRef<{ startY: number; startTime: number; dy: number } | null>(null)
+  // The current slide; reversing it closes the sheet (or reopens it mid-close).
+  const slide = useRef<Animation | null>(null)
+  // Parents usually drop the sheet's content as soon as it closes; keep showing what was
+  // there until the slide away has finished, so the sheet leaves whole instead of
+  // collapsing first. Once closed, the content unmounts.
+  const shown = useLastOpen(open, { title, children })
+  // True from opening until the closing slide has finished (set before any render where
+  // `open` is already false, so the content never drops out for a frame).
+  const [shownInDialog, setShownInDialog] = useState(false)
 
   useEffect(() => {
     openRef.current = open
     const dialog = ref.current
     if (!dialog) return undefined
     if (open) {
-      // Opening again mid-slide just stops the slide.
       delete dialog.dataset.closing
-      if (dialog.open) return undefined
-      // A sheet dragged closed last time keeps its inline position until it opens again.
-      dialog.style.translate = ''
+      if (dialog.open) {
+        // Reopened while sliding away: play the slide forwards again.
+        if (slide.current && slide.current.playbackRate < 0) slide.current.reverse()
+        return undefined
+      }
       dialog.showModal()
+      setShownInDialog(true)
       // A reused sheet starts at the top, not where its previous content was scrolled to.
       dialog.scrollTop = 0
       // showModal() focuses the first input, which would pop the keyboard on phones.
       dialog.focus()
+      slide.current?.cancel()
+      slide.current = prefersReducedMotion() ? null : dialog.animate(SLIDE, SLIDE_TIMING)
       return undefined
     }
     if (!dialog.open) return undefined
-    // Slide down first, then close: every way of closing (backdrop, Escape, a drag, the
-    // parent) looks the same, including in browsers without exit transitions (Safari).
-    if (prefersReducedMotion()) {
+    const current = slide.current
+    if (!current) {
       dialog.close()
+      setShownInDialog(false)
       return undefined
     }
+    // Every way of closing (backdrop, Escape, a drag, the parent) plays the slide backwards,
+    // then closes; the backdrop fades with it (styles/app.css).
     dialog.dataset.closing = ''
-    const timer = setTimeout(() => {
-      delete dialog.dataset.closing
-      dialog.close()
-    }, CLOSE_MS)
-    return () => clearTimeout(timer)
+    if (current.playbackRate > 0) current.reverse()
+    let cancelled = false
+    current.finished
+      .then(() => {
+        if (cancelled) return
+        delete dialog.dataset.closing
+        dialog.close()
+        setShownInDialog(false)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
   }, [open])
 
   // Dragging the header pulls the sheet down; far or fast enough, it closes.
   const startDrag = (event: PointerEvent<HTMLDivElement>) => {
+    // The finger moves the sheet now; a running slide would hold it in place.
+    slide.current?.cancel()
     drag.current = { startY: event.clientY, startTime: event.timeStamp, dy: 0 }
     event.currentTarget.setPointerCapture(event.pointerId)
   }
@@ -69,7 +126,6 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
     const dialog = ref.current
     if (!drag.current || !dialog) return
     drag.current.dy = Math.max(0, event.clientY - drag.current.startY)
-    dialog.style.transition = 'none'
     dialog.style.translate = `0 ${drag.current.dy}px`
   }
   const endDrag = (event: PointerEvent<HTMLDivElement>) => {
@@ -77,15 +133,11 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
     const state = drag.current
     drag.current = null
     if (!dialog || !state) return
-    dialog.style.transition = ''
+    dialog.style.translate = ''
+    slide.current = slideThrough(dialog, state.dy)
     const velocity = state.dy / Math.max(1, event.timeStamp - state.startTime)
-    if (state.dy > CLOSE_DISTANCE || (state.dy > 24 && velocity > CLOSE_VELOCITY)) {
-      // Carry on down from where the finger let go.
-      dialog.style.translate = '0 100%'
-      onClose()
-    } else {
-      dialog.style.translate = ''
-    }
+    // Far or fast enough: closing reverses the slide, carrying on down from the finger.
+    if (state.dy > CLOSE_DISTANCE || (state.dy > 24 && velocity > CLOSE_VELOCITY)) onClose()
   }
 
   return (
@@ -95,7 +147,7 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
     <dialog
       ref={ref}
       tabIndex={-1}
-      aria-label={title}
+      aria-label={shown.title}
       onCancel={(event) => {
         // Escape: let the sheet slide away like any other close.
         event.preventDefault()
@@ -122,9 +174,9 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
           onPointerCancel={endDrag}
         >
           <div aria-hidden className="mx-auto h-1.5 w-10 rounded-full bg-border" />
-          <h2 className="text-title font-extrabold">{title}</h2>
+          <h2 className="text-title font-extrabold">{shown.title}</h2>
         </div>
-        {children}
+        {open || shownInDialog ? shown.children : null}
       </div>
     </dialog>
   )
