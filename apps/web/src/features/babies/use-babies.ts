@@ -1,17 +1,27 @@
 import type { Baby } from '@bobo/shared'
+import { isNull } from '@tanstack/db'
 import { useLiveQuery } from '@tanstack/react-db'
 import { useCallback, useMemo } from 'react'
 
 import { useLocalStore } from '../../db'
 import { createStoredValue, stringCodec, useStore } from '../../lib/store'
-import { isActiveBaby, resolveSelectedBaby, sortBabies } from './records'
+import { isActiveBaby, resolveSelectedBaby } from './records'
 
 export function useBabies(): { active: Baby[]; archived: Baby[] } {
   const { babies } = useLocalStore()
-  const { data } = useLiveQuery({ query: (q) => q.from({ baby: babies }) })
+  // Creation order, as sortBabies; the selection falls back to the first active baby.
+  const { data } = useLiveQuery(
+    (q) =>
+      q
+        .from({ baby: babies })
+        .where(({ baby }) => isNull(baby.deletedAt))
+        .orderBy(({ baby }) => baby.createdAt)
+        .orderBy(({ baby }) => baby.id),
+    [babies],
+  )
 
   return useMemo(() => {
-    const all = sortBabies((data ?? []).filter((baby) => baby.deletedAt === null))
+    const all = data ?? []
     return {
       active: all.filter(isActiveBaby),
       archived: all.filter((baby) => !isActiveBaby(baby)),

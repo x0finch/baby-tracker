@@ -8,12 +8,12 @@ import { Card } from '../../components/ui/Card'
 import { ConfirmSheet } from '../../components/ui/ConfirmSheet'
 import { FormError } from '../../components/ui/FormError'
 import { Pill } from '../../components/ui/Pill'
-import { useLocalStore } from '../../db'
 import { m } from '../../paraglide/messages.js'
 import { requestSync } from '../../sync/runner'
 import { ageLabel } from '../babies/age-label'
 import { BabyAvatar } from '../babies/BabyAvatar'
 import { useBabies } from '../babies/use-babies'
+import { useRecordCount } from '../events/use-events'
 import { AliasSheet } from './AliasSheet'
 import { familyApi, invitesQuery, useMembers } from './api'
 import { scopeLabel } from './BabyScopePicker'
@@ -25,7 +25,6 @@ import { roleLabel } from './roles'
 
 /** One family: its babies, members and invites, and the actions the user's role allows. */
 export function FamilyDetail({ family, userId }: { family: FamilySummary; userId: string }) {
-  const store = useLocalStore()
   const { active, archived } = useBabies()
   const babies = [...active, ...archived].filter((baby) => baby.familyId === family.id)
   const queryClient = useQueryClient()
@@ -56,9 +55,7 @@ export function FamilyDetail({ family, userId }: { family: FamilySummary; userId
     onSuccess: refresh,
   })
 
-  const records = store.events.toArray.filter(
-    (event) => event.familyId === family.id && event.deletedAt === null,
-  ).length
+  const records = useRecordCount({ familyId: family.id })
   const others = (members?.length ?? family.memberCount ?? 1) - 1
 
   return (

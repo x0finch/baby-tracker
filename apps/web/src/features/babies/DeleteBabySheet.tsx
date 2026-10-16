@@ -4,6 +4,7 @@ import { DeleteConfirmSheet } from '../../components/ui/DeleteConfirmSheet'
 import { useLocalStore } from '../../db'
 import { m } from '../../paraglide/messages.js'
 import { useAccess } from '../../sync/use-access'
+import { useRecordCount } from '../events/use-events'
 import { deleteBaby } from './actions'
 
 /**
@@ -19,10 +20,7 @@ export function DeleteBabySheet({
 }) {
   const store = useLocalStore()
   const { access } = useAccess()
-  const records = baby
-    ? store.events.toArray.filter((event) => event.babyId === baby.id && event.deletedAt === null)
-        .length
-    : 0
+  const records = useRecordCount(baby && { babyId: baby.id })
   const family = access?.find((item) => item.id === baby?.familyId)
   const others = (family?.memberCount ?? 1) - 1
   const name = baby?.name ?? ''

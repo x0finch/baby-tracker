@@ -1,5 +1,6 @@
 import { type Baby, type Event, babySchema, eventSchema } from '@bobo/shared'
 import {
+  BasicIndex,
   type Collection,
   createCollection,
   createIndexedDB,
@@ -94,6 +95,15 @@ function createMemoryCollections() {
   }
 }
 
+/**
+ * Pages read events by baby (today, stats, export) and by family (deleting it), so those
+ * live queries look rows up in an index instead of scanning every record.
+ */
+function indexEvents(events: Collection<Event, string>) {
+  events.createIndex((row) => row.babyId, { indexType: BasicIndex })
+  events.createIndex((row) => row.familyId, { indexType: BasicIndex })
+}
+
 /** Backend-agnostic view of the collections; utils differ per storage backend. */
 export interface LocalStore {
   babies: Collection<Baby, string>
@@ -126,13 +136,16 @@ export async function openLocalStore(options: OpenLocalStoreOptions = {}): Promi
     })
   } catch (error) {
     console.warn('IndexedDB unavailable, falling back to in-memory storage', error)
-    return { ...createMemoryCollections(), mode: 'memory' }
+    const collections = createMemoryCollections()
+    indexEvents(collections.events)
+    return { ...collections, mode: 'memory' }
   }
 
   const [persisted, collections] = await Promise.all([
     (options.requestPersistence ?? requestPersistentStorage)(),
     loadAll(createIndexedDBCollections(db)),
   ])
+  indexEvents(collections.events)
   return { ...collections, mode: persisted ? 'persistent' : 'best-effort' }
 }
 
