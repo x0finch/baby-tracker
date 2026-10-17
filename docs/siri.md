@@ -58,26 +58,32 @@ The settings page's "添加到 Siri" button copies the user's code and opens
 code when it is added.
 
 Build it in the Shortcuts app on the Mac, or on the iPhone and let it sync. Name it
-**记录宝宝** and give it these actions in order:
+**记录宝宝**. It keeps asking "还有吗？" until the reply has `done` set: when the user says
+"没有了", or when asking again cannot help.
 
-1. **Ask for Input**
-   - Type: Text
-   - Prompt: `要记录什么？`
-2. **Text**
+Actions, in order:
+
+1. **Text**
    - Content: leave it empty. It holds the code, filled in by the import question below.
-3. **Get Contents of URL**
-   - URL: `https://bobo.009003.xyz/api/voice/siri`
-   - Method: POST
-   - Headers: `Authorization` → the **Text** from step 2
-   - Request Body: JSON, with a key `text` → **Provided Input** from step 1
-4. **Get Dictionary Value**
-   - Key: `reply`
-   - Dictionary: **Contents of URL**
-5. **Speak Text**
-   - Text: **Dictionary Value**
+   - Then **Set Variable**: name `口令`, input the Text.
+2. **Text**: `要记录什么？`
+   - Then **Set Variable**: name `问题`, input the Text.
+3. **Repeat** 20 times, with these inside:
+   1. **Ask for Input**: Type Text, Prompt `问题`.
+   2. **Get Contents of URL**:
+      - URL: `https://bobo.009003.xyz/api/voice/siri`
+      - Method: POST
+      - Headers: `Authorization` → `口令`
+      - Request Body: JSON, with a Text key `text` → **Provided Input**
+   3. **Get Dictionary Value**: Value for key `reply` in **Contents of URL**.
+   4. **Speak Text**: **Dictionary Value**.
+   5. **Get Dictionary Value**: Value for key `done` in **Contents of URL**.
+   6. **If** **Dictionary Value** is **true**: **Stop This Shortcut**. End If.
+   7. **Text**: `还有吗？`
+      - Then **Set Variable**: name `问题`, input the Text.
 
-Then open the shortcut's details (ⓘ) → **Setup** and add an import question for the **Text**
-action in step 2:
+Then open the shortcut's details (ⓘ) → **Setup** and add an import question for the empty
+**Text** in step 1:
 
 - Question: `请粘贴 Bobo 设置里复制的口令`
 - Default answer: empty

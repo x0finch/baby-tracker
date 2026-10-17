@@ -320,29 +320,39 @@ export function voiceRoutes(parserFor: VoiceParserFor) {
     })
 }
 
+/** "That's all": ends a conversation without asking the model. */
+const DONE_PHRASE =
+  /^(没有了?|没了|没有别的了?|好了|结束|不用了|就这些|就这样|退出|拜拜)[。！!.，, ]*$/
+
 /**
  * What the Siri shortcut calls, with its code instead of a session. Always answers 200 with
- * `{ ok, reply }`: the shortcut reads `reply` aloud, and Shortcuts may not read the body of
- * an error response, which would leave Siri silent.
+ * `{ ok, done, reply }`: Shortcuts may not read the body of an error response, which would
+ * leave Siri silent. The shortcut reads `reply` aloud and asks "还有吗？" until `done`, which
+ * is set when the user says they're finished or when asking again cannot help.
  */
 export function siriRoutes(parserFor: VoiceParserFor) {
   return new Hono<AppEnv>().post('/', async (c) => {
-    const answer = (result: VoiceResult, ok: boolean) => c.json({ ok, ...result })
+    const answer = (result: VoiceResult, ok: boolean, done = false) =>
+      c.json({ ok, done, ...result })
     const now = Date.now()
     const check = await useToken(c.env.DB, c.req.header('Authorization'), now)
-    if (check.status === 'invalid') return answer(reply(REPLIES.invalidToken), false)
-    if (check.status === 'limited') return answer(reply(REPLIES.limited), false)
+    if (check.status === 'invalid') return answer(reply(REPLIES.invalidToken), false, true)
+    if (check.status === 'limited') return answer(reply(REPLIES.limited), false, true)
     const burst = await c.env.VOICE_RATE_LIMIT?.limit({ key: check.token.id })
-    if (burst && !burst.success) return answer(reply(REPLIES.slowDown), false)
+    if (burst && !burst.success) return answer(reply(REPLIES.slowDown), false, true)
 
     const body = textSchema.safeParse(await c.req.json().catch(() => null))
     if (!body.success) return answer(reply('没听清，请再说一遍。'), false)
+    if (DONE_PHRASE.test(body.data.text)) return answer(reply('好的。'), true, true)
     try {
       const result = await runVoice(c.env, parserFor, check.token.userId, body.data.text, now, true)
-      return answer(result, result.records.length > 0 || result.reply.startsWith('已撤销'))
+      const recorded = result.records.length > 0 || result.reply.startsWith('已撤销')
+      // Nothing to record for, or no model to understand: asking again cannot help.
+      const stuck = result.reply === REPLIES.noAi || result.reply === REPLY.noBabies
+      return answer(result, recorded, stuck)
     } catch (error) {
       console.error('Voice command failed', error)
-      return answer(reply(REPLIES.unavailable), false)
+      return answer(reply(REPLIES.unavailable), false, true)
     }
   })
 }

@@ -6,7 +6,7 @@ import { clockToTime } from '../src/voice/plan'
 import { createTestApp } from './app'
 import { baby } from './fixtures'
 
-type Answer = { ok: boolean; reply: string; records: string[] }
+type Answer = { ok: boolean; done: boolean; reply: string; records: string[] }
 const answerOf = (res: Response): Promise<Answer> => res.json()
 
 const action = (overrides: Partial<VoiceAction>): VoiceAction => ({
@@ -132,6 +132,7 @@ describe('siri voice logging', () => {
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({
       ok: false,
+      done: true,
       reply: expect.stringContaining('口令已失效'),
       records: [],
     })
@@ -155,6 +156,27 @@ describe('siri voice logging', () => {
     const stored = (await events()).filter((event) => !earlier.has(event.id))
     expect(stored.map((event) => event.type).toSorted()).toEqual(['diaper', 'feeding'])
     expect(stored.every((event) => event.createdBy !== null)).toBe(true)
+  })
+
+  it('keeps the conversation going until the user is done', async () => {
+    const { token } = await newToken()
+    const logged = await say(token, '换尿布', {
+      unclear: false,
+      actions: [action({ type: 'diaper' })],
+    })
+    expect(logged.done).toBe(false)
+    const unclear = await say(token, '嗯', { unclear: true, actions: [] })
+    expect(unclear.done).toBe(false)
+    seen = undefined
+    const finished = await say(token, '没有了', { unclear: true, actions: [] })
+    expect(finished).toMatchObject({ ok: true, done: true, reply: '好的。' })
+    expect(seen).toBeUndefined()
+    aiReady = false
+    const noAi = await say(token, '换尿布', {
+      unclear: false,
+      actions: [action({ type: 'diaper' })],
+    })
+    expect(noAi.done).toBe(true)
   })
 
   it('undoes the last command', async () => {
