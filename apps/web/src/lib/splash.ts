@@ -1,7 +1,7 @@
 /**
  * iOS launch screens, shown while an installed Bobo starts instead of a blank page. iOS
  * only uses an image whose media query matches the device exactly, so there is one per
- * screen size (portrait, CSS pixels and pixel ratio) and theme. Rendered by
+ * screen size (portrait, CSS pixels and pixel ratio). Rendered by
  * scripts/render-splash.mjs.
  */
 export const SPLASH_SCREENS = [
@@ -27,23 +27,17 @@ export const SPLASH_SCREENS = [
   { width: 744, height: 1133, ratio: 2 },
 ] as const
 
-// Plain literals and no imports, so scripts/render-splash.mjs can load this file directly.
-export const SPLASH_THEMES = ['light', 'dark'] as const
+/** Launch screens use the dark background: iOS ignores a light/dark choice in their media query. */
+export const SPLASH_THEME = 'dark'
 
-export function splashFile(
-  screen: (typeof SPLASH_SCREENS)[number],
-  theme: (typeof SPLASH_THEMES)[number],
-) {
-  return `${screen.width * screen.ratio}x${screen.height * screen.ratio}-${theme}.png`
+export function splashFile(screen: (typeof SPLASH_SCREENS)[number]) {
+  return `${screen.width * screen.ratio}x${screen.height * screen.ratio}.png`
 }
 
-export const splashLinks = SPLASH_SCREENS.flatMap((screen) =>
-  SPLASH_THEMES.map((theme) => ({
-    rel: 'apple-touch-startup-image',
-    href: `/splash/${splashFile(screen, theme)}`,
-    media:
-      `(device-width: ${screen.width}px) and (device-height: ${screen.height}px) and ` +
-      `(-webkit-device-pixel-ratio: ${screen.ratio}) and (orientation: portrait) and ` +
-      `(prefers-color-scheme: ${theme})`,
-  })),
-)
+export const splashLinks = SPLASH_SCREENS.map((screen) => ({
+  rel: 'apple-touch-startup-image',
+  href: `/splash/${splashFile(screen)}`,
+  media:
+    `(device-width: ${screen.width}px) and (device-height: ${screen.height}px) and ` +
+    `(-webkit-device-pixel-ratio: ${screen.ratio}) and (orientation: portrait)`,
+}))
