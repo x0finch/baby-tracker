@@ -14,6 +14,8 @@ const { count, size, warnings } = await generateSW({
     'sw.js',
     'workbox-*.js',
     'push-sw.js',
+    // iOS reads launch screens when the app is added to the home screen, not from the cache.
+    'splash/**',
   ],
   swDest: 'dist/client/sw.js',
   // Any in-app URL opens the app shell offline; API calls (Phase 2) go to the network.

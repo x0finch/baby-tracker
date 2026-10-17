@@ -103,7 +103,7 @@ export function TodayList({ events }: { events: readonly Event[] }) {
                     key={event.id}
                     layout="position"
                     {...rowInOut}
-                    className="relative overflow-hidden border-b-2 border-border"
+                    className="relative -mx-2 overflow-hidden px-2 pb-0.5"
                   >
                     <motion.span
                       aria-hidden
@@ -114,13 +114,15 @@ export function TodayList({ events }: { events: readonly Event[] }) {
                       type="button"
                       aria-label={m.eventEditLabel({ time, title })}
                       onClick={() => setEditingId(event.id)}
-                      className="relative flex min-h-touch w-full items-center gap-3 py-3 text-left active:bg-surface"
+                      className="press-row flex min-h-touch w-full items-center gap-3 py-3 text-left"
                     >
                       <EventIcon {...eventIconProps(event)} className="size-7" />
                       <span className="w-12 shrink-0 text-fg-muted tabular-nums">{time}</span>
                       <span className="shrink-0 font-extrabold">{title}</span>
                       <span className="truncate text-fg-muted">{detail}</span>
                     </button>
+                    {/* The row is widened for its pressed background; the divider is not. */}
+                    <span aria-hidden className="absolute inset-x-2 bottom-0 h-0.5 bg-border" />
                   </motion.li>
                 )
               })}

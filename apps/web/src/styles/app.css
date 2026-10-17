@@ -214,6 +214,26 @@
   padding-left: calc(--spacing(--value(integer)) + env(safe-area-inset-left));
 }
 
+/*
+ * A tappable list row. Pressed, it shows a rounded background a little wider than the row,
+ * so the icon and text keep their place yet sit clear of the background's edges.
+ */
+@utility press-row {
+  position: relative;
+  isolation: isolate;
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0.25rem -0.5rem;
+    z-index: -1;
+    border-radius: var(--radius-lg);
+    transition: background-color 120ms;
+  }
+  &:active:not(:disabled)::before {
+    background-color: var(--color-surface);
+  }
+}
+
 /* Room for the fixed tab bar: page content ends above it, toasts float over it. */
 @utility h-tab-bar-safe {
   height: calc(var(--spacing-tab-bar) + env(safe-area-inset-bottom));
@@ -226,14 +246,55 @@
 }
 
 @layer base {
+  /*
+   * Feel like an installed app rather than a web page: no scrollbars, no page bounce or
+   * pull-to-refresh, no double-tap zoom, and no text selection or system menus on long
+   * press (except where people type).
+   */
   html {
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    scrollbar-width: none;
+    overscroll-behavior: none;
+  }
+
+  *,
+  ::before,
+  ::after {
+    scrollbar-width: none;
+  }
+
+  ::-webkit-scrollbar {
+    display: none;
   }
 
   body {
     @apply bg-bg font-sans text-body text-fg antialiased;
-    overscroll-behavior-y: none;
+    overscroll-behavior: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  input,
+  textarea,
+  [contenteditable] {
+    user-select: text;
+    -webkit-user-select: text;
+    -webkit-touch-callout: default;
+  }
+
+  /* iOS zooms into fields with text smaller than 16px when they get focus. */
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
+
+  img,
+  svg {
+    -webkit-user-drag: none;
   }
 
   :focus-visible {

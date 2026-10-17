@@ -291,7 +291,7 @@ export function GrowthView({ baby, events }: { baby: Baby; events: readonly Even
                 <button
                   type="button"
                   onClick={() => setEditingId(point.event.id)}
-                  className="flex min-h-touch w-full items-center gap-3 py-3 text-left active:bg-surface"
+                  className="press-row flex min-h-touch w-full items-center gap-3 py-3 text-left"
                 >
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="font-extrabold tabular-nums">

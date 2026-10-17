@@ -59,7 +59,7 @@ export function SettingsRow({
 }) {
   return (
     <li className="border-b-2 border-border last:border-b-0">
-      <Link {...link} className="flex min-h-touch items-center gap-3 py-3 active:bg-surface">
+      <Link {...link} className="press-row flex min-h-touch items-center gap-3 py-3">
         <span className="flex min-w-0 flex-1 flex-col">
           {badge ? (
             <span className="flex items-center gap-2">
