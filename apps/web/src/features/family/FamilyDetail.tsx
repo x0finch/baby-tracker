@@ -15,6 +15,7 @@ import { ageLabel } from '../babies/age-label'
 import { BabyAvatar } from '../babies/BabyAvatar'
 import { useBabies } from '../babies/use-babies'
 import { useRecordCount } from '../events/use-events'
+import { AiModelCard } from './AiModelCard'
 import { AliasSheet } from './AliasSheet'
 import { familyApi } from './api'
 import { scopeLabel } from './BabyScopePicker'
@@ -150,6 +151,8 @@ export function FamilyDetail({ family, userId }: { family: FamilySummary; userId
           </Button>
         )}
       </Card>
+
+      {managing && <AiModelCard familyId={family.id} />}
 
       <Card className="flex flex-col gap-2">
         {managing && (

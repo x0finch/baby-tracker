@@ -55,15 +55,51 @@ function Voice() {
       </Card>
     )
   }
+  const ready = settings.aiFamilyId !== null
   return (
     <>
+      {!ready && (
+        <Card tone="feeding">
+          <p className="m-0">{m.voiceNeedsAi()}</p>
+        </Card>
+      )}
       <PhraseCard settings={settings} />
-      <ConnectCard settings={settings} />
+      {settings.aiFamilies.length > 1 && <AiFamilyCard settings={settings} />}
+      <ConnectCard settings={settings} ready={ready} />
       <Card>
         <p className="m-0 text-caption text-fg-muted">{m.voiceBackTap()}</p>
       </Card>
-      <TryCard />
+      {ready && <TryCard />}
     </>
+  )
+}
+
+/** For people in several families with AI set up: whose model their commands use. */
+function AiFamilyCard({ settings }: { settings: VoiceSettings }) {
+  const queryClient = useQueryClient()
+  const choose = useMutation({
+    mutationFn: (aiFamilyId: string) => voiceApi.update({ aiFamilyId }),
+    onSuccess: (next) => queryClient.setQueryData(voiceKeys.settings, next),
+  })
+  return (
+    <Card className="flex flex-col gap-2">
+      <label className="flex flex-col gap-1.5">
+        <span className="font-bold">{m.voiceAiFamily()}</span>
+        <select
+          className="min-h-touch rounded-lg border-2 border-border bg-surface px-4 text-fg"
+          value={settings.aiFamilyId ?? ''}
+          onChange={(event) => choose.mutate(event.target.value)}
+        >
+          {settings.aiFamilies.map((family) => (
+            <option key={family.id} value={family.id}>
+              {family.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="m-0 text-caption text-fg-muted">{m.voiceAiFamilyHint()}</p>
+      {choose.isError && <FormError>{m.actionFailed()}</FormError>}
+    </Card>
   )
 }
 
@@ -72,7 +108,7 @@ function PhraseCard({ settings }: { settings: VoiceSettings }) {
   const queryClient = useQueryClient()
   const [phrase, setPhrase] = useState(settings.phrase)
   const save = useMutation({
-    mutationFn: voiceApi.setPhrase,
+    mutationFn: (next: string) => voiceApi.update({ phrase: next }),
     onSuccess: (next) => queryClient.setQueryData(voiceKeys.settings, next),
   })
   const shown = phrase.trim() || DEFAULT_PHRASE
@@ -96,7 +132,7 @@ function PhraseCard({ settings }: { settings: VoiceSettings }) {
 }
 
 /** Adds the shortcut: creates a code, copies it and opens the shortcut to paste it into. */
-function ConnectCard({ settings }: { settings: VoiceSettings }) {
+function ConnectCard({ settings, ready }: { settings: VoiceSettings; ready: boolean }) {
   const queryClient = useQueryClient()
   const refresh = () => queryClient.invalidateQueries({ queryKey: voiceKeys.settings })
   const add = useMutation({
@@ -123,7 +159,7 @@ function ConnectCard({ settings }: { settings: VoiceSettings }) {
       <Card className="flex flex-col gap-3">
         <p className="m-0">{m.voiceIntro()}</p>
         {steps}
-        <Button size="lg" block disabled={add.isPending} onClick={() => add.mutate()}>
+        <Button size="lg" block disabled={!ready || add.isPending} onClick={() => add.mutate()}>
           {m.voiceAdd()}
         </Button>
         {add.isError && <FormError>{m.actionFailed()}</FormError>}
