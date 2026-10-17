@@ -11,10 +11,10 @@ export interface VoiceSettings {
   phrase: string
   /** The code the shortcut uses, if one is active; the code itself is never shown again. */
   token: { createdAt: number; lastUsedAt: number | null } | null
-  /** The user's families that have an AI model set up. */
-  aiFamilies: { id: string; name: string }[]
-  /** Whose AI the user's commands use; one of aiFamilies, or null when there are none. */
-  aiFamilyId: string | null
+  /** Families the user can record for, and whether each has an AI model set up. */
+  families: { id: string; name: string; hasAi: boolean }[]
+  /** The one family Siri records for, with its own AI; null when there is none. */
+  familyId: string | null
 }
 
 export interface VoicePreview {
@@ -54,7 +54,7 @@ export const voiceKeys = { settings: ['voice-settings'] as const }
 
 export const voiceApi = {
   settings: () => apiFetch<VoiceSettings>('/api/voice'),
-  update: (patch: { phrase?: string; aiFamilyId?: string }) =>
+  update: (patch: { phrase?: string; familyId?: string }) =>
     apiFetch<VoiceSettings>('/api/voice', { method: 'PATCH', body: JSON.stringify(patch) }),
   /** Replaces any earlier code; the old one stops working at once. */
   createToken: async () => {

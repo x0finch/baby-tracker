@@ -1,6 +1,18 @@
+CREATE TABLE `family_ai` (
+	`family_id` text PRIMARY KEY NOT NULL,
+	`provider` text NOT NULL,
+	`model` text NOT NULL,
+	`key_cipher` text NOT NULL,
+	`key_hint` text NOT NULL,
+	`updated_by` text NOT NULL,
+	`updated_at` integer NOT NULL,
+	FOREIGN KEY (`family_id`) REFERENCES `families`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
 CREATE TABLE `voice_settings` (
 	`user_id` text PRIMARY KEY NOT NULL,
 	`phrase` text NOT NULL,
+	`family_id` text,
 	`time_zone` text NOT NULL,
 	`updated_at` integer NOT NULL
 );

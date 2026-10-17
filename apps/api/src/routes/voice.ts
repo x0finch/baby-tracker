@@ -2,9 +2,9 @@ import { type Event, inBabyScope } from '@bobo/shared'
 import { Hono } from 'hono'
 import { z } from 'zod'
 
-import { type Access, checkEventWrite, loadAccess } from '../access'
+import { type Access, type FamilyAccess, checkEventWrite, loadAccess } from '../access'
 import type { Env } from '../env'
-import { json } from '../http'
+import { fail, json } from '../http'
 import { parseEvent } from '../sync/protocol'
 import { bumpSeq, upsertEvents } from '../sync/sql'
 import type { AppEnv } from '../types'
@@ -18,7 +18,8 @@ const DEFAULT_ZONE = 'Asia/Shanghai'
 const UNDO_WINDOW_MS = 30 * 60_000
 const MAX_TEXT = 300
 
-export type VoiceParserFor = (env: Env) => VoiceParser | null
+/** The parser for a family's own AI settings, or null when the family has none. */
+export type VoiceParserFor = (env: Env, familyId: string) => Promise<VoiceParser | null>
 
 const isTimeZone = (zone: string) => {
   try {
@@ -31,6 +32,7 @@ const isTimeZone = (zone: string) => {
 const timeZoneSchema = z.string().max(64).refine(isTimeZone)
 const settingsPatchSchema = z.object({
   phrase: z.string().trim().min(1).max(20).optional(),
+  familyId: z.string().max(64).optional(),
   timeZone: timeZoneSchema.optional(),
 })
 const tokenCreateSchema = z.object({ timeZone: timeZoneSchema.optional() })
@@ -43,30 +45,77 @@ const REPLIES = {
   unavailable: '语音记录暂时不可用，请稍后再试。',
   forbidden: (name: string) => `你没有权限给${name}添加记录。`,
   nothingToUndo: '没有可以撤销的记录。',
+  noAi: '这个家庭还没设置 AI 模型，请家庭的创建者或管理员在 Bobo 里设置。',
 }
 
-async function readSettings(db: D1Database, userId: string) {
+interface Settings {
+  phrase: string
+  familyId: string | null
+  timeZone: string
+}
+
+async function readSettings(db: D1Database, userId: string): Promise<Settings> {
   const row = await db
-    .prepare('select phrase, time_zone as timeZone from voice_settings where user_id = ?')
+    .prepare(
+      `select phrase, family_id as familyId, time_zone as timeZone from voice_settings
+       where user_id = ?`,
+    )
     .bind(userId)
-    .first<{ phrase: string; timeZone: string }>()
-  return row ?? { phrase: DEFAULT_PHRASE, timeZone: DEFAULT_ZONE }
+    .first<Settings>()
+  return row ?? { phrase: DEFAULT_PHRASE, familyId: null, timeZone: DEFAULT_ZONE }
 }
 
-function saveSettings(
-  db: D1Database,
-  userId: string,
-  phrase: string,
-  timeZone: string,
-  now: number,
-) {
+function saveSettings(db: D1Database, userId: string, settings: Settings, now: number) {
   return db
     .prepare(
-      `insert into voice_settings (user_id, phrase, time_zone, updated_at) values (?, ?, ?, ?)
-       on conflict (user_id) do update set
-         phrase = excluded.phrase, time_zone = excluded.time_zone, updated_at = excluded.updated_at`,
+      `insert into voice_settings (user_id, phrase, family_id, time_zone, updated_at)
+       values (?, ?, ?, ?, ?)
+       on conflict (user_id) do update set phrase = excluded.phrase,
+         family_id = excluded.family_id, time_zone = excluded.time_zone,
+         updated_at = excluded.updated_at`,
     )
-    .bind(userId, phrase, timeZone, now)
+    .bind(userId, settings.phrase, settings.familyId, settings.timeZone, now)
+}
+
+/** Families the user can record for (not as a viewer), in the order they joined. */
+const recordingFamilies = (access: Access) =>
+  [...access.values()].filter((family) => family.role !== 'viewer')
+
+/**
+ * The one family Siri records for: the chosen one while the user can still record there,
+ * else their first. Its AI parses the command and only its babies can be recorded, so a
+ * family's key is never spent on another family.
+ */
+function siriFamily(access: Access, settings: Settings) {
+  const families = recordingFamilies(access)
+  return families.find((family) => family.id === settings.familyId) ?? families[0]
+}
+
+/** What the settings page shows. */
+async function settingsView(db: D1Database, userId: string, now: number) {
+  const [settings, access, token] = await Promise.all([
+    readSettings(db, userId),
+    loadAccess(db, userId),
+    tokenStatus(db, userId, now),
+  ])
+  const families = recordingFamilies(access)
+  const { results } = await db
+    .prepare(
+      'select family_id as familyId from family_ai where family_id in (select value from json_each(?))',
+    )
+    .bind(JSON.stringify(families.map((family) => family.id)))
+    .all<{ familyId: string }>()
+  const withAi = new Set(results.map((row) => row.familyId))
+  return {
+    phrase: settings.phrase,
+    token: token ?? null,
+    families: families.map((family) => ({
+      id: family.id,
+      name: family.alias ?? family.name,
+      hasAi: withAi.has(family.id),
+    })),
+    familyId: siriFamily(access, settings)?.id ?? null,
+  }
 }
 
 type EventRow = Omit<Event, 'data'> & { data: string }
@@ -82,19 +131,16 @@ function toEvents(rows: EventRow[]): Event[] {
   })
 }
 
-/** Babies the user may add records for: not archived, in a family where they can write. */
-async function writableBabies(db: D1Database, access: Access): Promise<VoiceBaby[]> {
-  const families = [...access.values()].filter((family) => family.role !== 'viewer')
-  if (families.length === 0) return []
+/** The family's babies the user may record for: not archived, within their baby scope. */
+async function writableBabies(db: D1Database, family: FamilyAccess): Promise<VoiceBaby[]> {
   const { results } = await db
     .prepare(
       `select id, name, family_id as familyId from babies
-       where family_id in (select value from json_each(?))
-         and deleted_at is null and archived_at is null order by created_at`,
+       where family_id = ? and deleted_at is null and archived_at is null order by created_at`,
     )
-    .bind(JSON.stringify(families.map((family) => family.id)))
+    .bind(family.id)
     .all<VoiceBaby>()
-  return results.filter((baby) => inBabyScope(access.get(baby.familyId)?.babyIds ?? null, baby.id))
+  return results.filter((baby) => inBabyScope(family.babyIds, baby.id))
 }
 
 async function runningSleeps(db: D1Database, babies: VoiceBaby[]) {
@@ -178,7 +224,7 @@ async function undoLast(
 /** Understands a sentence and, when `write` is set, records it. */
 async function runVoice(
   env: Env,
-  parser: VoiceParser,
+  parserFor: VoiceParserFor,
   userId: string,
   text: string,
   now: number,
@@ -186,7 +232,11 @@ async function runVoice(
 ): Promise<VoiceResult> {
   const db = env.DB
   const [settings, access] = await Promise.all([readSettings(db, userId), loadAccess(db, userId)])
-  const babies = await writableBabies(db, access)
+  const family = siriFamily(access, settings)
+  if (!family) return reply(REPLY.noBabies)
+  const parser = await parserFor(env, family.id)
+  if (!parser) return reply(REPLIES.noAi)
+  const babies = await writableBabies(db, family)
   const parsed = await parser({
     text,
     babyNames: babies.map((baby) => baby.name),
@@ -229,49 +279,44 @@ async function runVoice(
   return { reply: `已记录：${summary}`, records: plan.lines }
 }
 
-/** Settings page: the phrase, the code, and a preview. Needs a session. */
+/** Settings page: the phrase, the family, the code, and a preview. Needs a session. */
 export function voiceRoutes(parserFor: VoiceParserFor) {
   return new Hono<AppEnv>()
-    .get('/', async (c) => {
-      const userId = c.get('user').id
-      const now = Date.now()
-      const [settings, token] = await Promise.all([
-        readSettings(c.env.DB, userId),
-        tokenStatus(c.env.DB, userId, now),
-      ])
-      return c.json({ phrase: settings.phrase, token: token ?? null })
-    })
+    .get('/', async (c) => c.json(await settingsView(c.env.DB, c.get('user').id, Date.now())))
     .patch('/', json(settingsPatchSchema), async (c) => {
+      const db = c.env.DB
       const userId = c.get('user').id
-      const patch = c.req.valid('json')
-      const current = await readSettings(c.env.DB, userId)
-      const next = { ...current, ...patch }
-      await saveSettings(c.env.DB, userId, next.phrase, next.timeZone, Date.now()).run()
-      const token = await tokenStatus(c.env.DB, userId, Date.now())
-      return c.json({ phrase: next.phrase, token: token ?? null })
+      const { familyId, ...patch } = c.req.valid('json')
+      const current = await readSettings(db, userId)
+      if (familyId !== undefined) {
+        const access = await loadAccess(db, userId)
+        if (!recordingFamilies(access).some((family) => family.id === familyId)) fail('forbidden')
+      }
+      const next = { ...current, ...patch, familyId: familyId ?? current.familyId }
+      await saveSettings(db, userId, next, Date.now()).run()
+      return c.json(await settingsView(db, userId, Date.now()))
     })
     .post('/token', json(tokenCreateSchema), async (c) => {
+      const db = c.env.DB
       const userId = c.get('user').id
       const now = Date.now()
       const { timeZone } = c.req.valid('json')
       if (timeZone) {
-        const current = await readSettings(c.env.DB, userId)
-        await saveSettings(c.env.DB, userId, current.phrase, timeZone, now).run()
+        const current = await readSettings(db, userId)
+        await saveSettings(db, userId, { ...current, timeZone }, now).run()
       }
-      return c.json(await createToken(c.env.DB, userId, now))
+      return c.json(await createToken(db, userId, now))
     })
     .delete('/token', async (c) => {
       await revokeTokens(c.env.DB, c.get('user').id, c.req.query('id')).run()
       return c.body(null, 204)
     })
     .post('/preview', json(textSchema), async (c) => {
-      const parser = parserFor(c.env)
-      if (!parser) return c.json(reply(REPLIES.unavailable), 503)
       // Each preview calls the model too.
       const burst = await c.env.VOICE_RATE_LIMIT?.limit({ key: c.get('user').id })
       if (burst && !burst.success) return c.json(reply(REPLIES.slowDown), 429)
       const { text } = c.req.valid('json')
-      return c.json(await runVoice(c.env, parser, c.get('user').id, text, Date.now(), false))
+      return c.json(await runVoice(c.env, parserFor, c.get('user').id, text, Date.now(), false))
     })
 }
 
@@ -292,10 +337,8 @@ export function siriRoutes(parserFor: VoiceParserFor) {
 
     const body = textSchema.safeParse(await c.req.json().catch(() => null))
     if (!body.success) return answer(reply('没听清，请再说一遍。'), false)
-    const parser = parserFor(c.env)
-    if (!parser) return answer(reply(REPLIES.unavailable), false)
     try {
-      const result = await runVoice(c.env, parser, check.token.userId, body.data.text, now, true)
+      const result = await runVoice(c.env, parserFor, check.token.userId, body.data.text, now, true)
       return answer(result, result.records.length > 0 || result.reply.startsWith('已撤销'))
     } catch (error) {
       console.error('Voice command failed', error)

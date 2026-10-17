@@ -168,10 +168,29 @@ export const serverKeys = sqliteTable('server_keys', {
   createdAt: integer('created_at').notNull(),
 })
 
+/**
+ * A family's AI model for voice logging, set by its owner or admins. The provider key is
+ * encrypted with AI_KEY_SECRET (AES-GCM); only its last characters are kept in clear.
+ */
+export const familyAi = sqliteTable('family_ai', {
+  familyId: text('family_id')
+    .primaryKey()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  provider: text('provider', { enum: ['openai', 'openrouter'] }).notNull(),
+  model: text('model').notNull(),
+  /** base64url of iv (12 bytes) followed by the ciphertext. */
+  keyCipher: text('key_cipher').notNull(),
+  keyHint: text('key_hint').notNull(),
+  updatedBy: text('updated_by').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+})
+
 /** A user's Siri voice logging settings: what they say to Siri and their time zone. */
 export const voiceSettings = sqliteTable('voice_settings', {
   userId: text('user_id').primaryKey(),
   phrase: text('phrase').notNull(),
+  /** The one family Siri records for, with its AI; null picks the user's only family. */
+  familyId: text('family_id'),
   /** IANA zone for times said aloud ("三点"), from the browser that set it up. */
   timeZone: text('time_zone').notNull(),
   updatedAt: integer('updated_at').notNull(),

@@ -29,15 +29,14 @@ Secrets:
 | `BETTER_AUTH_SECRET`                       | yes                       | a random string of 32+ characters, e.g. from a password manager |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | for Google sign-in        | from Google Cloud (below)                                       |
 | `RESEND_API_KEY`                           | for password-reset emails | from [Resend](https://resend.com)                               |
-| `OPENAI_API_KEY`                           | for Siri voice logging    | from [OpenAI](https://platform.openai.com/api-keys)             |
+| `AI_KEY_SECRET`                            | for Siri voice logging    | a random string of 32+ characters; encrypts families' AI keys   |
 
 Variables:
 
-| Name          | Required             | Value                                                                               |
-| ------------- | -------------------- | ----------------------------------------------------------------------------------- |
-| `APP_URL`     | with a custom domain | e.g. `https://bobo.example.com`; defaults to `https://bobo.<subdomain>.workers.dev` |
-| `EMAIL_FROM`  | with Resend          | e.g. `Bobo <noreply@example.com>`, on a domain verified in Resend                   |
-| `VOICE_MODEL` | no                   | OpenAI model for Siri voice logging; defaults to `gpt-5.4-mini`                     |
+| Name         | Required             | Value                                                                               |
+| ------------ | -------------------- | ----------------------------------------------------------------------------------- |
+| `APP_URL`    | with a custom domain | e.g. `https://bobo.example.com`; defaults to `https://bobo.<subdomain>.workers.dev` |
+| `EMAIL_FROM` | with Resend          | e.g. `Bobo <noreply@example.com>`, on a domain verified in Resend                   |
 
 Changing `BETTER_AUTH_SECRET` later signs everyone out.
 
@@ -75,7 +74,7 @@ Sign-up and sign-in work without email. "Forgot password" needs it:
 
 ## Optional: Siri voice logging
 
-Set `OPENAI_API_KEY` and add the signed shortcut; see [siri.md](siri.md).
+Set `AI_KEY_SECRET` and add the signed shortcut; see [siri.md](siri.md).
 
 ## Notes
 

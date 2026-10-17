@@ -7,14 +7,26 @@ adds the records. Siri reads the result back.
 
 1. The **Shortcuts** shortcut asks "要记录什么？" and sends the answer to
    `POST /api/voice/siri` with the user's code in the `Authorization` header.
-2. The server parses the sentence with TanStack AI and OpenAI (`apps/api/src/voice/parse.ts`).
-   The model only fills in a strict schema. The server builds the records, validates them like
-   synced ones and checks family permissions (`apps/api/src/voice/plan.ts`).
+2. The server parses the sentence with TanStack AI, using the AI model of the one family the
+   user's Siri is bound to (`apps/api/src/voice/parse.ts`, `ai.ts`). The model only fills in a
+   strict schema. The server builds the records, validates them like synced ones and checks
+   family permissions (`apps/api/src/voice/plan.ts`).
 3. The records are written like a sync push, so every device gets them on its next pull. The
    reply (`{ reply }`) is what Siri says.
 
 "撤销" undoes the last command (within 30 minutes). Settings → Siri 语音记录 has a preview that
 parses without recording.
+
+### One family, its own AI
+
+- Each family's owner or admins set its AI model in the family's settings:
+  - provider: OpenAI, or OpenRouter for other vendors' models;
+  - their own API key;
+  - a model from the key's list.
+- The key is encrypted with `AI_KEY_SECRET` (AES-GCM). Only its last characters are ever shown.
+- A user's Siri records for one family: their only one, or the one they pick under
+  Settings → Siri 语音记录. It uses that family's AI and can only record that family's babies,
+  so a family's key is never spent on another family.
 
 ### The code
 
@@ -30,13 +42,14 @@ parses without recording.
 
 ## Setup
 
-### 1. OpenAI key
+### 1. Encryption secret
 
-Add the repository secret `OPENAI_API_KEY` (Settings → Secrets and variables → Actions) and
-re-run the deploy. Without it, the endpoints answer that voice logging is unavailable.
+Add the repository secret `AI_KEY_SECRET` (Settings → Secrets and variables → Actions): a random
+string of 32+ characters, e.g. from a password manager. Then re-run the deploy. Without it,
+families can't save AI keys. Changing it later makes saved keys unreadable, and families have to
+enter them again.
 
-Optional: set the variable `VOICE_MODEL` to use another OpenAI model. The default is
-`gpt-5.4-mini`.
+Then, in the app: family settings → AI 模型 → choose a provider, paste a key, pick a model.
 
 ### 2. The shortcut (once, on a Mac)
 

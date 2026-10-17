@@ -22,8 +22,9 @@ export interface Env
   RESEND_API_KEY?: string
   /** Sender address, e.g. "Bobo <noreply@yourdomain.com>"; its domain must be verified. */
   EMAIL_FROM?: string
-  /** OpenAI API key for Siri voice logging (wrangler secret put OPENAI_API_KEY). */
-  OPENAI_API_KEY?: string
-  /** OpenAI model that parses voice commands; defaults to a small, fast one. */
-  VOICE_MODEL?: string
+  /**
+   * Encrypts the AI provider keys families save for voice logging. Changing it makes the saved
+   * keys unreadable; families then enter them again.
+   */
+  AI_KEY_SECRET?: string
 }

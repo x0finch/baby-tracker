@@ -35,7 +35,7 @@ export const REPLY = {
   unclear: '没听懂，可以再说一遍吗？比如「小米粒换尿布了」。',
   noBabies: '还没有可以记录的宝宝。',
   whichBaby: '是哪个宝宝？请带上名字再说一遍。',
-  unknownBaby: (name: string) => `没找到叫「${name}」的宝宝。`,
+  unknownBaby: (name: string) => `这个家庭里没有叫「${name}」的宝宝。`,
   needAmount: '是多少毫升？请带上量再说一遍。',
   needTemperature: '体温是多少度？请再说一遍。',
   needMedicine: '吃的是什么药？请再说一遍。',

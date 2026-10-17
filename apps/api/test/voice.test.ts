@@ -34,6 +34,9 @@ describe('siri voice logging', () => {
   // What the fake model returns for the next sentence; the last context it was given.
   let next: VoiceParse = { actions: [], unclear: true }
   let seen: { text: string; babyNames: string[]; localNow: string } | undefined
+  // Whose AI the last command asked for, and whether families have one.
+  let parsedFor: string | undefined
+  let aiReady = true
 
   const siri = (token: string | null, text: string) =>
     t.request('/api/voice/siri', {
@@ -69,9 +72,13 @@ describe('siri voice logging', () => {
     t = await createTestApp(
       {},
       {
-        voiceParser: () => async (context) => {
-          seen = context
-          return next
+        voiceParser: async (_env, asked) => {
+          parsedFor = asked
+          if (!aiReady) return null
+          return async (context) => {
+            seen = context
+            return next
+          }
         },
       },
     )
@@ -87,11 +94,17 @@ describe('siri voice logging', () => {
   afterAll(() => t.dispose())
   beforeEach(() => {
     seen = undefined
+    aiReady = true
   })
 
   it('keeps the phrase and shows the code only when created', async () => {
     let res = await t.request('/api/voice', { headers })
-    expect(await res.json()).toEqual({ phrase: '记录宝宝', token: null })
+    expect(await res.json()).toEqual({
+      phrase: '记录宝宝',
+      token: null,
+      families: [{ id: familyId, name: '我们家', hasAi: false }],
+      familyId,
+    })
     res = await t.send('PATCH', '/api/voice', headers, { phrase: '宝宝日记' })
     expect(await res.json()).toMatchObject({ phrase: '宝宝日记' })
     const { token } = await newToken()
@@ -187,7 +200,7 @@ describe('siri voice logging', () => {
       unclear: false,
       actions: [action({ type: 'diaper', baby: '小豆子' })],
     })
-    expect(who.reply).toBe('没找到叫「小豆子」的宝宝。')
+    expect(who.reply).toBe('这个家庭里没有叫「小豆子」的宝宝。')
   })
 
   it('previews without recording', async () => {
@@ -229,6 +242,60 @@ describe('siri voice logging', () => {
     expect(await reply()).toBe('还没有可以记录的宝宝。')
     await ctx.internalAdapter.updatePassword(userId, 'new')
     expect(await reply()).toMatch(/口令已失效/)
+  })
+
+  it('answers that the family has no AI yet', async () => {
+    const { token } = await newToken()
+    aiReady = false
+    const result = await say(token, '换尿布', {
+      unclear: false,
+      actions: [action({ type: 'diaper' })],
+    })
+    expect(result.reply).toMatch(/还没设置 AI 模型/)
+  })
+
+  it("records only for the family Siri is bound to, with that family's AI", async () => {
+    // Also a member of grandma's family, with its own baby.
+    const grandma = await t.signIn('外婆')
+    const res = await t.send('POST', '/api/families', grandma.headers, { name: '外婆家' })
+    const other: { id: string } = await res.json()
+    await t.send('POST', '/api/sync/push', grandma.headers, {
+      babies: [baby(other.id, { name: '小豆子' })],
+      events: [],
+    })
+    const invite = await t.send('POST', `/api/families/${other.id}/invites`, grandma.headers, {
+      role: 'caregiver',
+      babyIds: null,
+    })
+    const { code } = (await invite.json()) as { code: string }
+    await t.send('POST', `/api/invites/${code}/accept`, headers)
+
+    const { token } = await newToken()
+    const mine = await say(token, '小豆子换尿布', {
+      unclear: false,
+      actions: [action({ type: 'diaper', baby: '小豆子' })],
+    })
+    expect(parsedFor).toBe(familyId)
+    expect(seen?.babyNames).toEqual(['小米粒'])
+    expect(mine.reply).toBe('这个家庭里没有叫「小豆子」的宝宝。')
+
+    const patched = await t.send('PATCH', '/api/voice', headers, { familyId: other.id })
+    expect(await patched.json()).toMatchObject({ familyId: other.id })
+    const theirs = await say(token, '小豆子换尿布', {
+      unclear: false,
+      actions: [action({ type: 'diaper', baby: '小豆子' })],
+    })
+    expect(parsedFor).toBe(other.id)
+    expect(theirs.reply).toMatch(/^已记录：小豆子/)
+    // Back to our own family for the other tests.
+    await t.send('PATCH', '/api/voice', headers, { familyId })
+  })
+
+  it('cannot bind Siri to a family the user is not in', async () => {
+    const res = await t.send('PATCH', '/api/voice', headers, {
+      familyId: '01J00000000000000000000000',
+    })
+    expect(res.status).toBe(403)
   })
 
   it('refuses viewers', async () => {

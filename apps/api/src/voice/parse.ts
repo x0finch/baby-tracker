@@ -1,5 +1,5 @@
 import { chat } from '@tanstack/ai'
-import { OPENAI_CHAT_MODELS, createOpenaiChat } from '@tanstack/ai-openai'
+import type { openaiCompatibleText } from '@tanstack/ai-openai/compatible'
 import { z } from 'zod'
 
 /**
@@ -81,23 +81,14 @@ Rules:
 - baby: the name as said if one was mentioned, else null. Known babies are listed below.
 - Set unclear to true and return no actions if the sentence is not about baby care.`
 
-type ChatModel = (typeof OPENAI_CHAT_MODELS)[number]
-
-/** Small, fast and cheap, with strict structured outputs. Override with VOICE_MODEL. */
-export const DEFAULT_MODEL: ChatModel = 'gpt-5.4-mini'
-
-const isChatModel = (model: string): model is ChatModel =>
-  (OPENAI_CHAT_MODELS as readonly string[]).includes(model)
-
 /**
- * The production parser: TanStack AI with the OpenAI adapter and a strict output schema.
- * Reasoning is off; this is extraction, and Siri is waiting.
+ * A parser over any TanStack AI text adapter, with a strict output schema. The model only
+ * extracts; the server builds and checks the records.
  */
-export function openaiParser(apiKey: string, model: string = DEFAULT_MODEL): VoiceParser {
-  const known = isChatModel(model) ? model : DEFAULT_MODEL
+export function chatParser(adapter: () => ReturnType<typeof openaiCompatibleText>): VoiceParser {
   return async ({ text, babyNames, localNow }) =>
     chat({
-      adapter: createOpenaiChat(known, apiKey),
+      adapter: adapter(),
       systemPrompts: [
         INSTRUCTIONS,
         `Now: ${localNow}. Known babies: ${babyNames.join('、') || '(none)'}.`,

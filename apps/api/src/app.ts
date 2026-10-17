@@ -7,12 +7,13 @@ import { requireUser } from './middleware'
 import { authRateLimit } from './rate-limit'
 import { accountRoutes } from './routes/account'
 import { familyRoutes } from './routes/families'
+import { familyAiRoutes, readFamilyAi } from './routes/family-ai'
 import { familyInviteRoutes, inviteAcceptRoutes, invitePreviewRoutes } from './routes/invites'
 import { pushRoutes, reminderRoutes } from './routes/notifications'
 import { syncRoutes } from './routes/sync'
 import { type VoiceParserFor, siriRoutes, voiceRoutes } from './routes/voice'
 import type { AppEnv, AuthFor } from './types'
-import { openaiParser } from './voice/parse'
+import { decryptKey, familyParser } from './voice/ai'
 
 export interface AppOptions {
   auth?: AuthFor
@@ -20,8 +21,16 @@ export interface AppOptions {
   voiceParser?: VoiceParserFor
 }
 
-const defaultVoiceParser: VoiceParserFor = (env) =>
-  env.OPENAI_API_KEY ? openaiParser(env.OPENAI_API_KEY, env.VOICE_MODEL) : null
+/** Parses with the family's own provider, model and key. */
+const defaultVoiceParser: VoiceParserFor = async (env, familyId) => {
+  const saved = await readFamilyAi(env.DB, familyId)
+  if (!saved || !env.AI_KEY_SECRET) return null
+  return familyParser(
+    saved.provider,
+    saved.model,
+    await decryptKey(env.AI_KEY_SECRET, saved.keyCipher),
+  )
+}
 
 export function createApp(options: AppOptions = {}) {
   const authFor = options.auth ?? getAuth
@@ -60,6 +69,7 @@ export function createApp(options: AppOptions = {}) {
   app.use('/families', auth)
   app.use('/families/*', auth)
   app.route('/families/:familyId/invites', familyInviteRoutes)
+  app.route('/families/:familyId/ai', familyAiRoutes)
   app.route('/families', familyRoutes)
   app.route('/invites', invitePreviewRoutes)
   app.use('/invites/:code/accept', auth)
