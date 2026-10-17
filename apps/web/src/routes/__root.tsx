@@ -14,6 +14,7 @@ import { Toaster } from '../components/ui/Toast'
 import { UpdatePrompt } from '../components/UpdatePrompt'
 import { getLocale } from '../lib/i18n'
 import { MotionProvider } from '../lib/motion'
+import { splashLinks } from '../lib/splash'
 import { THEME_COLORS, themeInitScript } from '../lib/theme'
 import { watchTheme } from '../lib/use-theme'
 import { SyncRunner } from '../sync/SyncRunner'
@@ -40,6 +41,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: 'manifest', href: '/manifest.webmanifest' },
       { rel: 'icon', href: '/icons/icon.svg', type: 'image/svg+xml' },
       { rel: 'apple-touch-icon', href: '/icons/apple-touch-icon.png' },
+      ...splashLinks,
     ],
   }),
   shellComponent: RootDocument,
@@ -73,6 +75,13 @@ function RootLayout() {
     document.documentElement.lang = getLocale()
   }, [])
   useEffect(watchTheme, [])
+  // iOS Safari only shows :active styles while a touch listener exists somewhere on the page;
+  // without one, rows and buttons give no feedback when pressed.
+  useEffect(() => {
+    const noop = () => undefined
+    document.addEventListener('touchstart', noop, { passive: true })
+    return () => document.removeEventListener('touchstart', noop)
+  }, [])
 
   return (
     <MotionProvider>

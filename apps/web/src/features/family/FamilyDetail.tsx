@@ -107,7 +107,7 @@ export function FamilyDetail({ family, userId }: { family: FamilySummary; userId
                     disabled={!editable}
                     aria-label={`${member.name} ${roleLabel[member.role]()}`}
                     onClick={() => setEditingId(member.userId)}
-                    className="flex min-h-touch w-full items-center gap-3 rounded-lg py-1 text-left active:bg-surface"
+                    className="press-row flex min-h-touch w-full items-center gap-3 py-1 text-left"
                   >
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate font-extrabold">

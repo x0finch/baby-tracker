@@ -19,7 +19,7 @@ function BabyRow({ baby, onClick }: { baby: Baby; onClick?: () => void }) {
       type="button"
       disabled={!onClick}
       onClick={onClick}
-      className="flex min-h-touch w-full items-center gap-3 rounded-lg py-1 text-left active:bg-surface"
+      className="press-row flex min-h-touch w-full items-center gap-3 py-1 text-left"
     >
       <BabyAvatar name={baby.name} color={baby.avatarColor} />
       <span className="flex flex-col">
