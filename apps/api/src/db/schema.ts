@@ -169,54 +169,64 @@ export const serverKeys = sqliteTable('server_keys', {
 })
 
 /**
- * A family's AI model for voice logging, set by its owner or admins. The provider key is
- * encrypted with AI_KEY_SECRET (AES-GCM); only its last characters are kept in clear.
+ * A user's own AI model for voice logging. The provider key is encrypted with AI_KEY_SECRET
+ * (AES-GCM); only its last characters are kept in clear.
  */
-export const familyAi = sqliteTable('family_ai', {
-  familyId: text('family_id')
-    .primaryKey()
-    .references(() => families.id, { onDelete: 'cascade' }),
+export const userAi = sqliteTable('user_ai', {
+  userId: text('user_id').primaryKey(),
   provider: text('provider', { enum: ['openai', 'openrouter'] }).notNull(),
   model: text('model').notNull(),
   /** base64url of iv (12 bytes) followed by the ciphertext. */
   keyCipher: text('key_cipher').notNull(),
   keyHint: text('key_hint').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+})
+
+/** A user's AI shared with a family: members without their own record there with it. */
+export const aiShares = sqliteTable(
+  'ai_shares',
+  {
+    familyId: text('family_id')
+      .notNull()
+      .references(() => families.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.familyId, table.userId] })],
+)
+
+/** Which shared AI a family uses, picked by its owner or admins; else the earliest shared. */
+export const familyAi = sqliteTable('family_ai', {
+  familyId: text('family_id')
+    .primaryKey()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull(),
   updatedBy: text('updated_by').notNull(),
   updatedAt: integer('updated_at').notNull(),
 })
 
 /**
- * A user's Siri shortcut for one family: what they say to start it, their time zone, and
- * the chat thread their commands continue (a new one after 30 idle minutes).
+ * A user's Siri shortcut: what they say to start it, their time zone, and the chat thread
+ * their commands continue (a new one after 30 idle minutes).
  */
-export const voiceShortcuts = sqliteTable(
-  'voice_shortcuts',
-  {
-    userId: text('user_id').notNull(),
-    familyId: text('family_id')
-      .notNull()
-      .references(() => families.id, { onDelete: 'cascade' }),
-    phrase: text('phrase').notNull(),
-    timeZone: text('time_zone').notNull(),
-    threadId: text('thread_id'),
-    threadActiveAt: integer('thread_active_at'),
-    updatedAt: integer('updated_at').notNull(),
-  },
-  (table) => [primaryKey({ columns: [table.userId, table.familyId] })],
-)
+export const voiceSettings = sqliteTable('voice_settings', {
+  userId: text('user_id').primaryKey(),
+  phrase: text('phrase').notNull(),
+  timeZone: text('time_zone').notNull(),
+  threadId: text('thread_id'),
+  threadActiveAt: integer('thread_active_at'),
+  updatedAt: integer('updated_at').notNull(),
+})
 
 /**
- * The code a Siri shortcut sends instead of a session: one per user and family, stored as a
- * SHA-256 hash. It acts only in its family, and lapses after long disuse.
+ * The code a Siri shortcut sends instead of a session: one per user, stored as a SHA-256
+ * hash. It lapses after long disuse.
  */
 export const voiceTokens = sqliteTable(
   'voice_tokens',
   {
     id: text('id').primaryKey(),
     userId: text('user_id').notNull(),
-    familyId: text('family_id')
-      .notNull()
-      .references(() => families.id, { onDelete: 'cascade' }),
     tokenHash: text('token_hash').notNull(),
     createdAt: integer('created_at').notNull(),
     lastUsedAt: integer('last_used_at'),
@@ -227,7 +237,7 @@ export const voiceTokens = sqliteTable(
   },
   (table) => [
     uniqueIndex('voice_tokens_hash_idx').on(table.tokenHash),
-    uniqueIndex('voice_tokens_user_family_idx').on(table.userId, table.familyId),
+    uniqueIndex('voice_tokens_user_idx').on(table.userId),
   ],
 )
 

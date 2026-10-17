@@ -15,11 +15,12 @@ import {
   writeChanges,
 } from './data'
 
-/** Everything a turn's tools act on: one user, one family, one thread. */
+/** Everything a turn's tools act on: one user, their families, one thread. */
 export interface AgentContext {
   db: D1Database
   access: Access
-  family: FamilyAccess
+  /** The families this turn may act in. */
+  families: FamilyAccess[]
   userId: string
   threadId: string
   runId: string
@@ -54,8 +55,8 @@ const REFUSED: Record<string, string> = {
 
 /** The tools for one turn, bound to its context. */
 export function agentTools(ctx: AgentContext) {
-  const { db, access, family, userId, now, timeZone } = ctx
-  const babies = () => writableBabies(db, family)
+  const { db, access, families, userId, now, timeZone } = ctx
+  const babies = () => writableBabies(db, families)
   const log = { threadId: ctx.threadId, runId: ctx.runId }
 
   /** One of the family's events, if the user may see it. */

@@ -21,17 +21,38 @@ function toEvents(rows: EventRow[]): Event[] {
   })
 }
 
-/** The family's babies the user may record for: not archived, within their baby scope. */
-export async function writableBabies(db: D1Database, family: FamilyAccess): Promise<VoiceBaby[]> {
-  if (family.role === 'viewer') return []
+/**
+ * The babies the user may record for in these families: not archived, within their baby
+ * scope. A name used in two families gets the family's name added, "小米粒（外婆家）", so the
+ * model and the user can tell them apart.
+ */
+export async function writableBabies(
+  db: D1Database,
+  families: FamilyAccess[],
+): Promise<VoiceBaby[]> {
+  const recording = families.filter((family) => family.role !== 'viewer')
+  if (recording.length === 0) return []
   const { results } = await db
     .prepare(
       `select id, name, family_id as familyId from babies
-       where family_id = ? and deleted_at is null and archived_at is null order by created_at`,
+       where family_id in (select value from json_each(?)) and deleted_at is null
+         and archived_at is null order by created_at`,
     )
-    .bind(family.id)
+    .bind(JSON.stringify(recording.map((family) => family.id)))
     .all<VoiceBaby>()
-  return results.filter((baby) => inBabyScope(family.babyIds, baby.id))
+  const byId = new Map(recording.map((family) => [family.id, family]))
+  const babies = results.filter((baby) => {
+    const family = byId.get(baby.familyId)
+    return family !== undefined && inBabyScope(family.babyIds, baby.id)
+  })
+  const counts = new Map<string, number>()
+  for (const baby of babies) counts.set(baby.name, (counts.get(baby.name) ?? 0) + 1)
+  for (const baby of babies) {
+    if ((counts.get(baby.name) ?? 0) < 2) continue
+    const family = byId.get(baby.familyId)
+    baby.name = `${baby.name}（${family?.alias ?? family?.name ?? ''}）`
+  }
+  return babies
 }
 
 /** Timed events still running (sleeps, breastfeeds), latest per baby and type. */

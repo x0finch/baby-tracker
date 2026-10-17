@@ -51,7 +51,8 @@ describe('voice agent', () => {
     scope = {
       db: t.env.DB,
       access,
-      family: access.get(family.id)!,
+      families: [access.get(family.id)!],
+      sharedOnly: false,
       userId: signedIn.user.id,
       timeZone: 'Asia/Shanghai',
       phrase: '记录宝宝',

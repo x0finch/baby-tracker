@@ -66,8 +66,8 @@ export async function listModels(provider: AiProvider, apiKey: string) {
   ]
 }
 
-/** The model adapter for a family's saved settings. */
-export function familyAdapter(provider: AiProvider, model: string, apiKey: string) {
+/** The model adapter for saved AI settings. */
+export function aiAdapter(provider: AiProvider, model: string, apiKey: string) {
   const info = PROVIDERS[provider]
   return openaiCompatibleText(model, { baseURL: info.baseURL, apiKey, api: info.api })
 }

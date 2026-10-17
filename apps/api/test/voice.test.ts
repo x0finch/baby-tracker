@@ -1,6 +1,6 @@
 import type { Event, PullResponse } from '@bobo/shared'
 import { fakeText } from '@tanstack/ai/testing'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import type { VoiceAction } from '../src/voice/action'
 import { clockToTime } from '../src/voice/plan'
@@ -9,14 +9,6 @@ import { baby } from './fixtures'
 
 type Answer = { ok: boolean; done: boolean; confirming: boolean; reply: string }
 const answerOf = (res: Response): Promise<Answer> => res.json()
-
-interface Shortcut {
-  familyId: string
-  familyName: string
-  phrase: string
-  hasAi: boolean
-  token: { createdAt: number; lastUsedAt: number | null } | null
-}
 
 const action = (overrides: Partial<VoiceAction>): VoiceAction => ({
   type: 'diaper',
@@ -36,14 +28,16 @@ const action = (overrides: Partial<VoiceAction>): VoiceAction => ({
   ...overrides,
 })
 
+const AI = { provider: 'openrouter', model: 'openai/gpt-5.4-mini', apiKey: 'sk-or-v1-0123456789' }
+
 describe('siri voice logging', () => {
   let t: Awaited<ReturnType<typeof createTestApp>>
   let headers: Headers
   let familyId: string
   const fake = fakeText()
-  // Whose AI the last message asked for, and whether families have one.
-  let askedFor: string | undefined
-  let aiReady = true
+  // The model the last message ran on (by saved key hint), and what it was told.
+  let usedKey: string | undefined
+  let system = ''
 
   const siri = (token: string | null, text: string) =>
     t.request('/api/voice/siri', {
@@ -61,67 +55,80 @@ describe('siri voice logging', () => {
     actions: VoiceAction[],
     reply = '记好了。',
   ) => {
-    fake.setResponses([{ toolCalls: [{ name: 'record', input: { actions } }] }, { text: reply }])
+    fake.setResponses([
+      ({ request }) => {
+        system = JSON.stringify(request.systemPrompts ?? [])
+        return { toolCalls: [{ name: 'record', input: { actions } }] }
+      },
+      { text: reply },
+    ])
     return answerOf(await siri(token, text))
   }
   const works = async (token: string) =>
     (await record(token, '换尿布', [action({ type: 'diaper' })])).ok
-  const newToken = async (h = headers, family = familyId) => {
-    const res = await t.send('POST', `/api/voice/families/${family}/token`, h, {
-      timeZone: 'Asia/Shanghai',
-    })
+  const newToken = async (h = headers) => {
+    const res = await t.send('POST', '/api/voice/token', h, { timeZone: 'Asia/Shanghai' })
     expect(res.status).toBe(200)
     return (await res.json()) as { id: string; token: string }
-  }
-  const shortcuts = async (h = headers) => {
-    const res = await t.request('/api/voice', { headers: h })
-    const view: { shortcuts: Shortcut[] } = await res.json()
-    return view.shortcuts
   }
   const events = async (h = headers) => {
     const res = await t.request('/api/sync/pull?cursor=', { headers: h })
     const page = (await res.json()) as PullResponse
     return page.events.filter((event: Event) => event.deletedAt === null)
   }
+  const newFamily = async (h: Headers, name: string, babyName: string) => {
+    const res = await t.send('POST', '/api/families', h, { name })
+    const created: { id: string } = await res.json()
+    await t.send('POST', '/api/sync/push', h, {
+      babies: [baby(created.id, { name: babyName })],
+      events: [],
+    })
+    return created.id
+  }
+  const join = async (inviter: Headers, family: string, joiner: Headers, role = 'caregiver') => {
+    const invite = await t.send('POST', `/api/families/${family}/invites`, inviter, {
+      role,
+      babyIds: null,
+    })
+    const { code } = (await invite.json()) as { code: string }
+    await t.send('POST', `/api/invites/${code}/accept`, joiner)
+  }
 
   beforeAll(async () => {
     t = await createTestApp(
-      {},
+      { AI_KEY_SECRET: 'test-ai-key-secret-test-ai-key-secret' },
       {
-        voiceAdapter: async (_env, asked) => {
-          askedFor = asked
-          return aiReady ? fake : null
+        voiceAdapter: async (_env, ai) => {
+          usedKey = ai.keyHint
+          return fake
         },
       },
     )
     headers = (await t.signIn()).headers
-    const res = await t.send('POST', '/api/families', headers, { name: '我们家' })
-    const family: { id: string } = await res.json()
-    familyId = family.id
-    await t.send('POST', '/api/sync/push', headers, {
-      babies: [baby(familyId, { name: '小米粒' })],
-      events: [],
-    })
+    familyId = await newFamily(headers, '我们家', '小米粒')
   })
   afterAll(() => t.dispose())
-  beforeEach(() => {
-    aiReady = true
+
+  it('answers that there is no AI yet', async () => {
+    const { token } = await newToken()
+    const result = await answerOf(await siri(token, '换尿布'))
+    expect(result).toMatchObject({ done: true, reply: expect.stringMatching(/还没有可用的 AI/) })
+    const settings: unknown = await (await t.request('/api/voice', { headers })).json()
+    expect(settings).toMatchObject({ ai: null })
+    await t.send('PUT', '/api/ai', headers, AI)
   })
 
-  it('shows one shortcut per family, with the code only when created', async () => {
-    expect(await shortcuts()).toEqual([
-      { familyId, familyName: '我们家', phrase: '记录宝宝', hasAi: false, token: null },
-    ])
-    const res = await t.send('PATCH', `/api/voice/families/${familyId}`, headers, {
-      phrase: '宝宝日记',
-    })
-    expect(await res.json()).toMatchObject({ shortcuts: [{ phrase: '宝宝日记' }] })
+  it('keeps the phrase and shows the code only when created', async () => {
+    let res = await t.request('/api/voice', { headers })
+    expect(await res.json()).toMatchObject({ phrase: '记录宝宝', ai: { kind: 'own' } })
+    res = await t.send('PATCH', '/api/voice', headers, { phrase: '宝宝日记' })
+    expect(await res.json()).toMatchObject({ phrase: '宝宝日记' })
     const { token } = await newToken()
     expect(token).toMatch(/^bobo_/)
-    const [shortcut] = await shortcuts()
-    expect(shortcut?.token?.createdAt).toBeTypeOf('number')
-    expect(JSON.stringify(shortcut)).not.toContain(token)
-    await t.send('PATCH', `/api/voice/families/${familyId}`, headers, { phrase: '记录宝宝' })
+    res = await t.request('/api/voice', { headers })
+    const settings = (await res.json()) as { token: { createdAt: number } | null }
+    expect(settings.token?.createdAt).toBeTypeOf('number')
+    expect(JSON.stringify(settings)).not.toContain(token)
   })
 
   it('takes the code with or without the Bearer scheme', async () => {
@@ -160,37 +167,31 @@ describe('siri voice logging', () => {
       action({ type: 'bottle', baby: '小米粒', amountMl: 120, milk: 'formula' }),
     ])
     expect(result).toMatchObject({ ok: true, done: false, reply: '记好了。' })
-    expect(askedFor).toBe(familyId)
     const stored = (await events()).filter((event) => !earlier.has(event.id))
     expect(stored.map((event) => event.type).toSorted()).toEqual(['diaper', 'feeding'])
     expect(stored.every((event) => event.createdBy !== null)).toBe(true)
   })
 
-  it('ends when the agent says the user is done, or when there is no AI', async () => {
+  it('ends when the agent says the user is done', async () => {
     const { token } = await newToken()
     fake.setResponses([
       { toolCalls: [{ name: 'end_conversation', input: {} }] },
       { text: '好的，再见。' },
     ])
     expect(await answerOf(await siri(token, '没有了'))).toMatchObject({ ok: true, done: true })
-    aiReady = false
-    const noAi = await answerOf(await siri(token, '换尿布'))
-    expect(noAi).toMatchObject({ done: true, reply: expect.stringMatching(/还没设置 AI 模型/) })
   })
 
   it('chats in the app, in the same conversation as Siri', async () => {
     const { token } = await newToken()
     await record(token, '换尿布', [action({ type: 'diaper' })], '记好了，还有吗？')
     fake.setResponses([{ text: '今天换了几次尿布。' }])
-    const res = await t.send('POST', `/api/voice/families/${familyId}/chat`, headers, {
-      text: '今天怎么样',
-    })
+    const res = await t.send('POST', '/api/voice/chat', headers, { text: '今天怎么样' })
     expect(await res.json()).toEqual({
       reply: '今天换了几次尿布。',
       done: false,
       confirming: false,
     })
-    const chat = await t.request(`/api/voice/families/${familyId}/chat`, { headers })
+    const chat = await t.request('/api/voice/chat', { headers })
     const { messages } = (await chat.json()) as { messages: Array<{ role: string; text: string }> }
     expect(messages.slice(-4)).toEqual([
       { role: 'user', text: '换尿布' },
@@ -203,16 +204,14 @@ describe('siri voice logging', () => {
   it('asks before deleting and waits for yes', async () => {
     const [stored] = await events()
     fake.setResponses([{ toolCalls: [{ name: 'delete_event', input: { id: stored?.id } }] }])
-    const ask = await t.send('POST', `/api/voice/families/${familyId}/chat`, headers, {
-      text: '删掉刚才那条',
-    })
+    const ask = await t.send('POST', '/api/voice/chat', headers, { text: '删掉刚才那条' })
     expect(await ask.json()).toMatchObject({
       confirming: true,
       reply: expect.stringMatching(/^要删除/),
     })
     const before = (await events()).length
     fake.setResponses([{ text: '删掉了。' }])
-    await t.send('POST', `/api/voice/families/${familyId}/chat`, headers, { text: '确定' })
+    await t.send('POST', '/api/voice/chat', headers, { text: '确定' })
     expect(await events()).toHaveLength(before - 1)
   })
 
@@ -223,14 +222,14 @@ describe('siri voice logging', () => {
     // Revoking an old id (a device signing out) leaves the current code alone.
     await t.send('DELETE', `/api/voice/tokens/${first.id}`, headers)
     expect(await works(second.token)).toBe(true)
-    await t.send('DELETE', `/api/voice/families/${familyId}/token`, headers)
+    await t.send('DELETE', '/api/voice/token', headers)
     expect(await works(second.token)).toBe(false)
   })
 
   it('stops working when the password changes', async () => {
     const parent = await t.signIn('爸爸')
-    const res = await t.send('POST', '/api/families', parent.headers, { name: '爸爸家' })
-    const own: { id: string } = await res.json()
+    await newFamily(parent.headers, '爸爸家', '小核桃')
+    await t.send('PUT', '/api/ai', parent.headers, AI)
     const ctx = await t.auth.$context
     const userId = parent.user.id
     await ctx.internalAdapter.linkAccount({
@@ -239,71 +238,65 @@ describe('siri voice logging', () => {
       accountId: userId,
       password: 'old',
     })
-    const { token } = await newToken(parent.headers, own.id)
+    const { token } = await newToken(parent.headers)
     fake.setResponses([{ text: '你好。' }])
     expect((await answerOf(await siri(token, '你好'))).ok).toBe(true)
     await ctx.internalAdapter.updatePassword(userId, 'new')
     expect((await answerOf(await siri(token, '你好'))).reply).toMatch(/口令已失效/)
   })
 
-  it('gives each family its own shortcut, code and AI', async () => {
-    // Also a member of grandma's family, with its own baby.
+  it('records in every family with your own key, telling same names apart', async () => {
     const grandma = await t.signIn('外婆')
-    const res = await t.send('POST', '/api/families', grandma.headers, { name: '外婆家' })
-    const other: { id: string } = await res.json()
+    const other = await newFamily(grandma.headers, '外婆家', '小豆子')
     await t.send('POST', '/api/sync/push', grandma.headers, {
-      babies: [baby(other.id, { name: '小豆子' })],
+      babies: [baby(other, { name: '小米粒' })],
       events: [],
     })
-    const invite = await t.send('POST', `/api/families/${other.id}/invites`, grandma.headers, {
-      role: 'caregiver',
-      babyIds: null,
-    })
-    const { code } = (await invite.json()) as { code: string }
-    await t.send('POST', `/api/invites/${code}/accept`, headers)
+    await join(grandma.headers, other, headers)
+    const { token } = await newToken()
 
-    expect((await shortcuts()).map((shortcut) => shortcut.phrase)).toEqual([
-      '记录宝宝',
-      '记录外婆家',
+    await record(token, '小豆子换尿布', [action({ type: 'diaper', baby: '小豆子' })])
+    expect(system).toContain('小米粒（我们家）')
+    expect(system).toContain('小米粒（外婆家）')
+    expect((await events(grandma.headers)).filter((e) => e.type === 'diaper')).toHaveLength(1)
+
+    const which = await record(token, '小米粒换尿布', [action({ type: 'diaper', baby: '小米粒' })])
+    expect(which.ok).toBe(true)
+    expect((await events(grandma.headers)).filter((e) => e.type === 'diaper')).toHaveLength(1)
+    await record(token, '外婆家的小米粒换尿布', [
+      action({ type: 'diaper', baby: '小米粒（外婆家）' }),
     ])
-    const taken = await t.send('PATCH', `/api/voice/families/${other.id}`, headers, {
-      phrase: '记录宝宝',
-    })
-    expect(taken.status).toBe(409)
+    expect((await events(grandma.headers)).filter((e) => e.type === 'diaper')).toHaveLength(2)
+  })
 
-    const ours = await newToken()
-    const theirs = await newToken(headers, other.id)
-    const refused = await record(ours.token, '小豆子换尿布', [
-      action({ type: 'diaper', baby: '小豆子' }),
-    ])
-    expect(askedFor).toBe(familyId)
-    expect(refused.ok).toBe(true)
-    expect((await events(grandma.headers)).filter((e) => e.type === 'diaper')).toHaveLength(0)
+  it('without a key of your own, records only in the family that shared one', async () => {
+    const aunt = await t.signIn('阿姨')
+    await join(headers, familyId, aunt.headers)
+    const grandma = await t.signIn('奶奶')
+    const theirs = await newFamily(grandma.headers, '奶奶家', '小橙子')
+    await join(grandma.headers, theirs, aunt.headers)
+    // Grandma's family is joined later but is the only one with a shared AI.
+    await t.send('PUT', '/api/ai', grandma.headers, { ...AI, apiKey: 'sk-or-v1-grandma-key' })
+    await t.send('PUT', '/api/ai/shares', grandma.headers, { familyIds: [theirs] })
 
-    await record(theirs.token, '小豆子换尿布', [action({ type: 'diaper', baby: '小豆子' })])
-    expect(askedFor).toBe(other.id)
+    const settings = await (await t.request('/api/voice', { headers: aunt.headers })).json()
+    expect(settings).toMatchObject({ ai: { kind: 'shared', familyName: '奶奶家', by: '奶奶' } })
+    const { token } = await newToken(aunt.headers)
+    const ours = (await events()).length
+    await record(token, '小米粒换尿布', [action({ type: 'diaper', baby: '小米粒' })])
+    expect(usedKey).toMatch(/-key$/)
+    expect(system).not.toContain('小米粒')
+    expect(system).toContain('只能记这个家庭')
+    expect(await events()).toHaveLength(ours)
+    await record(token, '小橙子换尿布', [action({ type: 'diaper', baby: '小橙子' })])
     expect((await events(grandma.headers)).filter((e) => e.type === 'diaper')).toHaveLength(1)
   })
 
-  it('cannot add a shortcut for a family the user is not in, or only views', async () => {
-    const res = await t.send(
-      'POST',
-      '/api/voice/families/01J00000000000000000000000/token',
-      headers,
-      {},
-    )
-    expect(res.status).toBe(403)
-
-    const viewer = await t.signIn('奶奶')
-    const invite = await t.send('POST', `/api/families/${familyId}/invites`, headers, {
-      role: 'viewer',
-      babyIds: null,
-    })
-    const { code } = (await invite.json()) as { code: string }
-    await t.send('POST', `/api/invites/${code}/accept`, viewer.headers)
-    expect(await shortcuts(viewer.headers)).toEqual([])
-    const denied = await t.send('POST', `/api/voice/families/${familyId}/token`, viewer.headers, {})
-    expect(denied.status).toBe(403)
+  it('answers viewers that there is nothing to record', async () => {
+    const viewer = await t.signIn('邻居')
+    await join(headers, familyId, viewer.headers, 'viewer')
+    const { token } = await newToken(viewer.headers)
+    expect((await answerOf(await siri(token, '换尿布'))).reply).toBe('还没有可以记录的家庭。')
   })
 })
 

@@ -1,9 +1,55 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "81278624-4d37-40fc-8c17-d698967dae9d",
+  "id": "68d630fb-b7be-439d-973a-51d041bb0b28",
   "prevId": "b9cfe7da-1d93-4540-94be-a66851f58036",
   "tables": {
+    "ai_shares": {
+      "name": "ai_shares",
+      "columns": {
+        "family_id": {
+          "name": "family_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "ai_shares_family_id_families_id_fk": {
+          "name": "ai_shares_family_id_families_id_fk",
+          "tableFrom": "ai_shares",
+          "tableTo": "families",
+          "columnsFrom": ["family_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "ai_shares_family_id_user_id_pk": {
+          "columns": ["family_id", "user_id"],
+          "name": "ai_shares_family_id_user_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "babies": {
       "name": "babies",
       "columns": {
@@ -507,29 +553,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "provider": {
-          "name": "provider",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "model": {
-          "name": "model",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "key_cipher": {
-          "name": "key_cipher",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "key_hint": {
-          "name": "key_hint",
+        "user_id": {
+          "name": "user_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -948,6 +973,58 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "user_ai": {
+      "name": "user_ai",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "key_cipher": {
+          "name": "key_cipher",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "key_hint": {
+          "name": "key_hint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "voice_ops": {
       "name": "voice_ops",
       "columns": {
@@ -1006,20 +1083,13 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "voice_shortcuts": {
-      "name": "voice_shortcuts",
+    "voice_settings": {
+      "name": "voice_settings",
       "columns": {
         "user_id": {
           "name": "user_id",
           "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "family_id": {
-          "name": "family_id",
-          "type": "text",
-          "primaryKey": false,
+          "primaryKey": true,
           "notNull": true,
           "autoincrement": false
         },
@@ -1060,23 +1130,8 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {
-        "voice_shortcuts_family_id_families_id_fk": {
-          "name": "voice_shortcuts_family_id_families_id_fk",
-          "tableFrom": "voice_shortcuts",
-          "tableTo": "families",
-          "columnsFrom": ["family_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "voice_shortcuts_user_id_family_id_pk": {
-          "columns": ["user_id", "family_id"],
-          "name": "voice_shortcuts_user_id_family_id_pk"
-        }
-      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -1092,13 +1147,6 @@
         },
         "user_id": {
           "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "family_id": {
-          "name": "family_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -1155,23 +1203,13 @@
           "columns": ["token_hash"],
           "isUnique": true
         },
-        "voice_tokens_user_family_idx": {
-          "name": "voice_tokens_user_family_idx",
-          "columns": ["user_id", "family_id"],
+        "voice_tokens_user_idx": {
+          "name": "voice_tokens_user_idx",
+          "columns": ["user_id"],
           "isUnique": true
         }
       },
-      "foreignKeys": {
-        "voice_tokens_family_id_families_id_fk": {
-          "name": "voice_tokens_family_id_families_id_fk",
-          "tableFrom": "voice_tokens",
-          "tableTo": "families",
-          "columnsFrom": ["family_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}

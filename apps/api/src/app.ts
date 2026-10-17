@@ -6,14 +6,14 @@ import { errorResponse } from './http'
 import { requireUser } from './middleware'
 import { authRateLimit } from './rate-limit'
 import { accountRoutes } from './routes/account'
+import { familyAiRoutes, userAiRoutes } from './routes/ai'
 import { familyRoutes } from './routes/families'
-import { familyAiRoutes, readFamilyAi } from './routes/family-ai'
 import { familyInviteRoutes, inviteAcceptRoutes, invitePreviewRoutes } from './routes/invites'
 import { pushRoutes, reminderRoutes } from './routes/notifications'
 import { syncRoutes } from './routes/sync'
 import { type AdapterFor, siriRoutes, voiceRoutes } from './routes/voice'
 import type { AppEnv, AuthFor } from './types'
-import { decryptKey, familyAdapter } from './voice/ai'
+import { decryptKey, aiAdapter } from './voice/ai'
 
 export interface AppOptions {
   auth?: AuthFor
@@ -21,15 +21,10 @@ export interface AppOptions {
   voiceAdapter?: AdapterFor
 }
 
-/** The family's own provider, model and key. */
-const defaultAdapter: AdapterFor = async (env, familyId) => {
-  const saved = await readFamilyAi(env.DB, familyId)
-  if (!saved || !env.AI_KEY_SECRET) return null
-  return familyAdapter(
-    saved.provider,
-    saved.model,
-    await decryptKey(env.AI_KEY_SECRET, saved.keyCipher),
-  )
+/** A saved provider, model and key, as a model adapter. */
+const defaultAdapter: AdapterFor = async (env, ai) => {
+  if (!env.AI_KEY_SECRET) return null
+  return aiAdapter(ai.provider, ai.model, await decryptKey(env.AI_KEY_SECRET, ai.keyCipher))
 }
 
 export function createApp(options: AppOptions = {}) {
@@ -64,6 +59,9 @@ export function createApp(options: AppOptions = {}) {
     return c.json({ id: user.id, name: user.name, email: user.email, image: user.image ?? null })
   })
 
+  app.use('/ai', auth)
+  app.use('/ai/*', auth)
+  app.route('/ai', userAiRoutes)
   app.use('/account', auth)
   app.route('/account', accountRoutes)
   app.use('/families', auth)
@@ -83,8 +81,9 @@ export function createApp(options: AppOptions = {}) {
   // The shortcut authenticates with its own code, not a session.
   app.route('/voice/siri', siriRoutes(voiceAdapter))
   app.use('/voice', auth)
-  app.use('/voice/families/*', auth)
+  app.use('/voice/token', auth)
   app.use('/voice/tokens/*', auth)
+  app.use('/voice/chat', auth)
   app.route('/voice', voiceRoutes(voiceAdapter))
 
   app.notFound((c) => c.json({ error: 'not_found' }, 404))

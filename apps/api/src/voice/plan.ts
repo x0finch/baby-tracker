@@ -34,8 +34,8 @@ export type Plan =
 export const REPLY = {
   unclear: '没听懂，可以再说一遍吗？比如「小米粒换尿布了」。',
   noBabies: '还没有可以记录的宝宝。',
-  whichBaby: '是哪个宝宝？请带上名字再说一遍。',
-  unknownBaby: (name: string) => `这个家庭里没有叫「${name}」的宝宝。`,
+  whichBaby: '是哪个宝宝？请带上名字（重名时带上家庭）再说一遍。',
+  unknownBaby: (name: string) => `没有叫「${name}」的宝宝。`,
   needAmount: '是多少毫升？请带上量再说一遍。',
   needTemperature: '体温是多少度？请再说一遍。',
   needMedicine: '吃的是什么药？请再说一遍。',
@@ -157,11 +157,12 @@ function pickBaby(action: VoiceAction, babies: VoiceBaby[]): VoiceBaby {
   if (babies.length === 0) refuse(REPLY.noBabies)
   const said = action.baby?.trim()
   if (!said) return babies.length === 1 && babies[0] ? babies[0] : refuse(REPLY.whichBaby)
-  return (
-    babies.find((baby) => baby.name === said) ??
-    babies.find((baby) => said.includes(baby.name) || baby.name.includes(said)) ??
-    refuse(REPLY.unknownBaby(said))
-  )
+  const exact = babies.find((baby) => baby.name === said)
+  if (exact) return exact
+  const close = babies.filter((baby) => said.includes(baby.name) || baby.name.includes(said))
+  // Two babies of that name in different families.
+  if (close.length > 1) refuse(REPLY.whichBaby)
+  return close[0] ?? refuse(REPLY.unknownBaby(said))
 }
 
 /** When it happened: a clock time, "N minutes ago", or now. Never in the future. */
