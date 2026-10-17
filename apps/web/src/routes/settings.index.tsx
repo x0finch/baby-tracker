@@ -9,6 +9,7 @@ import { useSyncStatusText } from '../features/account/AccountCard'
 import { useBabies } from '../features/babies/use-babies'
 import { FamilyList } from '../features/family/FamilyList'
 import { usePushState } from '../features/reminders/RemindersCard'
+import { useVoiceSummary } from '../features/voice/VoiceCard'
 import { m } from '../paraglide/messages.js'
 import { getAccount } from '../sync/local'
 import { useAccess } from '../sync/use-access'
@@ -65,6 +66,11 @@ function SettingsIndex() {
           link={{ to: '/settings/reminders' }}
           title={m.reminderTitle()}
           summary={remindersSummary}
+        />
+        <SettingsRow
+          link={{ to: '/settings/voice' }}
+          title={m.voiceTitle()}
+          summary={useVoiceSummary()}
         />
         <SettingsRow
           link={{ to: '/settings/export' }}
