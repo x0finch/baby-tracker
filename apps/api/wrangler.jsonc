@@ -32,6 +32,12 @@
       "namespace_id": "1002",
       "simple": { "limit": 20, "period": 60 },
     },
+    // Siri voice commands per code (src/routes/voice.ts).
+    {
+      "name": "VOICE_RATE_LIMIT",
+      "namespace_id": "1003",
+      "simple": { "limit": 10, "period": 60 },
+    },
   ],
   // To send email with Cloudflare Email Service (Workers Paid plan), add:
   //   "send_email": [{ "name": "EMAIL" }]

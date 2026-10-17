@@ -1,4 +1,4 @@
-import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 // Server copies of the shared records (@bobo/shared). Timestamps are epoch milliseconds.
 const syncColumns = {
@@ -165,6 +165,46 @@ export const reminders = sqliteTable(
 export const serverKeys = sqliteTable('server_keys', {
   name: text('name').primaryKey(),
   value: text('value').notNull(),
+  createdAt: integer('created_at').notNull(),
+})
+
+/** A user's Siri voice logging settings: what they say to Siri and their time zone. */
+export const voiceSettings = sqliteTable('voice_settings', {
+  userId: text('user_id').primaryKey(),
+  phrase: text('phrase').notNull(),
+  /** IANA zone for times said aloud ("三点"), from the browser that set it up. */
+  timeZone: text('time_zone').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+})
+
+/**
+ * The code a Siri shortcut sends instead of a session: one per user, stored as a SHA-256
+ * hash. It only adds records and undoes the last ones, and lapses after long disuse.
+ */
+export const voiceTokens = sqliteTable(
+  'voice_tokens',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    tokenHash: text('token_hash').notNull(),
+    createdAt: integer('created_at').notNull(),
+    lastUsedAt: integer('last_used_at'),
+    expiresAt: integer('expires_at').notNull(),
+    /** Requests on `day` (UTC date), for the daily cap. */
+    day: text('day').notNull().default(''),
+    dayCount: integer('day_count').notNull().default(0),
+  },
+  (table) => [
+    uniqueIndex('voice_tokens_hash_idx').on(table.tokenHash),
+    index('voice_tokens_user_idx').on(table.userId),
+  ],
+)
+
+/** What the last voice command changed, so "撤销" can put it back. One per user. */
+export const voiceUndo = sqliteTable('voice_undo', {
+  userId: text('user_id').primaryKey(),
+  /** JSON: [{ id, before }] where before is the event as it was, or null if it was added. */
+  changes: text('changes').notNull(),
   createdAt: integer('created_at').notNull(),
 })
 

@@ -15,9 +15,12 @@
   "dependencies": {
     "@better-auth/passkey": "catalog:",
     "@bobo/shared": "workspace:*",
+    "@tanstack/ai": "^0.69.0",
+    "@tanstack/ai-openai": "^0.30.0",
     "better-auth": "catalog:",
     "drizzle-orm": "^0.45.4",
-    "hono": "^4.13.13"
+    "hono": "^4.13.13",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

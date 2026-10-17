@@ -20,6 +20,32 @@ export interface VoicePreview {
   records: string[]
 }
 
+// The code made on this device, so signing out here can end it (another account may sign
+// in next, and the shortcut would otherwise keep logging for this one).
+const TOKEN_ID_KEY = 'bobo.voiceTokenId'
+
+function rememberToken(id: string | null) {
+  try {
+    if (id) localStorage.setItem(TOKEN_ID_KEY, id)
+    else localStorage.removeItem(TOKEN_ID_KEY)
+  } catch {
+    // Storage unavailable: signing out just won't end the code.
+  }
+}
+
+/** Ends the code made on this device, if it is still the account's current one. */
+export async function revokeThisDeviceToken() {
+  let id: string | null = null
+  try {
+    id = localStorage.getItem(TOKEN_ID_KEY)
+  } catch {
+    return
+  }
+  if (!id) return
+  await apiFetch<void>(`/api/voice/token?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+  rememberToken(null)
+}
+
 export const voiceKeys = { settings: ['voice-settings'] as const }
 
 export const voiceApi = {
@@ -27,8 +53,19 @@ export const voiceApi = {
   setPhrase: (phrase: string) =>
     apiFetch<VoiceSettings>('/api/voice', { method: 'PATCH', body: JSON.stringify({ phrase }) }),
   /** Replaces any earlier code; the old one stops working at once. */
-  createToken: () => apiFetch<{ token: string }>('/api/voice/token', { method: 'POST' }),
-  revokeToken: () => apiFetch<void>('/api/voice/token', { method: 'DELETE' }),
+  createToken: async () => {
+    const created = await apiFetch<{ id: string; token: string }>('/api/voice/token', {
+      method: 'POST',
+      // Times said aloud ("三点") are read in this device's zone.
+      body: JSON.stringify({ timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }),
+    })
+    rememberToken(created.id)
+    return created
+  },
+  revokeToken: async () => {
+    await apiFetch<void>('/api/voice/token', { method: 'DELETE' })
+    rememberToken(null)
+  },
   preview: (text: string) =>
     apiFetch<VoicePreview>('/api/voice/preview', {
       method: 'POST',

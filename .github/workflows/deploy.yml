@@ -120,20 +120,23 @@ jobs:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+          VOICE_MODEL: ${{ vars.VOICE_MODEL }}
           APP_URL: ${{ steps.url.outputs.url }}
           TRUSTED_ORIGINS: ${{ steps.url.outputs.extra }}
         run: |
           # Secrets are uploaded with the new version; unset optional ones are left out.
           secrets="$RUNNER_TEMP/secrets.json"
           node -e '
-            const names = ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "RESEND_API_KEY"]
+            const names = ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "RESEND_API_KEY", "OPENAI_API_KEY"]
             const set = Object.fromEntries(names.filter((n) => process.env[n]).map((n) => [n, process.env[n]]))
             require("node:fs").writeFileSync(process.argv[1], JSON.stringify(set), { mode: 0o600 })
           ' "$secrets"
           vars=(--var "BETTER_AUTH_URL:$APP_URL")
           if [ -n "$TRUSTED_ORIGINS" ]; then vars+=(--var "TRUSTED_ORIGINS:$TRUSTED_ORIGINS"); fi
           if [ -n "$EMAIL_FROM" ]; then vars+=(--var "EMAIL_FROM:$EMAIL_FROM"); fi
+          if [ -n "$VOICE_MODEL" ]; then vars+=(--var "VOICE_MODEL:$VOICE_MODEL"); fi
           pnpm exec wrangler deploy --secrets-file "$secrets" "${vars[@]}"
           rm -f "$secrets"
 

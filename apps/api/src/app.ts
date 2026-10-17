@@ -10,14 +10,22 @@ import { familyRoutes } from './routes/families'
 import { familyInviteRoutes, inviteAcceptRoutes, invitePreviewRoutes } from './routes/invites'
 import { pushRoutes, reminderRoutes } from './routes/notifications'
 import { syncRoutes } from './routes/sync'
+import { type VoiceParserFor, siriRoutes, voiceRoutes } from './routes/voice'
 import type { AppEnv, AuthFor } from './types'
+import { openaiParser } from './voice/parse'
 
 export interface AppOptions {
   auth?: AuthFor
+  /** Parses Siri voice commands; tests pass a fake instead of calling the model. */
+  voiceParser?: VoiceParserFor
 }
+
+const defaultVoiceParser: VoiceParserFor = (env) =>
+  env.OPENAI_API_KEY ? openaiParser(env.OPENAI_API_KEY, env.VOICE_MODEL) : null
 
 export function createApp(options: AppOptions = {}) {
   const authFor = options.auth ?? getAuth
+  const voiceParser = options.voiceParser ?? defaultVoiceParser
   const app = new Hono<AppEnv>().basePath('/api')
 
   // The web app is same-origin; CORS only matters for the native shell (#45).
@@ -62,6 +70,12 @@ export function createApp(options: AppOptions = {}) {
   app.route('/push', pushRoutes)
   app.use('/reminders', auth)
   app.route('/reminders', reminderRoutes)
+  // The shortcut authenticates with its own code, not a session.
+  app.route('/voice/siri', siriRoutes(voiceParser))
+  app.use('/voice', auth)
+  app.use('/voice/token', auth)
+  app.use('/voice/preview', auth)
+  app.route('/voice', voiceRoutes(voiceParser))
 
   app.notFound((c) => c.json({ error: 'not_found' }, 404))
   app.onError(errorResponse)

@@ -12,6 +12,7 @@ import { m } from '../../paraglide/messages.js'
 import { getAccount } from '../../sync/local'
 import { requestSync, useSyncState } from '../../sync/runner'
 import { disablePush } from '../reminders/notifications'
+import { revokeThisDeviceToken } from '../voice/api'
 import { deleteAccountRemote, disconnectLocal, httpAccountApi, signOutRemote } from './account'
 import { connectIfSignedIn } from './connection'
 import { PasskeySection } from './PasskeySection'
@@ -67,8 +68,10 @@ export function AccountCard() {
   })
 
   async function signOut(clearData: boolean) {
-    // Reminders for this account shouldn't keep arriving on this device.
+    // Reminders for this account shouldn't keep arriving on this device, and the Siri
+    // shortcut set up here shouldn't keep logging for it.
     await disablePush().catch(() => undefined)
+    await revokeThisDeviceToken().catch(() => undefined)
     try {
       await signOutRemote()
     } catch {
