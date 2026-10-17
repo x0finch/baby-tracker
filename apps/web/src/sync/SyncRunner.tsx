@@ -6,6 +6,7 @@ import { showToast } from '../components/ui/Toast'
 import { useLocalStore } from '../db'
 import {
   connectIfSignedIn,
+  reloadWhenSignedInElsewhere,
   resolveClaimChoice,
   useClaimChoice,
 } from '../features/account/connection'
@@ -40,7 +41,11 @@ export function SyncRunner() {
     if (!window.location.pathname.startsWith('/join/')) {
       void connectIfSignedIn(store)
     }
-    return stop
+    const unwatch = reloadWhenSignedInElsewhere(store)
+    return () => {
+      stop()
+      unwatch()
+    }
   }, [store])
 
   return (

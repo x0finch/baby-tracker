@@ -45,3 +45,37 @@ export async function resolveClaimChoice(store: LocalStore, family: FamilySummar
   claimChoice.set(null)
   await requestSync()
 }
+
+/**
+ * Picks up a sign-in finished in another window of the app. On iPhone, Google sign-in from
+ * the installed app runs in a separate browser sheet: the session and the local database
+ * are shared, but this window's copy of the data is not told, so it would stay signed out
+ * until restarted. When the app comes back into view (or back from the page cache) while
+ * signed out here, ask the server; if there is a session, start over from the saved data,
+ * which also links the account if the other window hadn't.
+ */
+export function reloadWhenSignedInElsewhere(store: LocalStore) {
+  const check = async () => {
+    // Signed in but deliberately not linked yet: choosing where records go, or joining.
+    if (getAccount(store) || claimChoice.get() || window.location.pathname.startsWith('/join/')) {
+      return
+    }
+    try {
+      if (await httpAccountApi.me()) window.location.reload()
+    } catch {
+      // Offline: nothing to pick up yet.
+    }
+  }
+  const onVisible = () => {
+    if (document.visibilityState === 'visible') void check()
+  }
+  const onPageShow = (event: PageTransitionEvent) => {
+    if (event.persisted) void check()
+  }
+  document.addEventListener('visibilitychange', onVisible)
+  window.addEventListener('pageshow', onPageShow)
+  return () => {
+    document.removeEventListener('visibilitychange', onVisible)
+    window.removeEventListener('pageshow', onPageShow)
+  }
+}
