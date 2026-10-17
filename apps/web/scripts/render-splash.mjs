@@ -1,10 +1,10 @@
 // Renders the iOS launch screens listed in src/lib/splash.ts: the app icon centered on
-// the theme's background. Run manually after changing the icon or the list:
+// the dark background. Run manually after changing the icon or the list:
 // `node scripts/render-splash.mjs` (needs Playwright).
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 
-import { SPLASH_SCREENS, SPLASH_THEMES, splashFile } from '../src/lib/splash.ts'
+import { SPLASH_SCREENS, SPLASH_THEME, splashFile } from '../src/lib/splash.ts'
 import { THEME_COLORS } from '../src/lib/theme.ts'
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
@@ -21,13 +21,10 @@ for (const screen of SPLASH_SCREENS) {
     viewport: { width: screen.width, height: screen.height },
     deviceScaleFactor: screen.ratio,
   })
-  for (const theme of SPLASH_THEMES) {
-    await page.setContent(
-      `<style>html,body{margin:0;height:100%;background:${THEME_COLORS[theme]};display:grid;place-items:center}svg{width:112px;height:112px}</style>${icon}`,
-    )
-    const shot = await page.screenshot({ scale: 'device' })
-    await writeFile(dir + splashFile(screen, theme), shot)
-  }
+  await page.setContent(
+    `<style>html,body{margin:0;height:100%;background:${THEME_COLORS[SPLASH_THEME]};display:grid;place-items:center}svg{width:112px;height:112px}</style>${icon}`,
+  )
+  await writeFile(dir + splashFile(screen), await page.screenshot({ scale: 'device' }))
   await page.close()
 }
 await browser.close()
