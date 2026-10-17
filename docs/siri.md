@@ -42,7 +42,7 @@ Each user can set their own AI under Settings → 我的 AI:
 - their API key;
 - a model from the key's list. Only models that can use tools are listed.
 
-The key is encrypted with `AI_KEY_SECRET` (AES-GCM). Only its last characters are ever shown.
+The key is encrypted with `ENCRYPTION_SECRET` (AES-GCM). Only its last characters are ever shown.
 
 A user can share their AI with any of their families. Members without a key of their own use it
 there. When several members share with a family, its owner or admins pick one; by default it is
@@ -72,7 +72,7 @@ Which key a command uses (`agent/keys.ts`):
 
 ### 1. Encryption secret
 
-Add the repository secret `AI_KEY_SECRET` (Settings → Secrets and variables → Actions): a random
+Add the repository secret `ENCRYPTION_SECRET` (Settings → Secrets and variables → Actions): a random
 string of 32+ characters, e.g. from a password manager. Then re-run the deploy. Without it, nobody
 can save an AI key. Changing it later makes saved keys unreadable, and users have to enter them
 again.

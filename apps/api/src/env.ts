@@ -23,8 +23,8 @@ export interface Env
   /** Sender address, e.g. "Bobo <noreply@yourdomain.com>"; its domain must be verified. */
   EMAIL_FROM?: string
   /**
-   * Encrypts the AI provider keys families save for voice logging. Changing it makes the saved
-   * keys unreadable; families then enter them again.
+   * Encrypts secrets stored in the database, such as users' AI provider keys. Changing it
+   * makes them unreadable; users then enter them again.
    */
-  AI_KEY_SECRET?: string
+  ENCRYPTION_SECRET?: string
 }

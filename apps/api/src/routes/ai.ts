@@ -35,7 +35,7 @@ async function view(db: D1Database, userId: string) {
 export const userAiRoutes = new Hono<AppEnv>()
   .get('/', async (c) => c.json(await view(c.env.DB, c.get('user').id)))
   .post('/models', json(modelsSchema), async (c) => {
-    const secret = c.env.AI_KEY_SECRET
+    const secret = c.env.ENCRYPTION_SECRET
     if (!secret) return c.json({ error: 'not_configured' }, 503)
     const { provider, apiKey } = c.req.valid('json')
     let key = apiKey
@@ -53,7 +53,7 @@ export const userAiRoutes = new Hono<AppEnv>()
     }
   })
   .put('/', json(saveSchema), async (c) => {
-    const secret = c.env.AI_KEY_SECRET
+    const secret = c.env.ENCRYPTION_SECRET
     if (!secret) return c.json({ error: 'not_configured' }, 503)
     const db = c.env.DB
     const userId = c.get('user').id

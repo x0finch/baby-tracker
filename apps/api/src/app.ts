@@ -23,8 +23,8 @@ export interface AppOptions {
 
 /** A saved provider, model and key, as a model adapter. */
 const defaultAdapter: AdapterFor = async (env, ai) => {
-  if (!env.AI_KEY_SECRET) return null
-  return aiAdapter(ai.provider, ai.model, await decryptKey(env.AI_KEY_SECRET, ai.keyCipher))
+  if (!env.ENCRYPTION_SECRET) return null
+  return aiAdapter(ai.provider, ai.model, await decryptKey(env.ENCRYPTION_SECRET, ai.keyCipher))
 }
 
 export function createApp(options: AppOptions = {}) {

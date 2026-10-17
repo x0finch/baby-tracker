@@ -120,7 +120,7 @@ jobs:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          AI_KEY_SECRET: ${{ secrets.AI_KEY_SECRET }}
+          ENCRYPTION_SECRET: ${{ secrets.ENCRYPTION_SECRET }}
           EMAIL_FROM: ${{ vars.EMAIL_FROM }}
           APP_URL: ${{ steps.url.outputs.url }}
           TRUSTED_ORIGINS: ${{ steps.url.outputs.extra }}
@@ -128,7 +128,7 @@ jobs:
           # Secrets are uploaded with the new version; unset optional ones are left out.
           secrets="$RUNNER_TEMP/secrets.json"
           node -e '
-            const names = ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "RESEND_API_KEY", "AI_KEY_SECRET"]
+            const names = ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "RESEND_API_KEY", "ENCRYPTION_SECRET"]
             const set = Object.fromEntries(names.filter((n) => process.env[n]).map((n) => [n, process.env[n]]))
             require("node:fs").writeFileSync(process.argv[1], JSON.stringify(set), { mode: 0o600 })
           ' "$secrets"

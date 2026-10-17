@@ -96,7 +96,7 @@ describe('siri voice logging', () => {
 
   beforeAll(async () => {
     t = await createTestApp(
-      { AI_KEY_SECRET: 'test-ai-key-secret-test-ai-key-secret' },
+      { ENCRYPTION_SECRET: 'test-ai-key-secret-test-ai-key-secret' },
       {
         voiceAdapter: async (_env, ai) => {
           usedKey = ai.keyHint

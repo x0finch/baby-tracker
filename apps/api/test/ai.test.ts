@@ -32,7 +32,7 @@ describe('AI settings', () => {
     (await t.request(`/api/families/${familyId}/ai`, { headers })).json()
 
   beforeAll(async () => {
-    t = await createTestApp({ AI_KEY_SECRET: SECRET })
+    t = await createTestApp({ ENCRYPTION_SECRET: SECRET })
     owner = (await t.signIn()).headers
     const res = await t.send('POST', '/api/families', owner, { name: '我们家' })
     const created: { id: string } = await res.json()

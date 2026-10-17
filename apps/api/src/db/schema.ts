@@ -169,7 +169,7 @@ export const serverKeys = sqliteTable('server_keys', {
 })
 
 /**
- * A user's own AI model for voice logging. The provider key is encrypted with AI_KEY_SECRET
+ * A user's own AI model for voice logging. The provider key is encrypted with ENCRYPTION_SECRET
  * (AES-GCM); only its last characters are kept in clear.
  */
 export const userAi = sqliteTable('user_ai', {

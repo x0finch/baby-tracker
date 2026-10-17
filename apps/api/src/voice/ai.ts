@@ -72,7 +72,7 @@ export function aiAdapter(provider: AiProvider, model: string, apiKey: string) {
   return openaiCompatibleText(model, { baseURL: info.baseURL, apiKey, api: info.api })
 }
 
-// Provider keys are encrypted at rest with a key derived from AI_KEY_SECRET.
+// Provider keys are encrypted at rest with a key derived from ENCRYPTION_SECRET.
 
 async function cipherKey(secret: string): Promise<CryptoKey> {
   const material = await crypto.subtle.importKey(
@@ -87,7 +87,7 @@ async function cipherKey(secret: string): Promise<CryptoKey> {
       name: 'HKDF',
       hash: 'SHA-256',
       salt: new Uint8Array(0),
-      info: new TextEncoder().encode('bobo family ai key'),
+      info: new TextEncoder().encode('bobo ai key'),
     },
     material,
     { name: 'AES-GCM', length: 256 },
