@@ -185,26 +185,38 @@ export const familyAi = sqliteTable('family_ai', {
   updatedAt: integer('updated_at').notNull(),
 })
 
-/** A user's Siri voice logging settings: what they say to Siri and their time zone. */
-export const voiceSettings = sqliteTable('voice_settings', {
-  userId: text('user_id').primaryKey(),
-  phrase: text('phrase').notNull(),
-  /** The one family Siri records for, with its AI; null picks the user's only family. */
-  familyId: text('family_id'),
-  /** IANA zone for times said aloud ("三点"), from the browser that set it up. */
-  timeZone: text('time_zone').notNull(),
-  updatedAt: integer('updated_at').notNull(),
-})
+/**
+ * A user's Siri shortcut for one family: what they say to start it, their time zone, and
+ * the chat thread their commands continue (a new one after 30 idle minutes).
+ */
+export const voiceShortcuts = sqliteTable(
+  'voice_shortcuts',
+  {
+    userId: text('user_id').notNull(),
+    familyId: text('family_id')
+      .notNull()
+      .references(() => families.id, { onDelete: 'cascade' }),
+    phrase: text('phrase').notNull(),
+    timeZone: text('time_zone').notNull(),
+    threadId: text('thread_id'),
+    threadActiveAt: integer('thread_active_at'),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.familyId] })],
+)
 
 /**
- * The code a Siri shortcut sends instead of a session: one per user, stored as a SHA-256
- * hash. It only adds records and undoes the last ones, and lapses after long disuse.
+ * The code a Siri shortcut sends instead of a session: one per user and family, stored as a
+ * SHA-256 hash. It acts only in its family, and lapses after long disuse.
  */
 export const voiceTokens = sqliteTable(
   'voice_tokens',
   {
     id: text('id').primaryKey(),
     userId: text('user_id').notNull(),
+    familyId: text('family_id')
+      .notNull()
+      .references(() => families.id, { onDelete: 'cascade' }),
     tokenHash: text('token_hash').notNull(),
     createdAt: integer('created_at').notNull(),
     lastUsedAt: integer('last_used_at'),
@@ -215,16 +227,75 @@ export const voiceTokens = sqliteTable(
   },
   (table) => [
     uniqueIndex('voice_tokens_hash_idx').on(table.tokenHash),
-    index('voice_tokens_user_idx').on(table.userId),
+    uniqueIndex('voice_tokens_user_family_idx').on(table.userId, table.familyId),
   ],
 )
 
-/** What the last voice command changed, so "撤销" can put it back. One per user. */
-export const voiceUndo = sqliteTable('voice_undo', {
-  userId: text('user_id').primaryKey(),
-  /** JSON: [{ id, before }] where before is the event as it was, or null if it was added. */
-  changes: text('changes').notNull(),
-  createdAt: integer('created_at').notNull(),
+/** What each agent turn changed, so "撤销" can put it back. */
+export const voiceOps = sqliteTable(
+  'voice_ops',
+  {
+    id: text('id').primaryKey(),
+    threadId: text('thread_id').notNull(),
+    /** One run (agent turn); undo reverts the latest run that changed anything. */
+    runId: text('run_id').notNull(),
+    eventId: text('event_id').notNull(),
+    /** The event as it was, or null when the turn added it. */
+    before: text('before'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => [index('voice_ops_thread_idx').on(table.threadId, table.createdAt)],
+)
+
+// TanStack AI chat persistence (src/agent/persistence.ts), as its Cloudflare recipe lays out.
+
+export const chatThreads = sqliteTable('chat_threads', {
+  threadId: text('thread_id').primaryKey(),
+  messagesJson: text('messages_json').notNull(),
+  updatedAt: integer('updated_at').notNull(),
 })
+
+export const chatRuns = sqliteTable(
+  'chat_runs',
+  {
+    runId: text('run_id').primaryKey(),
+    threadId: text('thread_id').notNull(),
+    status: text('status').notNull(),
+    startedAt: integer('started_at').notNull(),
+    finishedAt: integer('finished_at'),
+    error: text('error'),
+    errorCode: text('error_code'),
+    usageJson: text('usage_json'),
+    sandboxKey: text('sandbox_key'),
+    detachedSince: integer('detached_since'),
+    cancelRequested: integer('cancel_requested'),
+    driverEpoch: integer('driver_epoch'),
+    parentRunId: text('parent_run_id'),
+    subagentRunId: text('subagent_run_id'),
+    name: text('name'),
+  },
+  (table) => [
+    index('chat_runs_thread_status').on(table.threadId, table.status),
+    index('chat_runs_thread_started').on(table.threadId, table.startedAt),
+  ],
+)
+
+export const chatInterrupts = sqliteTable(
+  'chat_interrupts',
+  {
+    interruptId: text('interrupt_id').primaryKey(),
+    runId: text('run_id').notNull(),
+    threadId: text('thread_id').notNull(),
+    status: text('status').notNull(),
+    requestedAt: integer('requested_at').notNull(),
+    resolvedAt: integer('resolved_at'),
+    payloadJson: text('payload_json').notNull(),
+    responseJson: text('response_json'),
+  },
+  (table) => [
+    index('chat_interrupts_thread').on(table.threadId, table.requestedAt),
+    index('chat_interrupts_run').on(table.runId),
+  ],
+)
 
 export * from './auth-schema'
