@@ -29,7 +29,7 @@ Secrets:
 | `BETTER_AUTH_SECRET`                       | yes                       | a random string of 32+ characters, e.g. from a password manager |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | for Google sign-in        | from Google Cloud (below)                                       |
 | `RESEND_API_KEY`                           | for password-reset emails | from [Resend](https://resend.com)                               |
-| `AI_KEY_SECRET`                            | for Siri voice logging    | a random string of 32+ characters; encrypts families' AI keys   |
+| `AI_KEY_SECRET`                            | for Siri voice logging    | a random string of 32+ characters; encrypts users' AI keys      |
 
 Variables:
 
