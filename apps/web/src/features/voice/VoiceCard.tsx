@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { type FormEvent, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
@@ -6,7 +7,6 @@ import { Card } from '../../components/ui/Card'
 import { FormError } from '../../components/ui/FormError'
 import { Input } from '../../components/ui/Input'
 import { Sheet } from '../../components/ui/Sheet'
-import { HttpError } from '../../lib/api'
 import { formatDate, formatTime } from '../../lib/i18n'
 import { m } from '../../paraglide/messages.js'
 import { useAccess } from '../../sync/use-access'
@@ -14,13 +14,13 @@ import {
   type ChatMessage,
   type ChatTurn,
   SHORTCUT_URL,
-  type VoiceShortcut,
+  type VoiceSettings,
   copyWhenReady,
   voiceApi,
   voiceKeys,
 } from './api'
 
-/** The settings row's status: how many of the user's Siri shortcuts are connected. */
+/** The settings row's status: whether Siri can add records for this account. */
 export function useVoiceSummary() {
   const { userId } = useAccess()
   const { data } = useQuery({
@@ -29,8 +29,7 @@ export function useVoiceSummary() {
     enabled: Boolean(userId),
   })
   if (!userId) return m.settingsNeedsSignIn()
-  const connected = data?.shortcuts.filter((shortcut) => shortcut.token).length ?? 0
-  return connected > 0 ? m.voiceSummaryOn() : m.voiceSummaryOff()
+  return data?.token ? m.voiceSummaryOn() : m.voiceSummaryOff()
 }
 
 /** Siri voice logging in settings: signed-in users only, as records go to the server. */
@@ -58,23 +57,15 @@ function Voice() {
       </Card>
     )
   }
-  if (settings.shortcuts.length === 0) {
-    return (
-      <Card>
-        <p className="m-0 text-fg-muted">{m.voiceNoFamily()}</p>
-      </Card>
-    )
-  }
-  const several = settings.shortcuts.length > 1
   return (
     <>
-      <Card>
+      <AiStatus settings={settings} />
+      <Card as="section" className="flex flex-col gap-3">
         <p className="m-0">{m.voiceIntro()}</p>
-        {several && <p className="m-0 mt-2 text-fg-muted">{m.voiceSeveralHint()}</p>}
+        <PhraseInput settings={settings} />
+        <Connect settings={settings} />
       </Card>
-      {settings.shortcuts.map((shortcut) => (
-        <ShortcutCard key={shortcut.familyId} shortcut={shortcut} titled={several} />
-      ))}
+      {settings.ai && <ChatCard />}
       <Card>
         <p className="m-0 text-caption text-fg-muted">{m.voiceBackTap()}</p>
       </Card>
@@ -82,38 +73,47 @@ function Voice() {
   )
 }
 
-/** One family's shortcut: what to say, adding it to Siri, and a chat to try it. */
-function ShortcutCard({ shortcut, titled }: { shortcut: VoiceShortcut; titled: boolean }) {
-  const [chatting, setChatting] = useState(false)
+/** Whose AI the commands use, and how to record in more families. */
+function AiStatus({ settings }: { settings: VoiceSettings }) {
+  const { ai } = settings
+  if (ai?.kind === 'own') return null
+  const link = (
+    <Link to="/settings/ai" className="font-bold underline">
+      {m.aiMineTitle()}
+    </Link>
+  )
   return (
-    <Card as="section" className="flex flex-col gap-3">
-      {titled && <h2 className="m-0 text-body font-extrabold">{shortcut.familyName}</h2>}
-      {shortcut.hasAi ? (
-        <>
-          <PhraseInput shortcut={shortcut} />
-          <Connect shortcut={shortcut} />
-          <Button variant="outline" block onClick={() => setChatting(true)}>
-            {m.voiceChatOpen()}
-          </Button>
-          <ChatSheet shortcut={shortcut} open={chatting} onClose={() => setChatting(false)} />
-        </>
-      ) : (
-        <p className="m-0 rounded-lg bg-feeding-soft p-3">{m.voiceNeedsAi()}</p>
-      )}
+    <Card tone="feeding">
+      <p className="m-0">
+        {ai ? m.voiceAiShared({ by: ai.by, family: ai.familyName }) : m.voiceAiNone()} {link}
+      </p>
+    </Card>
+  )
+}
+
+/** Opens the chat box. */
+function ChatCard() {
+  const [open, setOpen] = useState(false)
+  return (
+    <Card className="flex flex-col gap-2">
+      <Button variant="outline" block onClick={() => setOpen(true)}>
+        {m.voiceChatOpen()}
+      </Button>
+      <p className="m-0 text-caption text-fg-muted">{m.voiceChatHint()}</p>
+      <ChatSheet open={open} onClose={() => setOpen(false)} />
     </Card>
   )
 }
 
 /** What the user says to Siri; the shortcut must carry the same name. */
-function PhraseInput({ shortcut }: { shortcut: VoiceShortcut }) {
+function PhraseInput({ settings }: { settings: VoiceSettings }) {
   const queryClient = useQueryClient()
-  const [phrase, setPhrase] = useState(shortcut.phrase)
+  const [phrase, setPhrase] = useState(settings.phrase)
   const save = useMutation({
-    mutationFn: (next: string) => voiceApi.rename(shortcut.familyId, next),
+    mutationFn: voiceApi.rename,
     onSuccess: (next) => queryClient.setQueryData(voiceKeys.settings, next),
-    onError: () => setPhrase(shortcut.phrase),
+    onError: () => setPhrase(settings.phrase),
   })
-  const duplicate = save.error instanceof HttpError && save.error.status === 409
   return (
     <div className="flex flex-col gap-2">
       <Input
@@ -123,42 +123,44 @@ function PhraseInput({ shortcut }: { shortcut: VoiceShortcut }) {
         onChange={(event) => setPhrase(event.target.value)}
         onBlur={() => {
           const next = phrase.trim()
-          if (!next) setPhrase(shortcut.phrase)
-          else if (next !== shortcut.phrase) save.mutate(next)
+          if (!next) setPhrase(settings.phrase)
+          else if (next !== settings.phrase) save.mutate(next)
         }}
       />
-      <p className="m-0 text-fg-muted">{m.voiceSay({ phrase: shortcut.phrase })}</p>
-      {save.isError && <FormError>{duplicate ? m.voicePhraseTaken() : m.actionFailed()}</FormError>}
+      <p className="m-0 text-fg-muted">{m.voiceSay({ phrase: settings.phrase })}</p>
+      {save.isError && <FormError>{m.actionFailed()}</FormError>}
     </div>
   )
 }
 
 /** Adds the shortcut: creates a code, copies it and opens the shortcut to paste it into. */
-function Connect({ shortcut }: { shortcut: VoiceShortcut }) {
+function Connect({ settings }: { settings: VoiceSettings }) {
   const queryClient = useQueryClient()
   const refresh = () => queryClient.invalidateQueries({ queryKey: voiceKeys.settings })
   const add = useMutation({
     mutationFn: async () => {
-      const token = voiceApi.createToken(shortcut.familyId).then((created) => created.token)
+      const token = voiceApi.createToken().then((created) => created.token)
       await copyWhenReady(token)
       window.location.assign(SHORTCUT_URL)
     },
     onSettled: refresh,
   })
-  const revoke = useMutation({
-    mutationFn: () => voiceApi.revokeToken(shortcut.familyId),
-    onSettled: refresh,
-  })
+  const revoke = useMutation({ mutationFn: voiceApi.revokeToken, onSettled: refresh })
 
-  if (!shortcut.token) {
+  if (!settings.token) {
     return (
       <>
         <ol className="m-0 flex list-decimal flex-col gap-1 pl-5 text-fg-muted">
           <li>{m.voiceStepCopy()}</li>
           <li>{m.voiceStepPaste()}</li>
-          <li>{m.voiceStepRename({ phrase: shortcut.phrase })}</li>
+          <li>{m.voiceStepRename({ phrase: settings.phrase })}</li>
         </ol>
-        <Button size="lg" block disabled={add.isPending} onClick={() => add.mutate()}>
+        <Button
+          size="lg"
+          block
+          disabled={!settings.ai || add.isPending}
+          onClick={() => add.mutate()}
+        >
           {m.voiceAdd()}
         </Button>
         {add.isError && <FormError>{m.actionFailed()}</FormError>}
@@ -166,7 +168,7 @@ function Connect({ shortcut }: { shortcut: VoiceShortcut }) {
     )
   }
 
-  const { createdAt, lastUsedAt } = shortcut.token
+  const { createdAt, lastUsedAt } = settings.token
   return (
     <>
       <div className="flex flex-col">
@@ -209,20 +211,12 @@ function Connect({ shortcut }: { shortcut: VoiceShortcut }) {
  * Talks to the family's assistant as Siri would, in the same conversation: what is said here
  * is really recorded, and Siri remembers it for the next half hour.
  */
-function ChatSheet({
-  shortcut,
-  open,
-  onClose,
-}: {
-  shortcut: VoiceShortcut
-  open: boolean
-  onClose: () => void
-}) {
+function ChatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const queryClient = useQueryClient()
-  const key = voiceKeys.chat(shortcut.familyId)
+  const key = voiceKeys.chat
   const { data: messages = [], isError } = useQuery({
     queryKey: key,
-    queryFn: () => voiceApi.chat(shortcut.familyId),
+    queryFn: voiceApi.chat,
     enabled: open,
   })
   const [text, setText] = useState('')
@@ -234,7 +228,7 @@ function ChatSheet({
       { ...message, id: crypto.randomUUID() },
     ])
   const send = useMutation<ChatTurn, Error, string>({
-    mutationFn: (said) => voiceApi.send(shortcut.familyId, said),
+    mutationFn: voiceApi.send,
     onMutate: (said) => append({ role: 'user', text: said }),
     onSuccess: (turn) => {
       append({ role: 'assistant', text: turn.reply })
@@ -295,7 +289,6 @@ function ChatSheet({
           </Button>
         </form>
         {send.isError && <FormError>{m.actionFailed()}</FormError>}
-        <p className="m-0 text-caption text-fg-muted">{m.voiceChatHint()}</p>
       </div>
     </Sheet>
   )

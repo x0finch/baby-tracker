@@ -11,11 +11,11 @@ import { Pill } from '../../components/ui/Pill'
 import { toastIfRefused } from '../../lib/server-collection'
 import { m } from '../../paraglide/messages.js'
 import { requestSync } from '../../sync/runner'
+import { FamilyAiCard } from '../ai/FamilyAiCard'
 import { ageLabel } from '../babies/age-label'
 import { BabyAvatar } from '../babies/BabyAvatar'
 import { useBabies } from '../babies/use-babies'
 import { useRecordCount } from '../events/use-events'
-import { AiModelCard } from './AiModelCard'
 import { AliasSheet } from './AliasSheet'
 import { familyApi } from './api'
 import { scopeLabel } from './BabyScopePicker'
@@ -152,7 +152,7 @@ export function FamilyDetail({ family, userId }: { family: FamilySummary; userId
         )}
       </Card>
 
-      {managing && <AiModelCard familyId={family.id} />}
+      <FamilyAiCard familyId={family.id} managing={managing} />
 
       <Card className="flex flex-col gap-2">
         {managing && (

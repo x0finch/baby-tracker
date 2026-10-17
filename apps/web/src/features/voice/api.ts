@@ -3,21 +3,16 @@ import { apiFetch } from '../../lib/api'
 /** The signed shortcut people add; it asks for their code once, on adding. */
 export const SHORTCUT_URL = '/siri/bobo.shortcut'
 
-/** One family's Siri shortcut. */
-export interface VoiceShortcut {
-  familyId: string
-  familyName: string
+export interface VoiceSettings {
   /** What the user says to Siri, i.e. the name they gave the shortcut. */
   phrase: string
-  /** Whether the family has an AI model set up; without one nothing can be recorded. */
-  hasAi: boolean
   /** The code the shortcut uses, if one is active; the code itself is never shown again. */
   token: { createdAt: number; lastUsedAt: number | null } | null
-}
-
-export interface VoiceSettings {
-  /** One per family the user can record for, in the order they joined. */
-  shortcuts: VoiceShortcut[]
+  /**
+   * Whose AI commands use: the user's own (every family), one a family shared (only that
+   * family), or none yet.
+   */
+  ai: { kind: 'own' } | { kind: 'shared'; familyName: string; by: string } | null
 }
 
 /** The agent's answer to one message. */
@@ -71,35 +66,32 @@ export async function revokeThisDeviceToken() {
 
 export const voiceKeys = {
   settings: ['voice-settings'] as const,
-  chat: (familyId: string) => ['voice-chat', familyId] as const,
+  chat: ['voice-chat'] as const,
 }
 
 // Times said aloud ("三点") are read in this device's zone.
 const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone
-const family = (familyId: string) => `/api/voice/families/${encodeURIComponent(familyId)}`
 
 export const voiceApi = {
   settings: () => apiFetch<VoiceSettings>('/api/voice'),
-  rename: (familyId: string, phrase: string) =>
-    apiFetch<VoiceSettings>(family(familyId), {
-      method: 'PATCH',
-      body: JSON.stringify({ phrase }),
-    }),
-  /** Replaces any earlier code for the family; the old one stops working at once. */
-  createToken: async (familyId: string) => {
-    const created = await apiFetch<{ id: string; token: string }>(`${family(familyId)}/token`, {
+  rename: (phrase: string) =>
+    apiFetch<VoiceSettings>('/api/voice', { method: 'PATCH', body: JSON.stringify({ phrase }) }),
+  /** Replaces any earlier code; the old one stops working at once. */
+  createToken: async () => {
+    const created = await apiFetch<{ id: string; token: string }>('/api/voice/token', {
       method: 'POST',
       body: JSON.stringify({ timeZone: timeZone() }),
     })
     saveDeviceTokenIds([...deviceTokenIds(), created.id])
     return created
   },
-  revokeToken: (familyId: string) =>
-    apiFetch<void>(`${family(familyId)}/token`, { method: 'DELETE' }),
-  chat: (familyId: string) =>
-    apiFetch<{ messages: ChatMessage[] }>(`${family(familyId)}/chat`).then((body) => body.messages),
-  send: (familyId: string, text: string) =>
-    apiFetch<ChatTurn>(`${family(familyId)}/chat`, {
+  revokeToken: () => apiFetch<void>('/api/voice/token', { method: 'DELETE' }),
+  chat: () =>
+    apiFetch<{ messages: Omit<ChatMessage, 'id'>[] }>('/api/voice/chat').then((body) =>
+      body.messages.map((message) => ({ ...message, id: crypto.randomUUID() })),
+    ),
+  send: (text: string) =>
+    apiFetch<ChatTurn>('/api/voice/chat', {
       method: 'POST',
       body: JSON.stringify({ text, timeZone: timeZone() }),
     }),

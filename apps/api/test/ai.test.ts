@@ -28,8 +28,8 @@ describe('AI settings', () => {
     t.send('PUT', '/api/ai', headers, { provider: 'openrouter', model, apiKey })
   const cipher = async () =>
     (await t.env.DB.prepare('select key_cipher as c from user_ai').first<{ c: string }>())?.c ?? ''
-  const family = (headers = owner) =>
-    t.request(`/api/families/${familyId}/ai`, { headers }).then((res) => res.json())
+  const family = async (headers = owner): Promise<unknown> =>
+    (await t.request(`/api/families/${familyId}/ai`, { headers })).json()
 
   beforeAll(async () => {
     t = await createTestApp({ AI_KEY_SECRET: SECRET })

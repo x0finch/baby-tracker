@@ -6,6 +6,7 @@ import { PageHeader } from '../components/PageHeader'
 import { SettingsGroup, SettingsRow } from '../components/SettingsLayout'
 import { useLocalStore } from '../db'
 import { useSyncStatusText } from '../features/account/AccountCard'
+import { useAiSummary } from '../features/ai/MyAi'
 import { useBabies } from '../features/babies/use-babies'
 import { FamilyList } from '../features/family/FamilyList'
 import { usePushState } from '../features/reminders/RemindersCard'
@@ -71,6 +72,11 @@ function SettingsIndex() {
           link={{ to: '/settings/voice' }}
           title={m.voiceTitle()}
           summary={useVoiceSummary()}
+        />
+        <SettingsRow
+          link={{ to: '/settings/ai' }}
+          title={m.aiMineTitle()}
+          summary={useAiSummary()}
         />
         <SettingsRow
           link={{ to: '/settings/export' }}

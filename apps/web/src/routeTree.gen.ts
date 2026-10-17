@@ -16,6 +16,7 @@ import { Route as JoinCodeRouteImport } from './routes/join.$code'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SettingsAboutRouteImport } from './routes/settings.about'
 import { Route as SettingsAccountRouteImport } from './routes/settings.account'
+import { Route as SettingsAiRouteImport } from './routes/settings.ai'
 import { Route as SettingsBabiesRouteImport } from './routes/settings.babies'
 import { Route as SettingsDisplayRouteImport } from './routes/settings.display'
 import { Route as SettingsExportRouteImport } from './routes/settings.export'
@@ -58,6 +59,11 @@ const SettingsAccountRoute = SettingsAccountRouteImport.update({
   path: '/settings/account',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsAiRoute = SettingsAiRouteImport.update({
+  id: '/settings/ai',
+  path: '/settings/ai',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsBabiesRoute = SettingsBabiesRouteImport.update({
   id: '/settings/babies',
   path: '/settings/babies',
@@ -96,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/join/$code': typeof JoinCodeRoute
   '/settings/about': typeof SettingsAboutRoute
   '/settings/account': typeof SettingsAccountRoute
+  '/settings/ai': typeof SettingsAiRoute
   '/settings/babies': typeof SettingsBabiesRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/export': typeof SettingsExportRoute
@@ -111,6 +118,7 @@ export interface FileRoutesByTo {
   '/join/$code': typeof JoinCodeRoute
   '/settings/about': typeof SettingsAboutRoute
   '/settings/account': typeof SettingsAccountRoute
+  '/settings/ai': typeof SettingsAiRoute
   '/settings/babies': typeof SettingsBabiesRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/export': typeof SettingsExportRoute
@@ -127,6 +135,7 @@ export interface FileRoutesById {
   '/join/$code': typeof JoinCodeRoute
   '/settings/about': typeof SettingsAboutRoute
   '/settings/account': typeof SettingsAccountRoute
+  '/settings/ai': typeof SettingsAiRoute
   '/settings/babies': typeof SettingsBabiesRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/export': typeof SettingsExportRoute
@@ -144,6 +153,7 @@ export interface FileRouteTypes {
     | '/join/$code'
     | '/settings/about'
     | '/settings/account'
+    | '/settings/ai'
     | '/settings/babies'
     | '/settings/display'
     | '/settings/export'
@@ -159,6 +169,7 @@ export interface FileRouteTypes {
     | '/join/$code'
     | '/settings/about'
     | '/settings/account'
+    | '/settings/ai'
     | '/settings/babies'
     | '/settings/display'
     | '/settings/export'
@@ -174,6 +185,7 @@ export interface FileRouteTypes {
     | '/join/$code'
     | '/settings/about'
     | '/settings/account'
+    | '/settings/ai'
     | '/settings/babies'
     | '/settings/display'
     | '/settings/export'
@@ -190,6 +202,7 @@ export interface RootRouteChildren {
   JoinCodeRoute: typeof JoinCodeRoute
   SettingsAboutRoute: typeof SettingsAboutRoute
   SettingsAccountRoute: typeof SettingsAccountRoute
+  SettingsAiRoute: typeof SettingsAiRoute
   SettingsBabiesRoute: typeof SettingsBabiesRoute
   SettingsDisplayRoute: typeof SettingsDisplayRoute
   SettingsExportRoute: typeof SettingsExportRoute
@@ -250,6 +263,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsAccountRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/ai': {
+      id: '/settings/ai'
+      path: '/settings/ai'
+      fullPath: '/settings/ai'
+      preLoaderRoute: typeof SettingsAiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/babies': {
       id: '/settings/babies'
       path: '/settings/babies'
@@ -302,6 +322,7 @@ const rootRouteChildren: RootRouteChildren = {
   JoinCodeRoute: JoinCodeRoute,
   SettingsAboutRoute: SettingsAboutRoute,
   SettingsAccountRoute: SettingsAccountRoute,
+  SettingsAiRoute: SettingsAiRoute,
   SettingsBabiesRoute: SettingsBabiesRoute,
   SettingsDisplayRoute: SettingsDisplayRoute,
   SettingsExportRoute: SettingsExportRoute,
