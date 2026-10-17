@@ -1,6 +1,6 @@
 import { type Event, eventSchema, newId } from '@bobo/shared'
 
-import type { VoiceAction } from './parse'
+import type { VoiceAction } from './action'
 
 const MINUTE = 60_000
 

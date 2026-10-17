@@ -1,8 +1,6 @@
 import { base64UrlDecode, base64UrlEncode } from '@bobo/shared'
 import { openaiCompatibleText } from '@tanstack/ai-openai/compatible'
 
-import { type VoiceParser, chatParser } from './parse'
-
 export const AI_PROVIDERS = ['openai', 'openrouter'] as const
 export type AiProvider = (typeof AI_PROVIDERS)[number]
 
@@ -11,7 +9,7 @@ interface ProviderInfo {
   api: 'responses' | 'chat-completions'
   /** Shown first and preselected: small, fast, cheap, with strict structured outputs. */
   recommended: string[]
-  /** Which listed models can parse commands (chat models with structured outputs). */
+  /** Which listed models can run the assistant (chat models that call tools). */
   usable: (model: ListedModel) => boolean
   /** A cheap request that fails with a bad key. */
   keyCheck: string
@@ -35,7 +33,7 @@ const PROVIDERS: Record<AiProvider, ProviderInfo> = {
     baseURL: 'https://openrouter.ai/api/v1',
     api: 'chat-completions',
     recommended: ['openai/gpt-5.4-mini', 'google/gemini-3-flash', 'openai/gpt-5.4-nano'],
-    usable: ({ supported_parameters: params = [] }) => params.includes('structured_outputs'),
+    usable: ({ supported_parameters: params = [] }) => params.includes('tools'),
     keyCheck: 'https://openrouter.ai/api/v1/key',
   },
 }
@@ -68,12 +66,10 @@ export async function listModels(provider: AiProvider, apiKey: string) {
   ]
 }
 
-/** The parser for a family's saved settings. */
-export function familyParser(provider: AiProvider, model: string, apiKey: string): VoiceParser {
+/** The model adapter for a family's saved settings. */
+export function familyAdapter(provider: AiProvider, model: string, apiKey: string) {
   const info = PROVIDERS[provider]
-  return chatParser(() =>
-    openaiCompatibleText(model, { baseURL: info.baseURL, apiKey, api: info.api }),
-  )
+  return openaiCompatibleText(model, { baseURL: info.baseURL, apiKey, api: info.api })
 }
 
 // Provider keys are encrypted at rest with a key derived from AI_KEY_SECRET.

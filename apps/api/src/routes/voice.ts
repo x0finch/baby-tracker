@@ -1,25 +1,21 @@
-import { type Event, inBabyScope } from '@bobo/shared'
+import type { AnyTextAdapter, ModelMessage } from '@tanstack/ai'
 import { Hono } from 'hono'
 import { z } from 'zod'
 
-import { type Access, type FamilyAccess, checkEventWrite, loadAccess } from '../access'
+import { type Access, type FamilyAccess, loadAccess } from '../access'
+import { chatPersistence } from '../agent/persistence'
+import { type AgentScope, type AgentTurn, SESSION_IDLE_MS, runAgent } from '../agent/run'
 import type { Env } from '../env'
 import { fail, json } from '../http'
-import { parseEvent } from '../sync/protocol'
-import { bumpSeq, upsertEvents } from '../sync/sql'
 import type { AppEnv } from '../types'
-import type { VoiceParser } from '../voice/parse'
-import { type PlannedChange, REPLY, type VoiceBaby, localNow, planActions } from '../voice/plan'
-import { createToken, revokeTokens, tokenStatus, useToken } from '../voice/tokens'
+import { createToken, revokeToken, tokenStatuses, useToken } from '../voice/tokens'
 
 export const DEFAULT_PHRASE = '记录宝宝'
 const DEFAULT_ZONE = 'Asia/Shanghai'
-/** "撤销" only reaches the last command, and only for a while. */
-const UNDO_WINDOW_MS = 30 * 60_000
 const MAX_TEXT = 300
 
-/** The parser for a family's own AI settings, or null when the family has none. */
-export type VoiceParserFor = (env: Env, familyId: string) => Promise<VoiceParser | null>
+/** The model for a family's own AI settings, or null when the family has none. */
+export type AdapterFor = (env: Env, familyId: string) => Promise<AnyTextAdapter | null>
 
 const isTimeZone = (zone: string) => {
   try {
@@ -30,73 +26,80 @@ const isTimeZone = (zone: string) => {
 }
 
 const timeZoneSchema = z.string().max(64).refine(isTimeZone)
-const settingsPatchSchema = z.object({
-  phrase: z.string().trim().min(1).max(20).optional(),
-  familyId: z.string().max(64).optional(),
+const phraseSchema = z.object({ phrase: z.string().trim().min(1).max(20) })
+const tokenCreateSchema = z.object({ timeZone: timeZoneSchema.optional() })
+const textSchema = z.object({
+  text: z.string().trim().min(1).max(MAX_TEXT),
   timeZone: timeZoneSchema.optional(),
 })
-const tokenCreateSchema = z.object({ timeZone: timeZoneSchema.optional() })
-const textSchema = z.object({ text: z.string().trim().min(1).max(MAX_TEXT) })
 
 const REPLIES = {
   invalidToken: '口令已失效，请到 Bobo 的设置 → Siri 语音记录里重新添加。',
   limited: '今天说得太多次了，明天再试吧。',
   slowDown: '说得太快了，请稍等一下再试。',
   unavailable: '语音记录暂时不可用，请稍后再试。',
-  forbidden: (name: string) => `你没有权限给${name}添加记录。`,
-  nothingToUndo: '没有可以撤销的记录。',
   noAi: '这个家庭还没设置 AI 模型，请家庭的创建者或管理员在 Bobo 里设置。',
+  noFamily: '你已经不在这个家庭里了，请到 Bobo 里重新添加 Siri。',
+  viewer: '你在这个家庭里只能查看，不能记录。',
+  unclear: '没听清，请再说一遍。',
 }
 
-interface Settings {
-  phrase: string
-  familyId: string | null
-  timeZone: string
-}
-
-async function readSettings(db: D1Database, userId: string): Promise<Settings> {
-  const row = await db
-    .prepare(
-      `select phrase, family_id as familyId, time_zone as timeZone from voice_settings
-       where user_id = ?`,
-    )
-    .bind(userId)
-    .first<Settings>()
-  return row ?? { phrase: DEFAULT_PHRASE, familyId: null, timeZone: DEFAULT_ZONE }
-}
-
-function saveSettings(db: D1Database, userId: string, settings: Settings, now: number) {
-  return db
-    .prepare(
-      `insert into voice_settings (user_id, phrase, family_id, time_zone, updated_at)
-       values (?, ?, ?, ?, ?)
-       on conflict (user_id) do update set phrase = excluded.phrase,
-         family_id = excluded.family_id, time_zone = excluded.time_zone,
-         updated_at = excluded.updated_at`,
-    )
-    .bind(userId, settings.phrase, settings.familyId, settings.timeZone, now)
-}
+const stop = (reply: string): AgentTurn => ({ reply, done: true, confirming: false })
 
 /** Families the user can record for (not as a viewer), in the order they joined. */
 const recordingFamilies = (access: Access) =>
   [...access.values()].filter((family) => family.role !== 'viewer')
 
-/**
- * The one family Siri records for: the chosen one while the user can still record there,
- * else their first. Its AI parses the command and only its babies can be recorded, so a
- * family's key is never spent on another family.
- */
-function siriFamily(access: Access, settings: Settings) {
-  const families = recordingFamilies(access)
-  return families.find((family) => family.id === settings.familyId) ?? families[0]
+interface ShortcutRow {
+  familyId: string
+  phrase: string
+  timeZone: string
 }
 
-/** What the settings page shows. */
+async function shortcutRows(db: D1Database, userId: string) {
+  const { results } = await db
+    .prepare(
+      `select family_id as familyId, phrase, time_zone as timeZone from voice_shortcuts
+       where user_id = ?`,
+    )
+    .bind(userId)
+    .all<ShortcutRow>()
+  return new Map(results.map((row) => [row.familyId, row]))
+}
+
+/** "记录宝宝" for the first family, "记录<家庭名>" for the others, until the user picks one. */
+function defaultPhrase(families: FamilyAccess[], family: FamilyAccess) {
+  return families[0]?.id === family.id ? DEFAULT_PHRASE : `记录${family.alias ?? family.name}`
+}
+
+/** Everything a turn needs, or the reply that explains why there is no turn. */
+async function scopeFor(
+  db: D1Database,
+  userId: string,
+  familyId: string,
+  timeZone?: string,
+): Promise<AgentScope | string> {
+  const access = await loadAccess(db, userId)
+  const family = access.get(familyId)
+  if (!family) return REPLIES.noFamily
+  if (family.role === 'viewer') return REPLIES.viewer
+  const row = (await shortcutRows(db, userId)).get(familyId)
+  return {
+    db,
+    access,
+    family,
+    userId,
+    timeZone: timeZone ?? row?.timeZone ?? DEFAULT_ZONE,
+    phrase: row?.phrase ?? defaultPhrase(recordingFamilies(access), family),
+  }
+}
+
+/** What the settings page shows: one shortcut per family the user can record for. */
 async function settingsView(db: D1Database, userId: string, now: number) {
-  const [settings, access, token] = await Promise.all([
-    readSettings(db, userId),
+  const [access, rows, tokens] = await Promise.all([
     loadAccess(db, userId),
-    tokenStatus(db, userId, now),
+    shortcutRows(db, userId),
+    tokenStatuses(db, userId, now),
   ])
   const families = recordingFamilies(access)
   const { results } = await db
@@ -107,252 +110,176 @@ async function settingsView(db: D1Database, userId: string, now: number) {
     .all<{ familyId: string }>()
   const withAi = new Set(results.map((row) => row.familyId))
   return {
-    phrase: settings.phrase,
-    token: token ?? null,
-    families: families.map((family) => ({
-      id: family.id,
-      name: family.alias ?? family.name,
+    shortcuts: families.map((family) => ({
+      familyId: family.id,
+      familyName: family.alias ?? family.name,
+      phrase: rows.get(family.id)?.phrase ?? defaultPhrase(families, family),
       hasAi: withAi.has(family.id),
+      token: tokens.get(family.id) ?? null,
     })),
-    familyId: siriFamily(access, settings)?.id ?? null,
   }
 }
 
-type EventRow = Omit<Event, 'data'> & { data: string }
+/** Saves the user's shortcut settings for a family, keeping its conversation. */
+function saveShortcut(
+  db: D1Database,
+  userId: string,
+  familyId: string,
+  patch: { phrase: string; timeZone: string },
+  now: number,
+) {
+  return db
+    .prepare(
+      `insert into voice_shortcuts (user_id, family_id, phrase, time_zone, updated_at)
+       values (?, ?, ?, ?, ?)
+       on conflict (user_id, family_id) do update set phrase = excluded.phrase,
+         time_zone = excluded.time_zone, updated_at = excluded.updated_at`,
+    )
+    .bind(userId, familyId, patch.phrase, patch.timeZone, now)
+    .run()
+}
 
-const EVENT_COLUMNS = `id, baby_id as babyId, family_id as familyId, type, start_at as startAt,
-  end_at as endAt, data, note, created_at as createdAt, updated_at as updatedAt,
-  deleted_at as deletedAt, created_by as createdBy`
+const messageText = (message: ModelMessage) =>
+  typeof message.content === 'string'
+    ? message.content
+    : (message.content ?? []).map((part) => (part.type === 'text' ? part.content : '')).join('')
 
-function toEvents(rows: EventRow[]): Event[] {
-  return rows.flatMap((row) => {
-    const event = parseEvent({ ...row, data: JSON.parse(row.data) })
-    return event ? [event] : []
+/** The current conversation, as the chat box shows it; empty once it has gone idle. */
+async function transcript(db: D1Database, userId: string, familyId: string, now: number) {
+  const row = await db
+    .prepare(
+      `select thread_id as threadId, thread_active_at as activeAt from voice_shortcuts
+       where user_id = ? and family_id = ?`,
+    )
+    .bind(userId, familyId)
+    .first<{ threadId: string | null; activeAt: number | null }>()
+  if (!row?.threadId || row.activeAt === null || now - row.activeAt > SESSION_IDLE_MS) return []
+  const persistence = chatPersistence(db)
+  const messages = await persistence.stores.messages.loadThread(row.threadId)
+  return messages.flatMap((message) => {
+    if (message.role === 'tool') return []
+    const text = messageText(message).trim()
+    return text ? [{ role: message.role, text }] : []
   })
 }
 
-/** The family's babies the user may record for: not archived, within their baby scope. */
-async function writableBabies(db: D1Database, family: FamilyAccess): Promise<VoiceBaby[]> {
-  const { results } = await db
-    .prepare(
-      `select id, name, family_id as familyId from babies
-       where family_id = ? and deleted_at is null and archived_at is null order by created_at`,
-    )
-    .bind(family.id)
-    .all<VoiceBaby>()
-  return results.filter((baby) => inBabyScope(family.babyIds, baby.id))
-}
-
-async function runningSleeps(db: D1Database, babies: VoiceBaby[]) {
-  if (babies.length === 0) return new Map<string, Event>()
-  const { results } = await db
-    .prepare(
-      `select ${EVENT_COLUMNS} from events
-       where baby_id in (select value from json_each(?)) and type = 'sleep'
-         and end_at is null and deleted_at is null order by start_at`,
-    )
-    .bind(JSON.stringify(babies.map((baby) => baby.id)))
-    .all<EventRow>()
-  return new Map(toEvents(results).map((event) => [event.babyId, event]))
-}
-
-interface VoiceResult {
-  reply: string
-  /** One line per record, for the settings page's preview. */
-  records: string[]
-}
-
-const reply = (text: string): VoiceResult => ({ reply: text, records: [] })
-
-function permitted(access: Access, changes: PlannedChange[], babies: VoiceBaby[], userId: string) {
-  for (const { event, before } of changes) {
-    if (checkEventWrite(access, event, before ?? undefined, userId)) {
-      const name = babies.find((baby) => baby.id === event.babyId)?.name ?? '这个宝宝'
-      return REPLIES.forbidden(name)
-    }
-  }
-  return null
-}
-
-/** Puts back what the last voice command changed, if it was recent enough. */
-async function undoLast(
-  db: D1Database,
-  access: Access,
-  userId: string,
-  now: number,
-  write: boolean,
-) {
-  const row = await db
-    .prepare('select changes, created_at as createdAt from voice_undo where user_id = ?')
-    .bind(userId)
-    .first<{ changes: string; createdAt: number }>()
-  if (!row || now - row.createdAt > UNDO_WINDOW_MS) return reply(REPLIES.nothingToUndo)
-  const saved = z
-    .object({
-      lines: z.array(z.string()),
-      changes: z.array(z.object({ id: z.string(), before: z.unknown() })),
-    })
-    .safeParse(JSON.parse(row.changes))
-  if (!saved.success) return reply(REPLIES.nothingToUndo)
-  const text = `已撤销：${saved.data.lines.join('；')}`
-  if (!write) return { reply: `会撤销：${saved.data.lines.join('；')}`, records: [] }
-
-  const { results } = await db
-    .prepare(`select ${EVENT_COLUMNS} from events where id in (select value from json_each(?))`)
-    .bind(JSON.stringify(saved.data.changes.map((change) => change.id)))
-    .all<EventRow>()
-  const current = new Map(toEvents(results).map((event) => [event.id, event]))
-  const restored: Event[] = []
-  for (const change of saved.data.changes) {
-    const stored = current.get(change.id)
-    if (!stored) continue
-    const before = change.before === null ? null : parseEvent(change.before)
-    const next = before
-      ? { ...before, updatedAt: now }
-      : { ...stored, deletedAt: now, updatedAt: now }
-    if (checkEventWrite(access, next, stored, userId)) return reply(REPLIES.nothingToUndo)
-    restored.push(next)
-  }
-  await db.batch([
-    bumpSeq(db),
-    ...(restored.length > 0 ? [upsertEvents(db, restored)] : []),
-    db.prepare('delete from voice_undo where user_id = ?').bind(userId),
-  ])
-  return reply(text)
-}
-
-/** Understands a sentence and, when `write` is set, records it. */
-async function runVoice(
+/** One message to the family's agent, from the chat box or Siri. */
+async function turn(
   env: Env,
-  parserFor: VoiceParserFor,
+  adapterFor: AdapterFor,
   userId: string,
+  familyId: string,
   text: string,
   now: number,
-  write: boolean,
-): Promise<VoiceResult> {
-  const db = env.DB
-  const [settings, access] = await Promise.all([readSettings(db, userId), loadAccess(db, userId)])
-  const family = siriFamily(access, settings)
-  if (!family) return reply(REPLY.noBabies)
-  const parser = await parserFor(env, family.id)
-  if (!parser) return reply(REPLIES.noAi)
-  const babies = await writableBabies(db, family)
-  const parsed = await parser({
-    text,
-    babyNames: babies.map((baby) => baby.name),
-    localNow: localNow(now, settings.timeZone),
-  })
-  if (parsed.unclear) return reply(REPLY.unclear)
-
-  const plan = planActions(parsed.actions, {
-    babies,
-    runningSleeps: await runningSleeps(db, babies),
-    userId,
-    now,
-    timeZone: settings.timeZone,
-  })
-  if (plan.kind === 'reply') return reply(plan.reply)
-  if (plan.kind === 'undo') return undoLast(db, access, userId, now, write)
-
-  const refused = permitted(access, plan.changes, babies, userId)
-  if (refused) return reply(refused)
-  const summary = plan.lines.join('；')
-  if (!write) return { reply: `会记录：${summary}`, records: plan.lines }
-
-  const undo = {
-    lines: plan.lines,
-    changes: plan.changes.map(({ event, before }) => ({ id: event.id, before })),
-  }
-  await db.batch([
-    bumpSeq(db),
-    upsertEvents(
-      db,
-      plan.changes.map((change) => change.event),
-    ),
-    db
-      .prepare(
-        `insert into voice_undo (user_id, changes, created_at) values (?, ?, ?)
-         on conflict (user_id) do update set changes = excluded.changes, created_at = excluded.created_at`,
-      )
-      .bind(userId, JSON.stringify(undo), now),
-  ])
-  return { reply: `已记录：${summary}`, records: plan.lines }
+  timeZone?: string,
+): Promise<AgentTurn> {
+  const scope = await scopeFor(env.DB, userId, familyId, timeZone)
+  if (typeof scope === 'string') return stop(scope)
+  const adapter = await adapterFor(env, familyId)
+  if (!adapter) return stop(REPLIES.noAi)
+  return runAgent(adapter, scope, text, now)
 }
 
-/** Settings page: the phrase, the family, the code, and a preview. Needs a session. */
-export function voiceRoutes(parserFor: VoiceParserFor) {
+/** Settings page and chat box. Needs a session. */
+export function voiceRoutes(adapterFor: AdapterFor) {
   return new Hono<AppEnv>()
     .get('/', async (c) => c.json(await settingsView(c.env.DB, c.get('user').id, Date.now())))
-    .patch('/', json(settingsPatchSchema), async (c) => {
+    .patch('/families/:familyId', json(phraseSchema), async (c) => {
       const db = c.env.DB
       const userId = c.get('user').id
-      const { familyId, ...patch } = c.req.valid('json')
-      const current = await readSettings(db, userId)
-      if (familyId !== undefined) {
-        const access = await loadAccess(db, userId)
-        if (!recordingFamilies(access).some((family) => family.id === familyId)) fail('forbidden')
-      }
-      const next = { ...current, ...patch, familyId: familyId ?? current.familyId }
-      await saveSettings(db, userId, next, Date.now()).run()
-      return c.json(await settingsView(db, userId, Date.now()))
-    })
-    .post('/token', json(tokenCreateSchema), async (c) => {
-      const db = c.env.DB
-      const userId = c.get('user').id
+      const familyId = c.req.param('familyId')
+      const { phrase } = c.req.valid('json')
       const now = Date.now()
-      const { timeZone } = c.req.valid('json')
-      if (timeZone) {
-        const current = await readSettings(db, userId)
-        await saveSettings(db, userId, { ...current, timeZone }, now).run()
+      const view = await settingsView(db, userId, now)
+      if (!view.shortcuts.some((shortcut) => shortcut.familyId === familyId)) fail('forbidden')
+      // Siri tells shortcuts apart by what the user says.
+      if (view.shortcuts.some((other) => other.familyId !== familyId && other.phrase === phrase)) {
+        return c.json({ error: 'duplicate_phrase' }, 409)
       }
-      return c.json(await createToken(db, userId, now))
+      const row = (await shortcutRows(db, userId)).get(familyId)
+      await saveShortcut(
+        db,
+        userId,
+        familyId,
+        { phrase, timeZone: row?.timeZone ?? DEFAULT_ZONE },
+        now,
+      )
+      return c.json(await settingsView(db, userId, now))
     })
-    .delete('/token', async (c) => {
-      await revokeTokens(c.env.DB, c.get('user').id, c.req.query('id')).run()
+    .post('/families/:familyId/token', json(tokenCreateSchema), async (c) => {
+      const db = c.env.DB
+      const userId = c.get('user').id
+      const familyId = c.req.param('familyId')
+      const now = Date.now()
+      const scope = await scopeFor(db, userId, familyId, c.req.valid('json').timeZone)
+      if (typeof scope === 'string') fail('forbidden')
+      await saveShortcut(db, userId, familyId, scope, now)
+      return c.json(await createToken(db, userId, familyId, now))
+    })
+    .delete('/families/:familyId/token', async (c) => {
+      await revokeToken(c.env.DB, c.get('user').id, { familyId: c.req.param('familyId') }).run()
       return c.body(null, 204)
     })
-    .post('/preview', json(textSchema), async (c) => {
-      // Each preview calls the model too.
-      const burst = await c.env.VOICE_RATE_LIMIT?.limit({ key: c.get('user').id })
-      if (burst && !burst.success) return c.json(reply(REPLIES.slowDown), 429)
-      const { text } = c.req.valid('json')
-      return c.json(await runVoice(c.env, parserFor, c.get('user').id, text, Date.now(), false))
+    .delete('/tokens/:id', async (c) => {
+      await revokeToken(c.env.DB, c.get('user').id, { id: c.req.param('id') }).run()
+      return c.body(null, 204)
+    })
+    .get('/families/:familyId/chat', async (c) =>
+      c.json({
+        messages: await transcript(c.env.DB, c.get('user').id, c.req.param('familyId'), Date.now()),
+      }),
+    )
+    .post('/families/:familyId/chat', json(textSchema), async (c) => {
+      const userId = c.get('user').id
+      // Each message calls the model.
+      const burst = await c.env.VOICE_RATE_LIMIT?.limit({ key: userId })
+      if (burst && !burst.success) return c.json(stop(REPLIES.slowDown), 429)
+      const { text, timeZone } = c.req.valid('json')
+      try {
+        return c.json(
+          await turn(
+            c.env,
+            adapterFor,
+            userId,
+            c.req.param('familyId'),
+            text,
+            Date.now(),
+            timeZone,
+          ),
+        )
+      } catch (error) {
+        console.error('Voice chat failed', error)
+        return c.json(stop(REPLIES.unavailable), 503)
+      }
     })
 }
-
-/** "That's all": ends a conversation without asking the model. */
-const DONE_PHRASE =
-  /^(没有了?|没了|没有别的了?|好了|结束|不用了|就这些|就这样|退出|拜拜)[。！!.，, ]*$/
 
 /**
  * What the Siri shortcut calls, with its code instead of a session. Always answers 200 with
- * `{ ok, done, reply }`: Shortcuts may not read the body of an error response, which would
- * leave Siri silent. The shortcut reads `reply` aloud and asks "还有吗？" until `done`, which
- * is set when the user says they're finished or when asking again cannot help.
+ * `{ ok, done, confirming, reply }`: Shortcuts may not read the body of an error response,
+ * which would leave Siri silent. The shortcut reads `reply` aloud and asks "还有吗？" until
+ * `done`, which the agent sets when the user is finished, or the server when asking again
+ * cannot help.
  */
-export function siriRoutes(parserFor: VoiceParserFor) {
+export function siriRoutes(adapterFor: AdapterFor) {
   return new Hono<AppEnv>().post('/', async (c) => {
-    const answer = (result: VoiceResult, ok: boolean, done = false) =>
-      c.json({ ok, done, ...result })
+    const answer = (result: AgentTurn, ok: boolean) => c.json({ ok, ...result })
     const now = Date.now()
     const check = await useToken(c.env.DB, c.req.header('Authorization'), now)
-    if (check.status === 'invalid') return answer(reply(REPLIES.invalidToken), false, true)
-    if (check.status === 'limited') return answer(reply(REPLIES.limited), false, true)
+    if (check.status === 'invalid') return answer(stop(REPLIES.invalidToken), false)
+    if (check.status === 'limited') return answer(stop(REPLIES.limited), false)
     const burst = await c.env.VOICE_RATE_LIMIT?.limit({ key: check.token.id })
-    if (burst && !burst.success) return answer(reply(REPLIES.slowDown), false, true)
+    if (burst && !burst.success) return answer(stop(REPLIES.slowDown), false)
 
     const body = textSchema.safeParse(await c.req.json().catch(() => null))
-    if (!body.success) return answer(reply('没听清，请再说一遍。'), false)
-    if (DONE_PHRASE.test(body.data.text)) return answer(reply('好的。'), true, true)
+    if (!body.success)
+      return answer({ reply: REPLIES.unclear, done: false, confirming: false }, false)
     try {
-      const result = await runVoice(c.env, parserFor, check.token.userId, body.data.text, now, true)
-      const recorded = result.records.length > 0 || result.reply.startsWith('已撤销')
-      // Nothing to record for, or no model to understand: asking again cannot help.
-      const stuck = result.reply === REPLIES.noAi || result.reply === REPLY.noBabies
-      return answer(result, recorded, stuck)
+      const { userId, familyId } = check.token
+      return answer(await turn(c.env, adapterFor, userId, familyId, body.data.text, now), true)
     } catch (error) {
       console.error('Voice command failed', error)
-      return answer(reply(REPLIES.unavailable), false, true)
+      return answer(stop(REPLIES.unavailable), false)
     }
   })
 }

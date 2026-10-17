@@ -52,8 +52,13 @@ export const accountRoutes = new Hono<AppEnv>().delete('/', async (c) => {
     db.prepare('delete from reminders where user_id = ?').bind(userId),
     db.prepare('delete from push_subscriptions where user_id = ?').bind(userId),
     db.prepare('delete from voice_tokens where user_id = ?').bind(userId),
-    db.prepare('delete from voice_settings where user_id = ?').bind(userId),
-    db.prepare('delete from voice_undo where user_id = ?').bind(userId),
+    db
+      .prepare(
+        `delete from voice_ops where thread_id in
+           (select thread_id from voice_shortcuts where user_id = ? and thread_id is not null)`,
+      )
+      .bind(userId),
+    db.prepare('delete from voice_shortcuts where user_id = ?').bind(userId),
     db.prepare('delete from session where user_id = ?').bind(userId),
     db.prepare('delete from account where user_id = ?').bind(userId),
     db.prepare('delete from passkey where user_id = ?').bind(userId),

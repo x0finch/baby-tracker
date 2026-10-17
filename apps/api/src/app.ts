@@ -11,21 +11,21 @@ import { familyAiRoutes, readFamilyAi } from './routes/family-ai'
 import { familyInviteRoutes, inviteAcceptRoutes, invitePreviewRoutes } from './routes/invites'
 import { pushRoutes, reminderRoutes } from './routes/notifications'
 import { syncRoutes } from './routes/sync'
-import { type VoiceParserFor, siriRoutes, voiceRoutes } from './routes/voice'
+import { type AdapterFor, siriRoutes, voiceRoutes } from './routes/voice'
 import type { AppEnv, AuthFor } from './types'
-import { decryptKey, familyParser } from './voice/ai'
+import { decryptKey, familyAdapter } from './voice/ai'
 
 export interface AppOptions {
   auth?: AuthFor
-  /** Parses Siri voice commands; tests pass a fake instead of calling the model. */
-  voiceParser?: VoiceParserFor
+  /** The model behind voice logging; tests pass a fake instead of calling a provider. */
+  voiceAdapter?: AdapterFor
 }
 
-/** Parses with the family's own provider, model and key. */
-const defaultVoiceParser: VoiceParserFor = async (env, familyId) => {
+/** The family's own provider, model and key. */
+const defaultAdapter: AdapterFor = async (env, familyId) => {
   const saved = await readFamilyAi(env.DB, familyId)
   if (!saved || !env.AI_KEY_SECRET) return null
-  return familyParser(
+  return familyAdapter(
     saved.provider,
     saved.model,
     await decryptKey(env.AI_KEY_SECRET, saved.keyCipher),
@@ -34,7 +34,7 @@ const defaultVoiceParser: VoiceParserFor = async (env, familyId) => {
 
 export function createApp(options: AppOptions = {}) {
   const authFor = options.auth ?? getAuth
-  const voiceParser = options.voiceParser ?? defaultVoiceParser
+  const voiceAdapter = options.voiceAdapter ?? defaultAdapter
   const app = new Hono<AppEnv>().basePath('/api')
 
   // The web app is same-origin; CORS only matters for the native shell (#45).
@@ -81,11 +81,11 @@ export function createApp(options: AppOptions = {}) {
   app.use('/reminders', auth)
   app.route('/reminders', reminderRoutes)
   // The shortcut authenticates with its own code, not a session.
-  app.route('/voice/siri', siriRoutes(voiceParser))
+  app.route('/voice/siri', siriRoutes(voiceAdapter))
   app.use('/voice', auth)
-  app.use('/voice/token', auth)
-  app.use('/voice/preview', auth)
-  app.route('/voice', voiceRoutes(voiceParser))
+  app.use('/voice/families/*', auth)
+  app.use('/voice/tokens/*', auth)
+  app.route('/voice', voiceRoutes(voiceAdapter))
 
   app.notFound((c) => c.json({ error: 'not_found' }, 404))
   app.onError(errorResponse)

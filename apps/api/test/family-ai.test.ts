@@ -12,9 +12,9 @@ function fakeOpenRouter(valid = true) {
     if (url.endsWith('/key')) return new Response('{}', { status: valid ? 200 : 401 })
     return Response.json({
       data: [
-        { id: 'zeta/model', supported_parameters: ['structured_outputs'] },
-        { id: 'openai/gpt-5.4-mini', supported_parameters: ['structured_outputs'] },
-        { id: 'old/model', supported_parameters: [] },
+        { id: 'zeta/model', supported_parameters: ['tools'] },
+        { id: 'openai/gpt-5.4-mini', supported_parameters: ['tools'] },
+        { id: 'old/model', supported_parameters: ['structured_outputs'] },
       ],
     })
   })

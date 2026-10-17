@@ -3,7 +3,7 @@ import { toolDefinition } from '@tanstack/ai'
 import { z } from 'zod'
 
 import type { Access, FamilyAccess } from '../access'
-import { voiceActionSchema } from '../voice/parse'
+import { voiceActionSchema } from '../voice/action'
 import { type VoiceBaby, clockToTime, describe, formatClock, planActions } from '../voice/plan'
 import {
   type Change,
