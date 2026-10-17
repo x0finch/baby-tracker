@@ -83,48 +83,35 @@ with the family if others should use it.
 ### 2. The shortcut (once, on a Mac)
 
 The settings page's "添加到 Siri" button copies the user's code and opens
-`/siri/bobo.shortcut`. That file is one signed shortcut shared by everyone. It asks for the
-code when it is added.
+`/siri/bobo.shortcut`. That file is one signed shortcut shared by everyone. It asks for the code
+when it is added.
 
-Build it in the Shortcuts app on the Mac, or on the iPhone and let it sync. Name it
-**记录宝宝**; users who pick another phrase rename their copy. It keeps asking until the reply
-has `done` set: when the agent ends the conversation, or when asking again cannot help.
+`apps/web/scripts/build-shortcut.mjs` writes the shortcut. Only signing needs the Mac:
 
-Actions, in order:
+```sh
+cd apps/web
+node scripts/build-shortcut.mjs > 记录宝宝.shortcut
+shortcuts sign --mode anyone --input 记录宝宝.shortcut --output public/siri/bobo.shortcut
+```
 
-1. **Text**
-   - Content: leave it empty. It holds the code, filled in by the import question below.
-   - Then **Set Variable**: name `口令`, input the Text.
-2. **Text**: `要记录什么？`
-   - Then **Set Variable**: name `问题`, input the Text.
-3. **Repeat** 20 times, with these inside:
-   1. **Ask for Input**: Type Text, Prompt `问题`.
-   2. **Get Contents of URL**:
-      - URL: `https://bobo.009003.xyz/api/voice/siri`
-      - Method: POST
-      - Headers: `Authorization` → `口令`
-      - Request Body: JSON, with a Text key `text` → **Provided Input**
-   3. **Get Dictionary Value**: Value for key `reply` in **Contents of URL**.
-   4. **Speak Text**: **Dictionary Value**.
-   5. **Get Dictionary Value**: Value for key `done` in **Contents of URL**.
-   6. **If** **Dictionary Value** is **true**: **Stop This Shortcut**. End If.
-   7. **Set Variable**: name `问题`, input an empty **Text**. The reply just spoken already asks
-      the next question ("还有吗？", "要删除…吗？").
+Commit `public/siri/bobo.shortcut`. Until it exists, the "添加到 Siri" button has nothing to
+open. Pass another origin as the script's argument to point the shortcut at another server.
 
-Then open the shortcut's details (ⓘ) → **Setup** and add an import question for the empty
-**Text** in step 1:
+What the shortcut does:
 
-- Question: `请粘贴 Bobo 设置里复制的口令`
-- Default answer: empty
+1. Keeps the code (asked for on import: "请粘贴 Bobo 设置里复制的口令") and the question
+   "要记录什么？".
+2. Repeats up to 20 times:
+   1. **Ask for Input** with the question;
+   2. **Get Contents of URL**: POST `/api/voice/siri`, header `Authorization` with the code, JSON
+      body `{ "text": <the answer> }`;
+   3. **Speak Text** with the reply's `reply`;
+   4. stops when the reply's `next` is `stop` (the same as `done`, as text, which the shortcut's
+      If compares reliably);
+   5. clears the question: the reply just spoken already asks the next one ("还有吗？",
+      "要删除…吗？").
 
-Export it signed for everyone. Either way works:
-
-- In the Shortcuts app: right-click the shortcut → Share → Export File → Who can import:
-  **Anyone**. Save it as `bobo.shortcut`.
-- From the terminal: `shortcuts sign --mode anyone --input 记录宝宝.shortcut --output bobo.shortcut`.
-
-Commit the file as `apps/web/public/siri/bobo.shortcut`. Until it exists, the "添加到 Siri"
-button has nothing to open.
+Users who pick another phrase rename their copy of the shortcut to it.
 
 ### 3. Try it
 

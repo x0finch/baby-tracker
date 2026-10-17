@@ -194,14 +194,16 @@ export function voiceRoutes(adapterFor: AdapterFor) {
 
 /**
  * What the Siri shortcut calls, with its code instead of a session. Always answers 200 with
- * `{ ok, done, confirming, reply }`: Shortcuts may not read the body of an error response,
+ * `{ ok, done, confirming, reply, next }`: Shortcuts may not read the body of an error response,
  * which would leave Siri silent. The shortcut reads `reply` aloud and asks "还有吗？" until
  * `done`, which the agent sets when the user is finished, or the server when asking again
  * cannot help.
  */
 export function siriRoutes(adapterFor: AdapterFor) {
   return new Hono<AppEnv>().post('/', async (c) => {
-    const answer = (result: AgentTurn, ok: boolean) => c.json({ ok, ...result })
+    // `next` repeats `done` as text: the shortcut's If compares text reliably, not booleans.
+    const answer = (result: AgentTurn, ok: boolean) =>
+      c.json({ ok, ...result, next: result.done ? 'stop' : 'ask' })
     const now = Date.now()
     const check = await useToken(c.env.DB, c.req.header('Authorization'), now)
     if (check.status === 'invalid') return answer(stop(REPLIES.invalidToken), false)
