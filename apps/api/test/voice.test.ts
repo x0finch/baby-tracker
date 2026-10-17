@@ -6,6 +6,9 @@ import { clockToTime } from '../src/voice/plan'
 import { createTestApp } from './app'
 import { baby } from './fixtures'
 
+type Answer = { ok: boolean; reply: string; records: string[] }
+const answerOf = (res: Response): Promise<Answer> => res.json()
+
 const action = (overrides: Partial<VoiceAction>): VoiceAction => ({
   type: 'diaper',
   baby: null,
@@ -44,7 +47,12 @@ describe('siri voice logging', () => {
   const say = async (token: string, text: string, parse: VoiceParse) => {
     next = parse
     const res = await siri(token, text)
-    return { status: res.status, ...((await res.json()) as { reply: string; records: string[] }) }
+    return { status: res.status, ...(await answerOf(res)) }
+  }
+  const works = async (token: string) => {
+    next = { unclear: false, actions: [action({ type: 'diaper' })] }
+    const res = await siri(token, '换尿布')
+    return (await answerOf(res)).ok
   }
   const newToken = async (h = headers) => {
     const res = await t.send('POST', '/api/voice/token', h, { timeZone: 'Asia/Shanghai' })
@@ -102,14 +110,18 @@ describe('siri voice logging', () => {
       headers: { 'Content-Type': 'application/json', Authorization: token },
       body: JSON.stringify({ text: '换尿布' }),
     })
-    expect(res.status).toBe(200)
+    expect((await answerOf(res)).ok).toBe(true)
   })
 
   it('needs a valid code', async () => {
-    expect((await siri(null, '换尿布')).status).toBe(401)
+    expect((await answerOf(await siri(null, '换尿布'))).ok).toBe(false)
     const res = await siri('bobo_nope', '换尿布')
-    expect(res.status).toBe(401)
-    expect(await res.json()).toEqual({ reply: expect.stringContaining('口令已失效'), records: [] })
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({
+      ok: false,
+      reply: expect.stringContaining('口令已失效'),
+      records: [],
+    })
   })
 
   it('records what was said and syncs it to the app', async () => {
@@ -122,7 +134,7 @@ describe('siri voice logging', () => {
         action({ type: 'bottle', baby: '小米粒', amountMl: 120, milk: 'formula' }),
       ],
     })
-    expect(result.status).toBe(200)
+    expect(result.ok).toBe(true)
     expect(result.reply).toMatch(
       /^已记录：小米粒 \d\d:\d\d 换尿布（尿尿）；小米粒 \d\d:\d\d 瓶喂 120 毫升（配方奶）$/,
     )
@@ -191,13 +203,13 @@ describe('siri voice logging', () => {
   it('stops working when revoked or replaced', async () => {
     const first = await newToken()
     const second = await newToken()
-    expect((await siri(first.token, '换尿布')).status).toBe(401)
+    expect(await works(first.token)).toBe(false)
     // Revoking someone else's id (an old device signing out) leaves the current code alone.
     await t.send('DELETE', `/api/voice/token?id=${first.id}`, headers)
     next = { unclear: false, actions: [action({ type: 'diaper' })] }
-    expect((await siri(second.token, '换尿布')).status).toBe(200)
+    expect(await works(second.token)).toBe(true)
     await t.send('DELETE', `/api/voice/token?id=${second.id}`, headers)
-    expect((await siri(second.token, '换尿布')).status).toBe(401)
+    expect(await works(second.token)).toBe(false)
   })
 
   it('stops working when the password changes', async () => {
@@ -211,10 +223,12 @@ describe('siri voice logging', () => {
       password: 'old',
     })
     const { token } = await newToken(parent.headers)
+    // This account has no babies yet, so a working code gets that answer instead.
+    const reply = async () => (await answerOf(await siri(token, '换尿布'))).reply
     next = { unclear: false, actions: [action({ type: 'diaper' })] }
-    expect((await siri(token, '换尿布')).status).toBe(200)
+    expect(await reply()).toBe('还没有可以记录的宝宝。')
     await ctx.internalAdapter.updatePassword(userId, 'new')
-    expect((await siri(token, '换尿布')).status).toBe(401)
+    expect(await reply()).toMatch(/口令已失效/)
   })
 
   it('refuses viewers', async () => {

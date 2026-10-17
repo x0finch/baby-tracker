@@ -267,33 +267,39 @@ export function voiceRoutes(parserFor: VoiceParserFor) {
     .post('/preview', json(textSchema), async (c) => {
       const parser = parserFor(c.env)
       if (!parser) return c.json(reply(REPLIES.unavailable), 503)
+      // Each preview calls the model too.
+      const burst = await c.env.VOICE_RATE_LIMIT?.limit({ key: c.get('user').id })
+      if (burst && !burst.success) return c.json(reply(REPLIES.slowDown), 429)
       const { text } = c.req.valid('json')
       return c.json(await runVoice(c.env, parser, c.get('user').id, text, Date.now(), false))
     })
 }
 
 /**
- * What the Siri shortcut calls, with its code instead of a session. Always answers with
- * `{ reply }`, which the shortcut reads aloud.
+ * What the Siri shortcut calls, with its code instead of a session. Always answers 200 with
+ * `{ ok, reply }`: the shortcut reads `reply` aloud, and Shortcuts may not read the body of
+ * an error response, which would leave Siri silent.
  */
 export function siriRoutes(parserFor: VoiceParserFor) {
   return new Hono<AppEnv>().post('/', async (c) => {
+    const answer = (result: VoiceResult, ok: boolean) => c.json({ ok, ...result })
     const now = Date.now()
     const check = await useToken(c.env.DB, c.req.header('Authorization'), now)
-    if (check.status === 'invalid') return c.json(reply(REPLIES.invalidToken), 401)
-    if (check.status === 'limited') return c.json(reply(REPLIES.limited), 429)
+    if (check.status === 'invalid') return answer(reply(REPLIES.invalidToken), false)
+    if (check.status === 'limited') return answer(reply(REPLIES.limited), false)
     const burst = await c.env.VOICE_RATE_LIMIT?.limit({ key: check.token.id })
-    if (burst && !burst.success) return c.json(reply(REPLIES.slowDown), 429)
+    if (burst && !burst.success) return answer(reply(REPLIES.slowDown), false)
 
     const body = textSchema.safeParse(await c.req.json().catch(() => null))
-    if (!body.success) return c.json(reply('没听清，请再说一遍。'), 400)
+    if (!body.success) return answer(reply('没听清，请再说一遍。'), false)
     const parser = parserFor(c.env)
-    if (!parser) return c.json(reply(REPLIES.unavailable), 503)
+    if (!parser) return answer(reply(REPLIES.unavailable), false)
     try {
-      return c.json(await runVoice(c.env, parser, check.token.userId, body.data.text, now, true))
+      const result = await runVoice(c.env, parser, check.token.userId, body.data.text, now, true)
+      return answer(result, result.records.length > 0 || result.reply.startsWith('已撤销'))
     } catch (error) {
       console.error('Voice command failed', error)
-      return c.json(reply(REPLIES.unavailable), 500)
+      return answer(reply(REPLIES.unavailable), false)
     }
   })
 }
