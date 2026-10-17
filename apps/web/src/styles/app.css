@@ -234,15 +234,12 @@
   }
 }
 
-/* Room for the fixed tab bar: page content ends above it, toasts float over it. */
+/* Room for the fixed tab bar: page content ends above it. */
 @utility h-tab-bar-safe {
   height: calc(var(--spacing-tab-bar) + env(safe-area-inset-bottom));
 }
 @utility pb-above-tab-bar {
   padding-bottom: calc(var(--spacing-tab-bar) + 1rem + env(safe-area-inset-bottom));
-}
-@utility bottom-above-tab-bar {
-  bottom: calc(var(--spacing-tab-bar) + 0.75rem + env(safe-area-inset-bottom));
 }
 
 @layer base {

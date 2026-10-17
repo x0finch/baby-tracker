@@ -1,19 +1,20 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { type ExternalToast, Toaster as SonnerToaster, toast } from 'sonner'
 
-// Above the tab bar, as `bottom-above-tab-bar`; sonner positions the stack itself.
-const bottom = 'calc(var(--spacing-tab-bar) + 0.75rem + env(safe-area-inset-bottom))'
+// Below the status bar, over the top of the page (the baby switcher), so toasts never cover
+// the list at the bottom or the logging buttons; sonner positions the stack itself.
+const top = 'calc(0.75rem + env(safe-area-inset-top))'
 
 // As wide as `max-w-md`, the width the toasts had before.
 const toasterStyle: CSSProperties & Record<'--width', string> = { '--width': '28rem' }
 
-/** Hosts the app's toasts above the tab bar; several stack, newest in front. */
+/** Hosts the app's toasts at the top of the screen; several stack, newest in front. */
 export function Toaster() {
   return (
     <SonnerToaster
-      position="bottom-center"
-      offset={{ bottom }}
-      mobileOffset={{ bottom, left: '1rem', right: '1rem' }}
+      position="top-center"
+      offset={{ top }}
+      mobileOffset={{ top, left: '1rem', right: '1rem' }}
       style={toasterStyle}
       toastOptions={{
         unstyled: true,
