@@ -1,5 +1,11 @@
 import { newId } from '@bobo/shared'
-import { type AnyTextAdapter, chat, maxIterations } from '@tanstack/ai'
+import {
+  type AnyTextAdapter,
+  EventType,
+  type RunAgentResumeItem,
+  chat,
+  maxIterations,
+} from '@tanstack/ai'
 import {
   clearToolResults,
   composeStrategies,
@@ -102,13 +108,13 @@ async function runChat(
   adapter: AnyTextAdapter,
   ctx: AgentContext,
   scope: AgentScope,
-  input: { messages: Array<{ role: 'user'; content: string }> } | { resume: unknown[] },
+  input: { messages: Array<{ role: 'user'; content: string }> } | { resume: RunAgentResumeItem[] },
   babyNames: string[],
 ): Promise<RunOutcome> {
   let text = ''
   const approvals: Array<Record<string, unknown>> = []
   let error: string | null = null
-  const stream = chat({
+  const options = {
     adapter,
     threadId: ctx.threadId,
     runId: ctx.runId,
@@ -122,34 +128,18 @@ async function runChat(
         strategy: composeStrategies(clearToolResults(), evictOldest()),
       }),
     ],
-    ...('messages' in input
-      ? { messages: input.messages }
-      : { messages: [], resume: input.resume }),
-  } as Parameters<typeof chat>[0])
-  for await (const chunk of stream as AsyncIterable<{ type: string } & Record<string, unknown>>) {
-    if (chunk.type === 'TEXT_MESSAGE_START') text = ''
-    if (chunk.type === 'TEXT_MESSAGE_CONTENT' && typeof chunk.delta === 'string')
-      text += chunk.delta
-    if (chunk.type === 'RUN_ERROR') {
-      const message = chunk.error
-      error =
-        typeof message === 'object' && message !== null && 'message' in message
-          ? String(message.message)
-          : 'error'
-    }
-    if (chunk.type === 'RUN_FINISHED') {
-      const outcome = chunk.outcome
-      if (
-        typeof outcome === 'object' &&
-        outcome !== null &&
-        'interrupts' in outcome &&
-        Array.isArray(outcome.interrupts)
-      ) {
-        for (const interrupt of outcome.interrupts) {
-          if (typeof interrupt === 'object' && interrupt !== null && 'metadata' in interrupt) {
-            approvals.push(interrupt.metadata as Record<string, unknown>)
-          }
-        }
+  }
+  const stream =
+    'messages' in input
+      ? chat({ ...options, messages: input.messages })
+      : chat({ ...options, messages: [], resume: input.resume })
+  for await (const chunk of stream) {
+    if (chunk.type === EventType.TEXT_MESSAGE_START) text = ''
+    if (chunk.type === EventType.TEXT_MESSAGE_CONTENT) text += chunk.delta
+    if (chunk.type === EventType.RUN_ERROR) error = chunk.message
+    if (chunk.type === EventType.RUN_FINISHED && chunk.outcome?.type === 'interrupt') {
+      for (const interrupt of chunk.outcome.interrupts) {
+        if (interrupt.metadata) approvals.push(interrupt.metadata)
       }
     }
   }
@@ -182,7 +172,7 @@ export async function runAgent(
   let outcome: RunOutcome | null = null
   if (pending.length > 0) {
     const approved = YES.test(text.trim())
-    const resume = pending.map((item) => ({
+    const resume: RunAgentResumeItem[] = pending.map((item) => ({
       interruptId: item.interruptId,
       status: 'resolved',
       payload: { approved },

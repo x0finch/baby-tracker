@@ -9,8 +9,9 @@ import {
 // TanStack AI chat state in D1, after its Cloudflare recipe: messages, runs and interrupts
 // (tool approvals). Rows are JSON in text columns; times are epoch ms.
 
+/** Reads back JSON this module wrote; callers state what they stored. */
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters
 function parse<T>(json: string | null): T | undefined {
-  // Values come from this module's own writes.
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion
   return json === null ? undefined : (JSON.parse(json) as T)
 }
