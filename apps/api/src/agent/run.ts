@@ -66,6 +66,9 @@ function instructions(scope: AgentScope, now: number, babyNames: string[]) {
 - 现在是 ${localNow(now, scope.timeZone)}。`
 }
 
+/** Every thread of a user starts with this, so deleting the account can find them all. */
+export const threadPrefix = (userId: string) => `voice_${userId}_`
+
 /** The thread the user's next message goes to: the current one, or a new one after a pause. */
 export async function currentThread(db: D1Database, scope: AgentScope, now: number) {
   const row = await db
@@ -75,7 +78,7 @@ export async function currentThread(db: D1Database, scope: AgentScope, now: numb
     .bind(scope.userId)
     .first<{ threadId: string | null; activeAt: number | null }>()
   const fresh = !row?.threadId || row.activeAt === null || now - row.activeAt > SESSION_IDLE_MS
-  const threadId = fresh ? `voice_${newId(now)}` : (row.threadId ?? '')
+  const threadId = fresh ? `${threadPrefix(scope.userId)}${newId(now)}` : (row.threadId ?? '')
   await db
     .prepare(
       `insert into voice_settings (user_id, phrase, time_zone, thread_id, thread_active_at, updated_at)

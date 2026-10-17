@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 
+import { threadPrefix } from '../agent/run'
 import type { AppEnv } from '../types'
 
 const SESSION_COOKIES = ['better-auth.session_token', 'better-auth.session_data']
@@ -52,12 +53,12 @@ export const accountRoutes = new Hono<AppEnv>().delete('/', async (c) => {
     db.prepare('delete from reminders where user_id = ?').bind(userId),
     db.prepare('delete from push_subscriptions where user_id = ?').bind(userId),
     db.prepare('delete from voice_tokens where user_id = ?').bind(userId),
-    db
-      .prepare(
-        `delete from voice_ops where thread_id in
-           (select thread_id from voice_settings where user_id = ? and thread_id is not null)`,
-      )
-      .bind(userId),
+    // Their conversations with the voice agent, current and earlier ones.
+    ...['voice_ops', 'chat_interrupts', 'chat_runs', 'chat_threads'].map((table) =>
+      db
+        .prepare(`delete from ${table} where substr(thread_id, 1, length(?1)) = ?1`)
+        .bind(threadPrefix(userId)),
+    ),
     db.prepare('delete from voice_settings where user_id = ?').bind(userId),
     db.prepare('delete from ai_shares where user_id = ?').bind(userId),
     db.prepare('delete from user_ai where user_id = ?').bind(userId),

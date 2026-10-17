@@ -294,6 +294,23 @@ describe('siri voice logging', () => {
     expect((await events(grandma.headers)).filter((e) => e.type === 'diaper')).toHaveLength(1)
   })
 
+  it('forgets the conversations when the account is deleted', async () => {
+    const parent = await t.signIn('舅舅')
+    await newFamily(parent.headers, '舅舅家', '小葡萄')
+    await t.send('PUT', '/api/ai', parent.headers, AI)
+    fake.setResponses([{ text: '你好。' }])
+    await t.send('POST', '/api/voice/chat', parent.headers, { text: '你好' })
+    const count = async () =>
+      (
+        await t.env.DB.prepare('select count(*) as n from chat_threads where thread_id like ?')
+          .bind(`voice_${parent.user.id}_%`)
+          .first<{ n: number }>()
+      )?.n
+    expect(await count()).toBe(1)
+    await t.send('DELETE', '/api/account', parent.headers)
+    expect(await count()).toBe(0)
+  })
+
   it('answers viewers that there is nothing to record', async () => {
     const viewer = await t.signIn('邻居')
     await join(headers, familyId, viewer.headers, 'viewer')
