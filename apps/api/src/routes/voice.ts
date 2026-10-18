@@ -9,6 +9,7 @@ import { type AgentScope, type AgentTurn, SESSION_IDLE_MS, runAgent } from '../a
 import type { Env } from '../env'
 import { json } from '../http'
 import type { AppEnv } from '../types'
+import { modelOptionsFor } from '../voice/ai'
 import { DAILY_LIMIT, createToken, revokeToken, tokenStatus, useToken } from '../voice/tokens'
 
 export const DEFAULT_PHRASE = '记录宝宝'
@@ -159,6 +160,7 @@ async function turn(
     userId,
     timeZone: timeZone ?? settings.timeZone,
     phrase: settings.phrase,
+    modelOptions: modelOptionsFor(ai.ai.provider),
   }
   return runAgent(adapter, scope, text, now)
 }

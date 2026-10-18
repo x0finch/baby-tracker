@@ -128,6 +128,14 @@ export async function listModels(provider: AiProvider, apiKey: string): Promise<
   return [...recommended, ...rest]
 }
 
+/**
+ * Request options for the provider. OpenRouter routes only to hosts that support every
+ * parameter sent, tools included: a host without tool calling has models write their calls
+ * as text (DeepSeek's DSML), which the user would then hear.
+ */
+export const modelOptionsFor = (provider: AiProvider): Record<string, unknown> | undefined =>
+  provider === 'openrouter' ? { provider: { require_parameters: true } } : undefined
+
 /** The model to start with: the first recommended one this key can use. */
 export const firstChoice = (models: AiModel[]) =>
   models.find((model) => model.tag) ?? models.find((model) => model.everyday) ?? models[0]

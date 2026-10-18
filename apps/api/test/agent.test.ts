@@ -92,8 +92,18 @@ describe('voice agent', () => {
     expect(ask.reply).toMatch(/^要删除「小米粒 \d\d:\d\d 换尿布（尿尿）」吗？$/)
     expect(await events()).toHaveLength(1)
 
-    fake.setResponses([{ text: '删掉了。' }])
-    const done = await runAgent(fake, scope, '对', NOW + 150_000)
+    // The model reads the answer, in whatever words, then the change goes ahead.
+    let asked = ''
+    fake.setResponses([
+      ({ request }) => {
+        asked = JSON.stringify(request.messages)
+        return { text: '{"answer":"yes"}' }
+      },
+      { text: '删掉了。' },
+    ])
+    const done = await runAgent(fake, scope, 'yeah go ahead', NOW + 150_000)
+    expect(asked).toContain('要删除「小米粒')
+    expect(asked).toContain('yeah go ahead')
     expect(done.reply).toBe('删掉了。')
     expect(await events()).toHaveLength(0)
   })
@@ -107,10 +117,34 @@ describe('voice agent', () => {
     const [stored] = await events()
     fake.setResponses([{ toolCalls: [{ name: 'delete_event', input: { id: stored?.id } }] }])
     await runAgent(fake, scope, '删掉', NOW + 210_000)
-    fake.setResponses([{ text: '好，不删。' }])
-    const kept = await runAgent(fake, scope, '不要', NOW + 220_000)
+    fake.setResponses([{ text: '{"answer":"no"}' }, { text: '好，不删。' }])
+    const kept = await runAgent(fake, scope, '算了不删了', NOW + 220_000)
     expect(kept.reply).toBe('好，不删。')
     expect(await events()).toHaveLength(1)
+  })
+
+  it('takes a correction instead of an answer as a new message', async () => {
+    const [stored] = await events()
+    fake.setResponses([{ toolCalls: [{ name: 'delete_event', input: { id: stored?.id } }] }])
+    await runAgent(fake, scope, '删掉', NOW + 224_000)
+    fake.setResponses([
+      { text: '{"answer":"other"}' },
+      { text: '好，不删。' },
+      { text: '记住了，是早上的。' },
+    ])
+    const turn = await runAgent(fake, scope, '不是这条，是早上那条', NOW + 226_000)
+    expect(turn.reply).toBe('记住了，是早上的。')
+    expect(await events()).toHaveLength(1)
+  })
+
+  it('never says a tool call the model wrote as text', async () => {
+    fake.setResponses([
+      {
+        text: '<｜DSML｜invoke name="update_event"><｜DSML｜parameter name="id">x</｜DSML｜parameter>',
+      },
+    ])
+    const turn = await runAgent(fake, scope, '改一下', NOW + 230_000)
+    expect(turn).toEqual({ reply: '没处理好，请再说一遍。', done: false, confirming: false })
   })
 
   it('undoes the last change', async () => {

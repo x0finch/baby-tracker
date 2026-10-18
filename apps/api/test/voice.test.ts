@@ -213,7 +213,8 @@ describe('siri voice logging', () => {
       reply: expect.stringMatching(/^要删除/),
     })
     const before = (await events()).length
-    fake.setResponses([{ text: '删掉了。' }])
+    // The model reads the answer first.
+    fake.setResponses([{ text: '{"answer":"yes"}' }, { text: '删掉了。' }])
     await t.send('POST', '/api/voice/chat', headers, { text: '确定' })
     expect(await events()).toHaveLength(before - 1)
   })
