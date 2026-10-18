@@ -13,6 +13,7 @@ import {
   withCompaction,
 } from '@tanstack/ai-compaction'
 import { withPersistence } from '@tanstack/ai-persistence'
+import { z } from 'zod'
 
 import type { Access, FamilyAccess } from '../access'
 import { describe, formatClock, localNow } from '../voice/plan'
@@ -25,18 +26,37 @@ export const SESSION_IDLE_MS = 30 * 60_000
 /** Model calls per message: enough to look something up, act on it and answer. */
 const MAX_STEPS = 6
 
-// The answer to "要修改…吗？", as Siri hears it: "对是的", "是的确认", "好的改吧", "不是".
-// A reply that says anything more ("是五点", "改成五点") is a new message instead.
-const NO_WORDS = /不改|不删|不要|不用|不对|不是|不行|算了|取消|错了|别|不/g
-const YES_WORDS = /确定|确认|可以|没错|改吧|删吧|删掉|修改|删除|就这样|对|是|好|行|嗯|ok|yes/gi
-const FILLER = /[的了吧呀啊呢哦啦就呗嘛]/g
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null
 
-/** Whether a reply approves or refuses the change; null when it says something else. */
-export function answerTo(text: string): 'yes' | 'no' | null {
-  const said = text.toLowerCase().replace(/[\s\p{P}]/gu, '')
-  const rest = said.replace(NO_WORDS, '').replace(YES_WORDS, '').replace(FILLER, '')
-  if (said === '' || rest !== '') return null
-  return said.replace(NO_WORDS, '') === said ? 'yes' : 'no'
+const answerSchema = z.object({ answer: z.enum(['yes', 'no', 'other']) })
+
+/**
+ * How the user answered "要修改…吗？", in whatever words or language: yes, no, or null when
+ * they said something else ("不是五点，是六点"), which is then a new message.
+ */
+async function answerTo(
+  adapter: AnyTextAdapter,
+  scope: AgentScope,
+  question: string,
+  text: string,
+): Promise<'yes' | 'no' | null> {
+  try {
+    const { answer } = await chat({
+      adapter,
+      modelOptions: scope.modelOptions,
+      systemPrompts: [
+        'The user was asked to confirm a change to a baby record. Decide whether their reply approves it (yes), refuses it (no), or says something else, such as a correction or a new request (other). The reply may be in any language.',
+      ],
+      messages: [{ role: 'user', content: `Question: ${question}\nReply: ${text}` }],
+      outputSchema: answerSchema,
+    })
+    return answer === 'other' ? null : answer
+  } catch (error) {
+    // Unsure: the change is not made, and the reply is handled as a new message.
+    console.error('Reading the answer failed', error)
+    return null
+  }
 }
 
 /** A model that writes its tool calls as text (DeepSeek's DSML) instead of calling them. */
@@ -188,8 +208,9 @@ async function runChat(
 }
 
 /**
- * One message from the user. A change waiting for approval is approved by "对" and the like,
- * refused by "不" and the like; anything else refuses it and is then handled as a new message.
+ * One message from the user. While a change waits for approval, the model reads whether the
+ * message approves or refuses it; anything else refuses it and is then handled as a new
+ * message.
  */
 export async function runAgent(
   adapter: AnyTextAdapter,
@@ -212,7 +233,11 @@ export async function runAgent(
 
   let outcome: RunOutcome | null = null
   if (pending.length > 0) {
-    const answer = answerTo(text)
+    const metadata = pending[0]?.payload.metadata
+    const question = isRecord(metadata)
+      ? await confirmQuestion(scope, metadata)
+      : '要修改这条记录吗？'
+    const answer = await answerTo(adapter, scope, question, text)
     const approved = answer === 'yes'
     const resume: RunAgentResumeItem[] = pending.map((item) => ({
       interruptId: item.interruptId,

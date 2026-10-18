@@ -3,7 +3,7 @@ import { fakeText } from '@tanstack/ai/testing'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { loadAccess } from '../src/access'
-import { type AgentScope, SESSION_IDLE_MS, answerTo, runAgent } from '../src/agent/run'
+import { type AgentScope, SESSION_IDLE_MS, runAgent } from '../src/agent/run'
 import { createTestApp } from './app'
 import { baby } from './fixtures'
 
@@ -92,9 +92,18 @@ describe('voice agent', () => {
     expect(ask.reply).toMatch(/^要删除「小米粒 \d\d:\d\d 换尿布（尿尿）」吗？$/)
     expect(await events()).toHaveLength(1)
 
-    // As Siri hears a yes: more than one word.
-    fake.setResponses([{ text: '删掉了。' }])
-    const done = await runAgent(fake, scope, '对是的', NOW + 150_000)
+    // The model reads the answer, in whatever words, then the change goes ahead.
+    let asked = ''
+    fake.setResponses([
+      ({ request }) => {
+        asked = JSON.stringify(request.messages)
+        return { text: '{"answer":"yes"}' }
+      },
+      { text: '删掉了。' },
+    ])
+    const done = await runAgent(fake, scope, 'yeah go ahead', NOW + 150_000)
+    expect(asked).toContain('要删除「小米粒')
+    expect(asked).toContain('yeah go ahead')
     expect(done.reply).toBe('删掉了。')
     expect(await events()).toHaveLength(0)
   })
@@ -108,9 +117,23 @@ describe('voice agent', () => {
     const [stored] = await events()
     fake.setResponses([{ toolCalls: [{ name: 'delete_event', input: { id: stored?.id } }] }])
     await runAgent(fake, scope, '删掉', NOW + 210_000)
-    fake.setResponses([{ text: '好，不删。' }])
-    const kept = await runAgent(fake, scope, '不要', NOW + 220_000)
+    fake.setResponses([{ text: '{"answer":"no"}' }, { text: '好，不删。' }])
+    const kept = await runAgent(fake, scope, '算了不删了', NOW + 220_000)
     expect(kept.reply).toBe('好，不删。')
+    expect(await events()).toHaveLength(1)
+  })
+
+  it('takes a correction instead of an answer as a new message', async () => {
+    const [stored] = await events()
+    fake.setResponses([{ toolCalls: [{ name: 'delete_event', input: { id: stored?.id } }] }])
+    await runAgent(fake, scope, '删掉', NOW + 224_000)
+    fake.setResponses([
+      { text: '{"answer":"other"}' },
+      { text: '好，不删。' },
+      { text: '记住了，是早上的。' },
+    ])
+    const turn = await runAgent(fake, scope, '不是这条，是早上那条', NOW + 226_000)
+    expect(turn.reply).toBe('记住了，是早上的。')
     expect(await events()).toHaveLength(1)
   })
 
@@ -146,27 +169,5 @@ describe('voice agent', () => {
     ])
     await runAgent(fake, scope, '你好', NOW + 310_000 + SESSION_IDLE_MS + 1)
     expect(seen).toBe(1)
-  })
-})
-
-describe('answers to a confirmation', () => {
-  it.each([
-    ['对', 'yes'],
-    ['对是的', 'yes'],
-    ['是的确认', 'yes'],
-    ['好的改吧', 'yes'],
-    ['对的，改吧。', 'yes'],
-    ['确认修改', 'yes'],
-    ['OK', 'yes'],
-    ['不', 'no'],
-    ['不是', 'no'],
-    ['算了不改了', 'no'],
-    ['取消', 'no'],
-    ['是五点', null],
-    ['改成五点', null],
-    ['不是凌晨是早上', null],
-    ['没有了', null],
-  ] as const)('%s → %s', (text, answer) => {
-    expect(answerTo(text)).toBe(answer)
   })
 })
