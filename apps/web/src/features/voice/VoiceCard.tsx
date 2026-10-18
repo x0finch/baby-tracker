@@ -212,6 +212,8 @@ function Connect({ settings }: { settings: VoiceSettings }) {
           ].join(' · ')}
         </span>
       </div>
+      {/* Shortcuts may stay on its add sheet although it added the shortcut: a first try settles it. */}
+      {!lastUsedAt && <p className="m-0 text-caption text-fg-muted">{m.voiceTryNow()}</p>}
       <div className="flex gap-2">
         <Button variant="outline" className="flex-1" onClick={() => setGuide(true)}>
           {m.voiceReadd()}
