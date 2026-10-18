@@ -19,7 +19,8 @@ them, or say "没有了" to finish.
 
 - Each user has one conversation, stored in D1 with TanStack AI persistence
   (`agent/persistence.ts`). Long ones are compacted (`withCompaction`).
-- After 30 idle minutes the next message starts a new one.
+- After 30 idle minutes the next message starts a new one. So does a change of key (own or
+  shared, and which family's): what was said with one key never goes to another key's provider.
 - Settings → Siri 语音记录 → 试一下 opens the same conversation as a chat box. What is said
   there is really recorded.
 - Updating or deleting a record needs approval (`needsApproval`). Siri asks
@@ -66,7 +67,8 @@ Which key a command uses (`agent/keys.ts`):
   - when the password changes;
   - when the account is deleted;
   - when the user signs out on the device that made it.
-- Limits: 10 requests a minute (`VOICE_RATE_LIMIT`) and 200 a day per code.
+- Limits: 10 requests a minute (`VOICE_RATE_LIMIT`), and 200 messages a day per user across
+  Siri and the chat box.
 
 ## Setup
 
