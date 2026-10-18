@@ -1,8 +1,11 @@
 # Deploying
 
-Bobo deploys from GitHub Actions (`.github/workflows/deploy.yml`): every push to `main` that
-passes CI is built, migrated and deployed to Cloudflare. You can also run **Deploy** by hand
-from the Actions tab. Nothing needs to run on your computer.
+Bobo deploys from GitHub Actions (`.github/workflows/deploy.yml`): every push to `main` is
+built, migrated and deployed to Cloudflare. Changes reach `main` through pull requests whose CI
+passed on the merged result, so the deploy does not wait for CI to run again on `main`. Turn on
+"Require branches to be up to date before merging" in the branch protection for `main` so that
+result is exactly what ships. You can also run **Deploy** by hand from the Actions tab. Nothing
+needs to run on your computer.
 
 Until the Cloudflare secrets below are set, the workflow skips deploying.
 

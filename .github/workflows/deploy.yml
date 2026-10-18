@@ -1,11 +1,11 @@
 name: Deploy
 
-# Deploys main to Cloudflare after CI passes, or on demand from the Actions tab.
+# Deploys main to Cloudflare when it changes, or on demand from the Actions tab. Changes
+# reach main through pull requests whose CI already passed on the merged result, so the
+# deploy does not wait for CI to run again on main (it still runs there, as a record).
 # Configure in GitHub → Settings → Secrets and variables → Actions (see docs/deploy.md).
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
+  push:
     branches: [main]
   workflow_dispatch:
 
@@ -19,10 +19,6 @@ concurrency:
 jobs:
   deploy:
     name: Deploy to Cloudflare
-    # Only after a green CI run of a push to main (or a manual run).
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: production
@@ -49,9 +45,6 @@ jobs:
 
       - uses: actions/checkout@v7
         if: steps.config.outputs.ready == 'true'
-        with:
-          # The commit CI tested, not whatever main points at now.
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - uses: pnpm/action-setup@v6
         if: steps.config.outputs.ready == 'true'
