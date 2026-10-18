@@ -10,6 +10,7 @@ import { familyAiRoutes, userAiRoutes } from './routes/ai'
 import { familyRoutes } from './routes/families'
 import { familyInviteRoutes, inviteAcceptRoutes, invitePreviewRoutes } from './routes/invites'
 import { pushRoutes, reminderRoutes } from './routes/notifications'
+import { shortcutRoutes } from './routes/shortcut'
 import { syncRoutes } from './routes/sync'
 import { type AdapterFor, siriRoutes, voiceRoutes } from './routes/voice'
 import type { AppEnv, AuthFor } from './types'
@@ -80,6 +81,7 @@ export function createApp(options: AppOptions = {}) {
   app.route('/reminders', reminderRoutes)
   // The shortcut authenticates with its own code, not a session.
   app.route('/voice/siri', siriRoutes(voiceAdapter))
+  app.route('/voice/shortcut.shortcut', shortcutRoutes)
   app.use('/voice', auth)
   app.use('/voice/token', auth)
   app.use('/voice/tokens/*', auth)
