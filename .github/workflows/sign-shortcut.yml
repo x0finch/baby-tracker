@@ -1,0 +1,42 @@
+name: Sign Siri shortcut
+
+# Builds the Siri shortcut and signs it for anyone on a macOS runner, then commits the
+# signed file to the branch. It is then added on an iPhone and shared as the iCloud link
+# the app opens (docs/siri.md). Runs when the generator changes, or by hand.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - apps/web/scripts/build-shortcut.mjs
+      - .github/workflows/sign-shortcut.yml
+
+permissions:
+  contents: write
+
+jobs:
+  sign:
+    name: Sign
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - name: Build
+        run: node apps/web/scripts/build-shortcut.mjs > unsigned.shortcut
+      - name: Sign
+        run: |
+          mkdir -p apps/web/siri
+          shortcuts sign --mode anyone --input unsigned.shortcut --output apps/web/siri/bobo-signed.shortcut
+          head -c 4 apps/web/siri/bobo-signed.shortcut; echo
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/web/siri/bobo-signed.shortcut
+          if git diff --cached --quiet; then echo "Unchanged"; exit 0; fi
+          git commit -m "Sign Siri shortcut"
+          git push
