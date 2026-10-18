@@ -1,23 +1,14 @@
 import { apiFetch } from '../../lib/api'
 
-/** The shortcut's name when downloaded, and the phrase until the user picks another. */
-export const DEFAULT_PHRASE = '记录宝宝'
-
-/** The signed shortcut people add; it asks for their code once, on adding. */
-const SHORTCUT_FILE = '/siri/bobo.shortcut'
-
 /**
- * Opens the shortcut file in Safari, which hands it to the Shortcuts app. An installed app
- * would open the file inside itself, with no way back, so there it goes to Safari itself
- * (x-safari-https, iOS 17+). The Shortcuts app's own import link only takes iCloud links.
+ * The Siri shortcut, shared from iCloud (docs/siri.md). Opening it shows the Shortcuts
+ * app's add sheet, which asks for the code once. It is added under this name, the default
+ * phrase; people with another phrase rename it.
  */
-export function openShortcutFile() {
-  const file = new URL(SHORTCUT_FILE, window.location.origin)
-  const installed =
-    matchMedia('(display-mode: standalone)').matches ||
-    ('standalone' in navigator && navigator.standalone === true)
-  window.location.assign(installed ? `x-safari-${file.href}` : file.href)
-}
+const SHORTCUT_URL = 'https://www.icloud.com/shortcuts/09428ff8e1e8435a87ced0edfd19aed5'
+export const SHORTCUT_NAME = '记录宝宝'
+
+export const openShortcut = () => window.location.assign(SHORTCUT_URL)
 
 export interface VoiceSettings {
   /** What the user says to Siri, i.e. the name they gave the shortcut. */

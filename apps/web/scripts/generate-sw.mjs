@@ -20,8 +20,7 @@ const { count, size, warnings } = await generateSW({
   swDest: 'dist/client/sw.js',
   // Any in-app URL opens the app shell offline; API calls (Phase 2) go to the network.
   navigateFallback: '/index.html',
-  // The Siri shortcut file is downloaded, not an app page.
-  navigateFallbackDenylist: [/^\/api\//, /^\/siri\//],
+  navigateFallbackDenylist: [/^\/api\//],
   cleanupOutdatedCaches: true,
   clientsClaim: true,
   // New versions wait until the user accepts the update prompt (never mid-feed).
