@@ -150,39 +150,50 @@ function PhraseInput({ settings }: { settings: VoiceSettings }) {
   )
 }
 
-/** Adds the shortcut: creates a code, copies it and opens the shortcut to paste it into. */
+/** Adds the shortcut: first the steps, then a code is copied and the shortcut opened. */
 function Connect({ settings }: { settings: VoiceSettings }) {
   const queryClient = useQueryClient()
   const refresh = () => queryClient.invalidateQueries({ queryKey: voiceKeys.settings })
+  const [guide, setGuide] = useState(false)
   const add = useMutation({
     mutationFn: async () => {
       const token = voiceApi.createToken().then((created) => created.token)
       await copyWhenReady(token)
       openShortcut()
     },
+    onSuccess: () => setGuide(false),
     onSettled: refresh,
   })
   const revoke = useMutation({ mutationFn: voiceApi.revokeToken, onSettled: refresh })
 
-  if (!settings.token) {
-    return (
-      <>
-        <ol className="m-0 flex list-decimal flex-col gap-1 pl-5 text-fg-muted">
-          <li>{m.voiceStepCopy()}</li>
-          <li>{m.voiceStepPaste()}</li>
+  const guideSheet = (
+    <Sheet open={guide} onClose={() => setGuide(false)} title={m.voiceAdd()}>
+      <div className="flex flex-col gap-4">
+        <ol className="m-0 flex list-decimal flex-col gap-3 pl-5">
+          <li>{m.voiceGuideCopy()}</li>
+          <li>{m.voiceGuideGet()}</li>
+          <li>{m.voiceGuidePaste()}</li>
           {settings.phrase !== SHORTCUT_NAME && (
             <li>{m.voiceStepRename({ name: SHORTCUT_NAME, phrase: settings.phrase })}</li>
           )}
+          <li>{m.voiceGuideTry({ phrase: settings.phrase })}</li>
         </ol>
-        <Button
-          size="lg"
-          block
-          disabled={!settings.ai || add.isPending}
-          onClick={() => add.mutate()}
-        >
-          {m.voiceAdd()}
+        {settings.token && <p className="m-0 text-caption text-fg-muted">{m.voiceReaddHint()}</p>}
+        <Button size="lg" block disabled={add.isPending} onClick={() => add.mutate()}>
+          {m.voiceGuideGo()}
         </Button>
         {add.isError && <FormError>{m.actionFailed()}</FormError>}
+      </div>
+    </Sheet>
+  )
+
+  if (!settings.token) {
+    return (
+      <>
+        <Button size="lg" block disabled={!settings.ai} onClick={() => setGuide(true)}>
+          {m.voiceAdd()}
+        </Button>
+        {guideSheet}
       </>
     )
   }
@@ -201,14 +212,8 @@ function Connect({ settings }: { settings: VoiceSettings }) {
           ].join(' · ')}
         </span>
       </div>
-      <p className="m-0 text-caption text-fg-muted">{m.voiceReaddHint()}</p>
       <div className="flex gap-2">
-        <Button
-          variant="outline"
-          className="flex-1"
-          disabled={add.isPending}
-          onClick={() => add.mutate()}
-        >
+        <Button variant="outline" className="flex-1" onClick={() => setGuide(true)}>
           {m.voiceReadd()}
         </Button>
         <Button
@@ -221,7 +226,8 @@ function Connect({ settings }: { settings: VoiceSettings }) {
           {m.voiceRevoke()}
         </Button>
       </div>
-      {(add.isError || revoke.isError) && <FormError>{m.actionFailed()}</FormError>}
+      {revoke.isError && <FormError>{m.actionFailed()}</FormError>}
+      {guideSheet}
     </>
   )
 }
