@@ -103,7 +103,9 @@ To change the shortcut:
 
 Signing needs a signed-in iCloud account, so it cannot run on CI. Opening a self-hosted file
 did not work well: an old service worker served the app instead, Safari only downloaded the
-file, and the Shortcuts app's `import-shortcut` link only takes iCloud links.
+file. The Shortcuts app's `shortcuts://import-shortcut?url=…` link, which would skip Safari,
+rejects every URL from a web page ("shortcut URL provided invalid"): tried with the iCloud page,
+iCloud's own signed file and that file served by the API.
 
 What the shortcut does:
 

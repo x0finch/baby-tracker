@@ -1,5 +1,3 @@
-import { SHORTCUT_ICLOUD_ID, SHORTCUT_NAME } from '@bobo/shared'
-
 import { apiFetch } from '../../lib/api'
 
 /**
@@ -7,8 +5,8 @@ import { apiFetch } from '../../lib/api'
  * app's add sheet, which asks for the code once. It is added under this name, the default
  * phrase; people with another phrase rename it.
  */
-const SHORTCUT_URL = `https://www.icloud.com/shortcuts/${SHORTCUT_ICLOUD_ID}`
-export { SHORTCUT_NAME }
+const SHORTCUT_URL = 'https://www.icloud.com/shortcuts/99bb2773c34f45348e709d24e82c0af9'
+export const SHORTCUT_NAME = '记录宝宝'
 
 /**
  * Opens the shortcut's iCloud page in Safari, which hands it to the Shortcuts app. Inside the
