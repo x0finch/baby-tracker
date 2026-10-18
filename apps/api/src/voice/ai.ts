@@ -66,6 +66,14 @@ export async function listModels(provider: AiProvider, apiKey: string) {
   ]
 }
 
+/**
+ * Request options for the provider. OpenRouter routes only to hosts that support every
+ * parameter sent, tools included: a host without tool calling has models write their calls
+ * as text (DeepSeek's DSML), which the user would then hear.
+ */
+export const modelOptionsFor = (provider: AiProvider): Record<string, unknown> | undefined =>
+  provider === 'openrouter' ? { provider: { require_parameters: true } } : undefined
+
 /** The model adapter for saved AI settings. */
 export function aiAdapter(provider: AiProvider, model: string, apiKey: string) {
   const info = PROVIDERS[provider]

@@ -25,8 +25,22 @@ export const SESSION_IDLE_MS = 30 * 60_000
 /** Model calls per message: enough to look something up, act on it and answer. */
 const MAX_STEPS = 6
 
-const YES = /^(对|是|是的|确定|确认|好|好的|可以|行|嗯|没错|删吧|删掉|改吧|改吧)[。！!.，, 吧的]*$/
-const NO = /^(不|不要|不用|别|算了|取消|不对|错了)[。！!.，, 吧了]*$/
+// The answer to "要修改…吗？", as Siri hears it: "对是的", "是的确认", "好的改吧", "不是".
+// A reply that says anything more ("是五点", "改成五点") is a new message instead.
+const NO_WORDS = /不改|不删|不要|不用|不对|不是|不行|算了|取消|错了|别|不/g
+const YES_WORDS = /确定|确认|可以|没错|改吧|删吧|删掉|修改|删除|就这样|对|是|好|行|嗯|ok|yes/gi
+const FILLER = /[的了吧呀啊呢哦啦就呗嘛]/g
+
+/** Whether a reply approves or refuses the change; null when it says something else. */
+export function answerTo(text: string): 'yes' | 'no' | null {
+  const said = text.toLowerCase().replace(/[\s\p{P}]/gu, '')
+  const rest = said.replace(NO_WORDS, '').replace(YES_WORDS, '').replace(FILLER, '')
+  if (said === '' || rest !== '') return null
+  return said.replace(NO_WORDS, '') === said ? 'yes' : 'no'
+}
+
+/** A model that writes its tool calls as text (DeepSeek's DSML) instead of calling them. */
+const RAW_TOOL_CALL = /｜DSML｜|<\|tool|<\/?(invoke|function_calls|tool_call)\b/
 
 export interface AgentTurn {
   /** What to say back. */
@@ -52,6 +66,8 @@ export interface AgentScope {
   userId: string
   timeZone: string
   phrase: string
+  /** Extra request fields for the provider (modelOptionsFor). */
+  modelOptions?: Record<string, unknown>
 }
 
 function instructions(scope: AgentScope, now: number, babyNames: string[]) {
@@ -144,6 +160,7 @@ async function runChat(
     runId: ctx.runId,
     systemPrompts: [instructions(scope, ctx.now, babyNames)],
     tools: agentTools(ctx),
+    modelOptions: scope.modelOptions,
     agentLoopStrategy: maxIterations(MAX_STEPS),
     middleware: [
       withPersistence(chatPersistence(scope.db)),
@@ -195,14 +212,15 @@ export async function runAgent(
 
   let outcome: RunOutcome | null = null
   if (pending.length > 0) {
-    const approved = YES.test(text.trim())
+    const answer = answerTo(text)
+    const approved = answer === 'yes'
     const resume: RunAgentResumeItem[] = pending.map((item) => ({
       interruptId: item.interruptId,
       status: 'resolved',
       payload: { approved },
     }))
     outcome = await runChat(adapter, context(), scope, { resume }, babyNames)
-    if (!approved && !NO.test(text.trim())) outcome = null
+    if (answer === null) outcome = null
   }
   outcome ??= await runChat(
     adapter,
@@ -212,7 +230,10 @@ export async function runAgent(
     babyNames,
   )
 
-  if (outcome.error) return { reply: '没处理好，请再说一遍。', done: false, confirming: false }
+  if (outcome.error || RAW_TOOL_CALL.test(outcome.text)) {
+    if (!outcome.error) console.error('Model wrote a tool call as text', outcome.text.slice(0, 200))
+    return { reply: '没处理好，请再说一遍。', done: false, confirming: false }
+  }
   const first = outcome.approvals[0]
   if (first) return { reply: await confirmQuestion(scope, first), done: false, confirming: true }
   return { reply: outcome.text || '好的。', done: state.done, confirming: false }

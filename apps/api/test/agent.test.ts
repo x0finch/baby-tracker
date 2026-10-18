@@ -3,7 +3,7 @@ import { fakeText } from '@tanstack/ai/testing'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { loadAccess } from '../src/access'
-import { type AgentScope, SESSION_IDLE_MS, runAgent } from '../src/agent/run'
+import { type AgentScope, SESSION_IDLE_MS, answerTo, runAgent } from '../src/agent/run'
 import { createTestApp } from './app'
 import { baby } from './fixtures'
 
@@ -92,8 +92,9 @@ describe('voice agent', () => {
     expect(ask.reply).toMatch(/^要删除「小米粒 \d\d:\d\d 换尿布（尿尿）」吗？$/)
     expect(await events()).toHaveLength(1)
 
+    // As Siri hears a yes: more than one word.
     fake.setResponses([{ text: '删掉了。' }])
-    const done = await runAgent(fake, scope, '对', NOW + 150_000)
+    const done = await runAgent(fake, scope, '对是的', NOW + 150_000)
     expect(done.reply).toBe('删掉了。')
     expect(await events()).toHaveLength(0)
   })
@@ -111,6 +112,16 @@ describe('voice agent', () => {
     const kept = await runAgent(fake, scope, '不要', NOW + 220_000)
     expect(kept.reply).toBe('好，不删。')
     expect(await events()).toHaveLength(1)
+  })
+
+  it('never says a tool call the model wrote as text', async () => {
+    fake.setResponses([
+      {
+        text: '<｜DSML｜invoke name="update_event"><｜DSML｜parameter name="id">x</｜DSML｜parameter>',
+      },
+    ])
+    const turn = await runAgent(fake, scope, '改一下', NOW + 230_000)
+    expect(turn).toEqual({ reply: '没处理好，请再说一遍。', done: false, confirming: false })
   })
 
   it('undoes the last change', async () => {
@@ -135,5 +146,27 @@ describe('voice agent', () => {
     ])
     await runAgent(fake, scope, '你好', NOW + 310_000 + SESSION_IDLE_MS + 1)
     expect(seen).toBe(1)
+  })
+})
+
+describe('answers to a confirmation', () => {
+  it.each([
+    ['对', 'yes'],
+    ['对是的', 'yes'],
+    ['是的确认', 'yes'],
+    ['好的改吧', 'yes'],
+    ['对的，改吧。', 'yes'],
+    ['确认修改', 'yes'],
+    ['OK', 'yes'],
+    ['不', 'no'],
+    ['不是', 'no'],
+    ['算了不改了', 'no'],
+    ['取消', 'no'],
+    ['是五点', null],
+    ['改成五点', null],
+    ['不是凌晨是早上', null],
+    ['没有了', null],
+  ] as const)('%s → %s', (text, answer) => {
+    expect(answerTo(text)).toBe(answer)
   })
 })
