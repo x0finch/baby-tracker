@@ -76,14 +76,14 @@ function SettingsIndex() {
       </SettingsGroup>
       <SettingsGroup title={m.settingsGroupAi()}>
         <SettingsRow
-          link={{ to: '/settings/voice' }}
-          title={m.voiceTitle()}
-          summary={useVoiceSummary()}
-        />
-        <SettingsRow
           link={{ to: '/settings/ai' }}
           title={m.aiMineTitle()}
           summary={useAiSummary()}
+        />
+        <SettingsRow
+          link={{ to: '/settings/voice' }}
+          title={m.voiceTitle()}
+          summary={useVoiceSummary()}
         />
       </SettingsGroup>
       <SettingsGroup title={m.settingsGroupApp()}>
