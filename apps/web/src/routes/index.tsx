@@ -1,6 +1,7 @@
 import type { Baby } from '@bobo/shared'
 import { createFileRoute } from '@tanstack/react-router'
 
+import { PullToRefresh } from '../components/PullToRefresh'
 import { Card } from '../components/ui/Card'
 import { BadgeToast } from '../features/achievements/BadgeToast'
 import { RequireBaby } from '../features/babies/RequireBaby'
@@ -20,9 +21,11 @@ export const Route = createFileRoute('/')({
 
 function TodayPage() {
   return (
-    <RequireBaby>
-      <Today />
-    </RequireBaby>
+    <PullToRefresh>
+      <RequireBaby>
+        <Today />
+      </RequireBaby>
+    </PullToRefresh>
   )
 }
 
