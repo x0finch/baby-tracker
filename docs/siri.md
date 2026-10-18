@@ -85,8 +85,9 @@ with the family if others should use it.
 ### 2. The shortcut (shared from iCloud)
 
 The settings page's "添加到 Siri" button copies the user's code and opens the shortcut's iCloud
-link (`SHORTCUT_URL` in `apps/web/src/features/voice/api.ts`). The Shortcuts app shows its add
-sheet, which asks for the code ("请粘贴 Bobo 设置里复制的口令"). The shortcut is shared under the
+link (`SHORTCUT_URL` in `apps/web/src/features/voice/api.ts`) in Safari: from the installed app
+through `x-safari-https://` (iOS 17+), as the app's own window could land on its not-found page.
+The Shortcuts app shows its add sheet, which asks for the code ("请粘贴 Bobo 设置里复制的口令"). The shortcut is shared under the
 name `SHORTCUT_NAME` ("记录宝宝", the default phrase); people with another phrase rename it.
 
 To change the shortcut:

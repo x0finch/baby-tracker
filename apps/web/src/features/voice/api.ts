@@ -8,7 +8,17 @@ import { apiFetch } from '../../lib/api'
 const SHORTCUT_URL = 'https://www.icloud.com/shortcuts/09428ff8e1e8435a87ced0edfd19aed5'
 export const SHORTCUT_NAME = '记录宝宝'
 
-export const openShortcut = () => window.location.assign(SHORTCUT_URL)
+/**
+ * Opens the shortcut's iCloud page in Safari, which hands it to the Shortcuts app. Inside the
+ * installed app the page would open in the app's own window and could land on its not-found
+ * page, so there it goes to Safari itself (x-safari-https, iOS 17+).
+ */
+export function openShortcut() {
+  const installed =
+    matchMedia('(display-mode: standalone)').matches ||
+    ('standalone' in navigator && navigator.standalone === true)
+  window.location.assign(installed ? `x-safari-${SHORTCUT_URL}` : SHORTCUT_URL)
+}
 
 export interface VoiceSettings {
   /** What the user says to Siri, i.e. the name they gave the shortcut. */
