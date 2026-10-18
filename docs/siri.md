@@ -24,9 +24,12 @@ them, or say "没有了" to finish.
 - Settings → Siri 语音记录 → 试一下 opens the same conversation as a chat box. What is said
   there is really recorded.
 - Updating or deleting a record needs approval (`needsApproval`). Siri asks
-  "要删除「…」吗？". "对" and the like approve it, "不" and the like refuse it. Anything else
-  refuses it and is handled as a new message.
+  "要删除「…」吗？", and the same model reads the reply, in any words or language: yes
+  approves it, no refuses it. Anything else, such as a correction, refuses it and is handled as
+  a new message.
 - "撤销" reverts the latest change of the conversation (`voice_ops`).
+- Conversations are kept 30 days after they were last used: once an hour the cron deletes
+  older ones with their runs, pending questions and undo log (`agent/retention.ts`).
 
 ### Families
 
