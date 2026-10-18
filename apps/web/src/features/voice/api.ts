@@ -42,10 +42,23 @@ export interface ChatTurn {
 }
 
 export interface ChatMessage {
-  /** Only for React lists; not stored. */
+  /** Stable for a stored message; random for one shown before the server answers. */
   id: string
+  /** The conversation it belongs to; null until the server answers. */
+  threadId: string | null
   role: 'user' | 'assistant'
   text: string
+}
+
+/** A page of the last 30 days of conversations, oldest message first. */
+export interface ChatPage {
+  lines: ChatMessage[]
+  /** When each conversation on the page started. */
+  threads: Record<string, { startedAt: number }>
+  /** Where the page before this one ends; null at the oldest kept. */
+  next: string | null
+  /** The conversation the next message continues; null after a pause. */
+  activeThreadId: string | null
 }
 
 // Codes made on this device, so signing out here can end them (another account may sign in
@@ -103,9 +116,10 @@ export const voiceApi = {
     return created
   },
   revokeToken: () => apiFetch<void>('/api/voice/token', { method: 'DELETE' }),
-  chat: () =>
-    apiFetch<{ messages: Omit<ChatMessage, 'id'>[] }>('/api/voice/chat').then((body) =>
-      body.messages.map((message) => ({ ...message, id: crypto.randomUUID() })),
+  /** The latest messages, or those before an earlier page's `next`. */
+  chat: (before: string | null) =>
+    apiFetch<ChatPage>(
+      before ? `/api/voice/chat?before=${encodeURIComponent(before)}` : '/api/voice/chat',
     ),
   send: (text: string) =>
     apiFetch<ChatTurn>('/api/voice/chat', {

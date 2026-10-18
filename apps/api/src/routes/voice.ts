@@ -1,11 +1,18 @@
+import { idTime } from '@bobo/shared'
 import type { AnyTextAdapter, ModelMessage } from '@tanstack/ai'
 import { Hono } from 'hono'
 import { z } from 'zod'
 
 import { loadAccess } from '../access'
 import { type SavedAi, aiForUser } from '../agent/keys'
-import { chatPersistence } from '../agent/persistence'
-import { type AgentScope, type AgentTurn, SESSION_IDLE_MS, runAgent } from '../agent/run'
+import { KEEP_MS } from '../agent/retention'
+import {
+  type AgentScope,
+  type AgentTurn,
+  SESSION_IDLE_MS,
+  runAgent,
+  threadPrefix,
+} from '../agent/run'
 import type { Env } from '../env'
 import { json } from '../http'
 import type { AppEnv } from '../types'
@@ -99,21 +106,95 @@ const messageText = (message: ModelMessage) =>
     ? message.content
     : (message.content ?? []).map((part) => (part.type === 'text' ? part.content : '')).join('')
 
-/** The current conversation, as the chat box shows it; empty once it has gone idle. */
-async function transcript(db: D1Database, userId: string, now: number) {
+/** Messages on the chat box's first page, and on each earlier one. */
+const FIRST_PAGE = 10
+const MORE_PAGE = 20
+/** Conversations read at a time while filling a page. */
+const THREAD_BATCH = 5
+
+interface ChatLine {
+  /** `${threadId}~${index}`: stable, and where an earlier page ends. */
+  id: string
+  threadId: string
+  role: 'user' | 'assistant'
+  text: string
+}
+
+/** What a conversation shows: what the user said and the answers, not tool calls. */
+function visibleLines(threadId: string, json: string): ChatLine[] {
+  let messages: ModelMessage[]
+  try {
+    messages = JSON.parse(json)
+  } catch {
+    return []
+  }
+  const lines: ChatLine[] = []
+  for (const message of messages) {
+    if (message.role !== 'user' && message.role !== 'assistant') continue
+    const text = messageText(message).trim()
+    if (text) lines.push({ id: `${threadId}~${lines.length}`, threadId, role: message.role, text })
+  }
+  return lines
+}
+
+/**
+ * A page of the user's conversations with Siri and the chat box over the last 30 days: the
+ * latest messages, or those just before `before` (a page's `next`). Each conversation comes
+ * with when it started, and the one the next message continues is named.
+ */
+async function transcript(db: D1Database, userId: string, now: number, before?: string) {
+  const prefix = threadPrefix(userId)
+  const [cursorThread = '', cursorIndex = ''] = before?.split('~') ?? []
+  const fromCursor = cursorThread.startsWith(prefix) ? cursorThread : null
+  const end = Number.parseInt(cursorIndex, 10)
+  let wanted = fromCursor ? MORE_PAGE : FIRST_PAGE
+  const lines: ChatLine[] = []
+  let next: string | null = null
+  // Older conversations a batch at a time, until the page is full.
+  let upTo = fromCursor
+  let inclusive = true
+  while (wanted > 0) {
+    const { results } = await db
+      .prepare(
+        `select thread_id as threadId, messages_json as json from chat_threads
+         where substr(thread_id, 1, length(?1)) = ?1 and updated_at >= ?2
+           and (?3 is null or thread_id < ?3 or (?4 and thread_id = ?3))
+         order by thread_id desc limit ?5`,
+      )
+      .bind(prefix, now - KEEP_MS, upTo, inclusive ? 1 : 0, THREAD_BATCH)
+      .all<{ threadId: string; json: string }>()
+    for (const row of results) {
+      const all = visibleLines(row.threadId, row.json)
+      const stop = row.threadId === fromCursor && end >= 0 ? Math.min(end, all.length) : all.length
+      const start = Math.max(0, stop - wanted)
+      lines.unshift(...all.slice(start, stop))
+      wanted -= stop - start
+      if (wanted === 0) {
+        next = `${row.threadId}~${start}`
+        break
+      }
+    }
+    if (wanted === 0 || results.length < THREAD_BATCH) break
+    upTo = results.at(-1)?.threadId ?? null
+    inclusive = false
+  }
+  const threads = Object.fromEntries(
+    [...new Set(lines.map((line) => line.threadId))].map((id) => [
+      id,
+      { startedAt: idTime(id.slice(prefix.length)) },
+    ]),
+  )
   const row = await db
     .prepare(
       'select thread_id as threadId, thread_active_at as activeAt from voice_settings where user_id = ?',
     )
     .bind(userId)
     .first<{ threadId: string | null; activeAt: number | null }>()
-  if (!row?.threadId || row.activeAt === null || now - row.activeAt > SESSION_IDLE_MS) return []
-  const messages = await chatPersistence(db).stores.messages.loadThread(row.threadId)
-  return messages.flatMap((message) => {
-    if (message.role === 'tool') return []
-    const text = messageText(message).trim()
-    return text ? [{ role: message.role, text }] : []
-  })
+  const activeThreadId =
+    row?.threadId && row.activeAt !== null && now - row.activeAt <= SESSION_IDLE_MS
+      ? row.threadId
+      : null
+  return { lines, threads, next, activeThreadId }
 }
 
 /** Counts a message to the model; returns the user's count for the day. */
@@ -197,7 +278,7 @@ export function voiceRoutes(adapterFor: AdapterFor) {
       return c.body(null, 204)
     })
     .get('/chat', async (c) =>
-      c.json({ messages: await transcript(c.env.DB, c.get('user').id, Date.now()) }),
+      c.json(await transcript(c.env.DB, c.get('user').id, Date.now(), c.req.query('before'))),
     )
     .post('/chat', json(textSchema), async (c) => {
       const userId = c.get('user').id
