@@ -245,13 +245,13 @@
 @layer base {
   /*
    * Feel like an installed app rather than a web page: no scrollbars, no page bounce or
-   * pull-to-refresh, no double-tap zoom, and no text selection or system menus on long
-   * press (except where people type).
+   * pull-to-refresh, no pinch or double-tap zoom, and no text selection or system menus on
+   * long press (except where people type).
    */
   html {
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
+    touch-action: pan-x pan-y;
     scrollbar-width: none;
     overscroll-behavior: none;
   }
