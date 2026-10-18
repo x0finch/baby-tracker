@@ -22,13 +22,14 @@ In the repository, open **Settings → Secrets and variables → Actions**.
 
 Secrets:
 
-| Name                                       | Required                  | Value                                                           |
-| ------------------------------------------ | ------------------------- | --------------------------------------------------------------- |
-| `CLOUDFLARE_API_TOKEN`                     | yes                       | the token from step 1                                           |
-| `CLOUDFLARE_ACCOUNT_ID`                    | yes                       | the account ID from step 1                                      |
-| `BETTER_AUTH_SECRET`                       | yes                       | a random string of 32+ characters, e.g. from a password manager |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | for Google sign-in        | from Google Cloud (below)                                       |
-| `RESEND_API_KEY`                           | for password-reset emails | from [Resend](https://resend.com)                               |
+| Name                                       | Required                  | Value                                                                |
+| ------------------------------------------ | ------------------------- | -------------------------------------------------------------------- |
+| `CLOUDFLARE_API_TOKEN`                     | yes                       | the token from step 1                                                |
+| `CLOUDFLARE_ACCOUNT_ID`                    | yes                       | the account ID from step 1                                           |
+| `BETTER_AUTH_SECRET`                       | yes                       | a random string of 32+ characters, e.g. from a password manager      |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | for Google sign-in        | from Google Cloud (below)                                            |
+| `RESEND_API_KEY`                           | for password-reset emails | from [Resend](https://resend.com)                                    |
+| `ENCRYPTION_SECRET`                        | for Siri voice logging    | a random string of 32+ characters; encrypts stored secrets (AI keys) |
 
 Variables:
 
@@ -70,6 +71,10 @@ Sign-up and sign-in work without email. "Forgot password" needs it:
   `EMAIL_FROM`.
 - **Workers Paid:** you can use Cloudflare Email Service instead by adding
   `"send_email": [{ "name": "EMAIL" }]` to `apps/api/wrangler.jsonc`.
+
+## Optional: Siri voice logging
+
+Set `ENCRYPTION_SECRET` and add the signed shortcut; see [siri.md](siri.md).
 
 ## Notes
 

@@ -7,7 +7,7 @@ type Declared = Cloudflare.Env
 export interface Env
   extends
     Pick<Declared, 'DB'>,
-    Partial<Pick<Declared, 'AUTH_EMAIL_RATE_LIMIT' | 'AUTH_IP_RATE_LIMIT'>> {
+    Partial<Pick<Declared, 'AUTH_EMAIL_RATE_LIMIT' | 'AUTH_IP_RATE_LIMIT' | 'VOICE_RATE_LIMIT'>> {
   /** Public origin of the app, e.g. https://bobo.example.workers.dev */
   BETTER_AUTH_URL: string
   /** Secret used to sign session cookies (wrangler secret put BETTER_AUTH_SECRET). */
@@ -22,4 +22,9 @@ export interface Env
   RESEND_API_KEY?: string
   /** Sender address, e.g. "Bobo <noreply@yourdomain.com>"; its domain must be verified. */
   EMAIL_FROM?: string
+  /**
+   * Encrypts secrets stored in the database, such as users' AI provider keys. Changing it
+   * makes them unreadable; users then enter them again.
+   */
+  ENCRYPTION_SECRET?: string
 }

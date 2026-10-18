@@ -157,6 +157,10 @@ export const familyRoutes = new Hono<AppEnv>()
       db
         .prepare('delete from memberships where family_id = ? and user_id = ?')
         .bind(familyId, targetId),
+      // Their AI is no longer shared with a family they left.
+      db
+        .prepare('delete from ai_shares where family_id = ? and user_id = ?')
+        .bind(familyId, targetId),
       // Links handed out by someone who left should not keep letting people in.
       db
         .prepare(
