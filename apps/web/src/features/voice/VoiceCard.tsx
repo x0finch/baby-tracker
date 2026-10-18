@@ -155,7 +155,9 @@ function Connect({ settings }: { settings: VoiceSettings }) {
         <ol className="m-0 flex list-decimal flex-col gap-1 pl-5 text-fg-muted">
           <li>{m.voiceStepCopy()}</li>
           <li>{m.voiceStepPaste()}</li>
-          <li>{m.voiceStepRename({ name: SHORTCUT_NAME, phrase: settings.phrase })}</li>
+          {settings.phrase !== SHORTCUT_NAME && (
+            <li>{m.voiceStepRename({ name: SHORTCUT_NAME, phrase: settings.phrase })}</li>
+          )}
         </ol>
         <Button
           size="lg"

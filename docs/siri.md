@@ -87,7 +87,7 @@ with the family if others should use it.
 The settings page's "添加到 Siri" button copies the user's code and opens the shortcut's iCloud
 link (`SHORTCUT_URL` in `apps/web/src/features/voice/api.ts`). The Shortcuts app shows its add
 sheet, which asks for the code ("请粘贴 Bobo 设置里复制的口令"). The shortcut is shared under the
-name `SHORTCUT_NAME` ("bobo"); people rename it to their phrase.
+name `SHORTCUT_NAME` ("记录宝宝", the default phrase); people with another phrase rename it.
 
 To change the shortcut:
 
@@ -116,7 +116,7 @@ What the shortcut does:
 ### 3. Try it
 
 1. Settings → Siri 语音记录 → 试一下, and say something to record.
-2. Tap 添加到 Siri, paste the code when Shortcuts asks, add the shortcut and rename it to the
-   phrase.
+2. Tap 添加到 Siri, paste the code when Shortcuts asks, and add the shortcut (renaming it if the
+   phrase is not 记录宝宝).
 3. Say "嘿 Siri，记录宝宝".
 4. Optional: iPhone Settings → Accessibility → Touch → Back Tap → Double Tap → the shortcut.

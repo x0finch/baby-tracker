@@ -2,11 +2,11 @@ import { apiFetch } from '../../lib/api'
 
 /**
  * The Siri shortcut, shared from iCloud (docs/siri.md). Opening it shows the Shortcuts
- * app's add sheet, which asks for the code once. It is added under this name; people rename
- * it to their phrase.
+ * app's add sheet, which asks for the code once. It is added under this name, the default
+ * phrase; people with another phrase rename it.
  */
-const SHORTCUT_URL = 'https://www.icloud.com/shortcuts/9fb725e9d46f4e9bb2d1d5a2cfa3402c'
-export const SHORTCUT_NAME = 'bobo'
+const SHORTCUT_URL = 'https://www.icloud.com/shortcuts/09428ff8e1e8435a87ced0edfd19aed5'
+export const SHORTCUT_NAME = '记录宝宝'
 
 export const openShortcut = () => window.location.assign(SHORTCUT_URL)
 
