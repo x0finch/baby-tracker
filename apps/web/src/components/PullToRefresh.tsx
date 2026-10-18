@@ -7,9 +7,9 @@ import { m } from '../paraglide/messages.js'
 import { currentSyncPhase, requestSync } from '../sync/runner'
 
 /** How far (px) the page must be pulled to refresh, and where the badge rests meanwhile. */
-const THRESHOLD = 88
+const THRESHOLD = 72
 /** The page stops following the finger here. */
-const MAX_PULL = 136
+const MAX_PULL = 120
 /** The shortest spin, so a fast sync still reads as "refreshed". */
 const MIN_SPIN_MS = 600
 const DONE_MS = 700
@@ -21,15 +21,15 @@ const rubber = (dy: number) => MAX_PULL * (1 - Math.exp(-dy / (MAX_PULL * 1.6)))
 
 /**
  * Pull down at the top of the page to sync now. The page itself does not bounce (body has
- * overscroll-behavior: none), so the pull is drawn here: a chunky badge whose arrow turns
- * when letting go would refresh, a spin while syncing, then a tick.
+ * overscroll-behavior: none), so the pull is drawn here: a bold arrow that turns when
+ * letting go would refresh, a spin while syncing, then a tick.
  */
 export function PullToRefresh({ children }: { children: ReactNode }) {
   const pull = useMotionValue(0)
   const [phase, setPhase] = useState<Phase>('idle')
   const phaseRef = useRef<Phase>('idle')
 
-  const badgeY = useTransform(pull, (value) => value - 80)
+  const badgeY = useTransform(pull, (value) => value - 64)
   const badgeScale = useTransform(pull, [0, THRESHOLD], [0.6, 1], { clamp: true })
   const arrowTurn = useTransform(pull, [THRESHOLD * 0.6, THRESHOLD], [0, 180], { clamp: true })
   const badgeOpacity = useTransform(pull, [0, 24], [0, 1], { clamp: true })
@@ -113,12 +113,8 @@ export function PullToRefresh({ children }: { children: ReactNode }) {
         <motion.span
           style={{ scale: badgeScale }}
           className={clsx(
-            'flex size-11 items-center justify-center rounded-full border-2 border-b-4 transition-colors',
-            phase === 'failed'
-              ? 'border-danger-edge bg-danger text-on-accent'
-              : phase === 'pulling' || phase === 'idle'
-                ? 'border-border bg-bg text-primary-text'
-                : 'border-primary-edge bg-primary text-on-accent',
+            'flex size-8 items-center justify-center',
+            phase === 'failed' ? 'text-danger-text' : 'text-primary-text',
           )}
         >
           {phase === 'refreshing' ? (
@@ -133,7 +129,14 @@ export function PullToRefresh({ children }: { children: ReactNode }) {
             </motion.span>
           )}
         </motion.span>
-        <span className="text-caption font-bold text-fg-muted">{label}</span>
+        <span
+          className={clsx(
+            'text-caption font-extrabold',
+            phase === 'failed' ? 'text-danger-text' : 'text-primary-text',
+          )}
+        >
+          {label}
+        </span>
       </motion.output>
       <motion.div style={{ y: pull }}>{children}</motion.div>
     </div>
@@ -142,7 +145,7 @@ export function PullToRefresh({ children }: { children: ReactNode }) {
 
 function Arrow() {
   return (
-    <svg viewBox="0 0 24 24" className="size-6" fill="none" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className="size-7" fill="none" aria-hidden="true">
       <path
         d="M12 5v13m0 0-5.5-5.5M12 18l5.5-5.5"
         stroke="currentColor"
@@ -156,7 +159,7 @@ function Arrow() {
 
 function Spinner() {
   return (
-    <svg viewBox="0 0 24 24" className="size-6 animate-spin" fill="none" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className="size-7 animate-spin" fill="none" aria-hidden="true">
       <circle cx="12" cy="12" r="8" stroke="currentColor" strokeOpacity="0.35" strokeWidth="3" />
       <path d="M12 4a8 8 0 0 1 8 8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
     </svg>
@@ -167,7 +170,7 @@ function Tick() {
   return (
     <motion.svg
       viewBox="0 0 24 24"
-      className="size-6"
+      className="size-7"
       fill="none"
       aria-hidden="true"
       initial={{ scale: 0.4 }}
@@ -187,7 +190,7 @@ function Tick() {
 
 function Bang() {
   return (
-    <svg viewBox="0 0 24 24" className="size-6" fill="none" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className="size-7" fill="none" aria-hidden="true">
       <path d="M12 6v7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
       <circle cx="12" cy="18" r="1.75" fill="currentColor" />
     </svg>
