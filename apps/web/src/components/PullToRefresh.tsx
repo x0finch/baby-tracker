@@ -4,7 +4,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react'
 
 import { prefersReducedMotion, spring } from '../lib/motion'
 import { m } from '../paraglide/messages.js'
-import { currentSyncPhase, requestSync } from '../sync/runner'
+import { currentSyncState, requestSync } from '../sync/runner'
 
 /** How far (px) the page must be pulled to refresh, and where the badge rests meanwhile. */
 const THRESHOLD = 72
@@ -13,6 +13,24 @@ const MAX_PULL = 120
 /** The shortest spin, so a fast sync still reads as "refreshed". */
 const MIN_SPIN_MS = 600
 const DONE_MS = 700
+/** Coming to the page refreshes on its own only when the last sync is older than this. */
+const STALE_MS = 30_000
+const REFRESH_EVENT = 'bobo:refresh-today'
+
+/** Tapping the Today tab while on it: back to the top, then refresh as if pulled. */
+export const refreshToday = () => window.dispatchEvent(new Event(REFRESH_EVENT))
+
+/** Waits for a smooth scroll to the top, for at most a second. */
+function scrollToTop() {
+  if (window.scrollY <= 0) return Promise.resolve()
+  window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' })
+  const until = Date.now() + 1_000
+  return new Promise<void>((done) => {
+    const check = () =>
+      window.scrollY <= 0 || Date.now() > until ? done() : requestAnimationFrame(check)
+    requestAnimationFrame(check)
+  })
+}
 
 type Phase = 'idle' | 'pulling' | 'ready' | 'refreshing' | 'done' | 'failed'
 
@@ -20,7 +38,8 @@ type Phase = 'idle' | 'pulling' | 'ready' | 'refreshing' | 'done' | 'failed'
 const rubber = (dy: number) => MAX_PULL * (1 - Math.exp(-dy / (MAX_PULL * 1.6)))
 
 /**
- * Pull down at the top of the page to sync now; coming back to the app does the same. The page itself does not bounce (body has
+ * Pull down at the top of the page to sync now. Coming to the page with stale records, or
+ * tapping its tab while on it, does the same. The page itself does not bounce (body has
  * overscroll-behavior: none), so the pull is drawn here: a bold arrow that turns when
  * letting go would refresh, a spin while syncing, then a tick.
  */
@@ -65,7 +84,8 @@ export function PullToRefresh({ children }: { children: ReactNode }) {
       set('refreshing')
       void settle(THRESHOLD)
       await Promise.all([requestSync(), new Promise((done) => setTimeout(done, MIN_SPIN_MS))])
-      const failed = currentSyncPhase() === 'error' || currentSyncPhase() === 'offline'
+      const { phase: synced } = currentSyncState()
+      const failed = synced === 'error' || synced === 'offline'
       set(failed ? 'failed' : 'done')
       await new Promise((done) => setTimeout(done, DONE_MS))
       await settle(0)
@@ -81,13 +101,26 @@ export function PullToRefresh({ children }: { children: ReactNode }) {
       set('idle')
       void settle(0)
     }
-    // Coming back to the app refreshes as if pulled, so it shows that the records are fresh.
-    // Away from the top, or with a sheet open, the sync runner still syncs quietly.
-    const onForeground = () => {
+    // Coming to the page (from the background or another tab) refreshes as if pulled when the
+    // records may be stale. Away from the top, or with a sheet open, the sync runner still
+    // syncs quietly.
+    const refreshIfStale = () => {
       if (document.visibilityState !== 'visible' || phaseRef.current !== 'idle') return
       if (window.scrollY > 0 || document.querySelector('dialog[open]')) return
+      const { phase: synced, lastSyncedAt } = currentSyncState()
+      if (synced === 'signed-out') return
+      if (lastSyncedAt !== undefined && Date.now() - lastSyncedAt < STALE_MS) return
       void refresh()
     }
+    // The Today tab tapped while on it: always refresh.
+    const onTabTap = async () => {
+      if (phaseRef.current !== 'idle' || document.querySelector('dialog[open]')) return
+      await scrollToTop()
+      if (phaseRef.current === 'idle') await refresh()
+    }
+    const onForeground = () => refreshIfStale()
+    const onRefresh = () => void onTabTap()
+    refreshIfStale()
 
     const onEnd = () => void finish()
 
@@ -97,7 +130,9 @@ export function PullToRefresh({ children }: { children: ReactNode }) {
     window.addEventListener('touchcancel', onEnd)
     document.addEventListener('visibilitychange', onForeground)
     window.addEventListener('focus', onForeground)
+    window.addEventListener(REFRESH_EVENT, onRefresh)
     return () => {
+      window.removeEventListener(REFRESH_EVENT, onRefresh)
       document.removeEventListener('visibilitychange', onForeground)
       window.removeEventListener('focus', onForeground)
       window.removeEventListener('touchstart', onStart)
