@@ -161,7 +161,7 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
         if (event.target === event.currentTarget) onClose()
       }}
       className={clsx(
-        'fixed inset-x-0 top-auto bottom-0 m-0 mx-auto w-full max-w-app max-h-[85dvh]',
+        'fixed inset-x-0 top-auto bottom-0 m-0 mx-auto w-full max-w-app max-h-[85dvh] overflow-x-hidden',
         'sheet rounded-t-xl border-2 border-b-0 border-border bg-bg p-0 text-fg focus:outline-none',
       )}
     >

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
+import { clsx } from 'clsx'
 import { type FormEvent, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
@@ -281,7 +282,7 @@ function ChatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
           </div>
         )}
         <form className="flex items-end gap-2" onSubmit={submit}>
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             <Input
               label={m.voiceChatLabel()}
               placeholder={m.voiceChatPlaceholder()}
@@ -303,12 +304,14 @@ function ChatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 function Bubble({ message }: { message: ChatMessage }) {
   const mine = message.role === 'user'
   return (
+    // Long unbroken text (a link, an id) wraps instead of widening the sheet.
     <p
-      className={
+      className={clsx(
+        'm-0 max-w-[85%] rounded-2xl px-3 py-2 wrap-anywhere',
         mine
-          ? 'm-0 max-w-[85%] self-end rounded-2xl rounded-br-md bg-primary px-3 py-2 text-on-accent'
-          : 'm-0 max-w-[85%] self-start rounded-2xl rounded-bl-md bg-surface px-3 py-2'
-      }
+          ? 'self-end rounded-br-md bg-primary text-on-accent'
+          : 'self-start rounded-bl-md bg-surface',
+      )}
     >
       {message.text}
     </p>
