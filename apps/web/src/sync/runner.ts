@@ -35,8 +35,8 @@ const syncState = createStore<SyncState>({ phase: 'signed-out' })
 const setState = syncState.set
 
 export const useSyncState = (): SyncState => useStore(syncState)
-/** The sync phase now, for code that runs outside render (e.g. after awaiting a round). */
-export const currentSyncPhase = (): SyncPhase => syncState.get().phase
+/** The sync state now, for code that runs outside render (e.g. after awaiting a round). */
+export const currentSyncState = (): SyncState => syncState.get()
 
 let running: Promise<void> | null = null
 let again = false

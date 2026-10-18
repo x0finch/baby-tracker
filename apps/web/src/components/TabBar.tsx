@@ -1,6 +1,7 @@
-import { Link, useHydrated } from '@tanstack/react-router'
+import { Link, useHydrated, useLocation } from '@tanstack/react-router'
 
 import { m } from '../paraglide/messages.js'
+import { refreshToday } from './PullToRefresh'
 
 const tabs = [
   { to: '/', label: m.tabToday },
@@ -13,6 +14,7 @@ export function TabBar() {
   // React keeps mismatched attributes from hydration, so a deep link would keep the
   // shell's active tab. Remounting after hydration recreates the DOM with the real state.
   const hydrated = useHydrated()
+  const { pathname } = useLocation()
 
   return (
     <nav
@@ -25,6 +27,8 @@ export function TabBar() {
           to={tab.to}
           // Sub-pages keep their section's tab active.
           activeOptions={{ exact: tab.to === '/' }}
+          // Tapping Today again refreshes it, like a pull.
+          onClick={tab.to === '/' && pathname === '/' ? refreshToday : undefined}
           className="flex min-h-touch flex-1 items-center justify-center font-extrabold text-fg-muted aria-[current=page]:text-primary-text"
         >
           {tab.label()}
