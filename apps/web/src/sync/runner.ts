@@ -144,6 +144,8 @@ export function startSync(store: LocalStore, api: SyncApi = httpSyncApi): () => 
   }, INTERVAL_MS)
   window.addEventListener('online', now)
   document.addEventListener('visibilitychange', onVisible)
+  // iOS does not always report visibility when an installed app comes back (e.g. after Siri).
+  window.addEventListener('focus', now)
   now()
 
   return () => {
@@ -152,6 +154,7 @@ export function startSync(store: LocalStore, api: SyncApi = httpSyncApi): () => 
     outbox.unsubscribe()
     window.removeEventListener('online', now)
     document.removeEventListener('visibilitychange', onVisible)
+    window.removeEventListener('focus', now)
     current = null
   }
 }
