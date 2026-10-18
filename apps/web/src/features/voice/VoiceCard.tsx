@@ -9,6 +9,7 @@ import { Input } from '../../components/ui/Input'
 import { Sheet } from '../../components/ui/Sheet'
 import { formatDate, formatTime } from '../../lib/i18n'
 import { m } from '../../paraglide/messages.js'
+import { requestSync } from '../../sync/runner'
 import { useAccess } from '../../sync/use-access'
 import {
   type ChatMessage,
@@ -232,6 +233,8 @@ function ChatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
     onSuccess: (turn) => {
       append({ role: 'assistant', text: turn.reply })
       setConfirming(turn.confirming)
+      // The agent writes on the server; pull now so the records show without waiting.
+      void requestSync()
     },
   })
   const say = (said: string) => {
