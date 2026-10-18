@@ -16,6 +16,13 @@ const uuid = () => randomUUID().toUpperCase()
 // Values inside parameters: a named variable, an earlier action's output, or text with them.
 const variable = (name) => ({ Type: 'Variable', VariableName: name })
 const output = (id, name) => ({ Type: 'ActionOutput', OutputUUID: id, OutputName: name })
+/** An output read as text, so conditions compare it as text. */
+const asText = (value) => ({
+  ...value,
+  Aggrandizements: [
+    { Type: 'WFCoercionVariableAggrandizement', CoercionItemClass: 'WFStringContentItem' },
+  ],
+})
 const attachment = (value) => ({ Value: value, WFSerializationType: 'WFTextTokenAttachment' })
 const text = (value) =>
   typeof value === 'string'
@@ -79,11 +86,30 @@ const actions = [
     WFInput: attachment(output(fetched, 'Contents of URL')),
   }),
   // Finished: say the last reply and stop.
+  // Current iOS reads the condition from WFConditions; the flat keys are its older form.
+  // A Dictionary Value has no type of its own, so it is read as text to compare with "stop".
   action('conditional', {
     GroupingIdentifier: branch,
     WFControlFlowMode: 0,
+    WFConditions: {
+      Value: {
+        WFActionParameterFilterPrefix: 1,
+        WFActionParameterFilterTemplates: [
+          {
+            WFCondition: 4,
+            WFConditionalActionString: 'stop',
+            WFInput: {
+              Type: 'Variable',
+              Variable: attachment(asText(output(next, 'Dictionary Value'))),
+            },
+          },
+        ],
+        WFContentPredicateBoundedDate: false,
+      },
+      WFSerializationType: 'WFContentPredicateTableTemplate',
+    },
     WFCondition: 4,
-    WFInput: { Type: 'Variable', Variable: attachment(output(next, 'Dictionary Value')) },
+    WFInput: { Type: 'Variable', Variable: attachment(asText(output(next, 'Dictionary Value'))) },
     WFConditionalActionString: 'stop',
   }),
   action('speaktext', { WFText: text(output(reply, 'Dictionary Value')) }),
@@ -100,7 +126,7 @@ const actions = [
 
 const shortcut = {
   WFWorkflowActions: actions,
-  WFWorkflowClientVersion: '2302.0.4',
+  WFWorkflowClientVersion: '5037.0.19',
   WFWorkflowMinimumClientVersion: 900,
   WFWorkflowMinimumClientVersionString: '900',
   WFWorkflowHasOutputFallback: false,
