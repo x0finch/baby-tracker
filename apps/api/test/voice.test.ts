@@ -1,4 +1,4 @@
-import type { Event, PullResponse } from '@bobo/shared'
+import { type Event, type PullResponse, newId } from '@bobo/shared'
 import { fakeText } from '@tanstack/ai/testing'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -195,13 +195,70 @@ describe('siri voice logging', () => {
       confirming: false,
     })
     const chat = await t.request('/api/voice/chat', { headers })
-    const { messages } = (await chat.json()) as { messages: Array<{ role: string; text: string }> }
-    expect(messages.slice(-4)).toEqual([
+    const { lines } = (await chat.json()) as { lines: Array<{ role: string; text: string }> }
+    expect(lines.slice(-4).map(({ role, text }) => ({ role, text }))).toEqual([
       { role: 'user', text: '换尿布' },
       { role: 'assistant', text: '记好了，还有吗？' },
       { role: 'user', text: '今天怎么样' },
       { role: 'assistant', text: '今天换了几次尿布。' },
     ])
+  })
+
+  it('pages through the last 30 days of conversations, newest first', async () => {
+    const reader = await t.signIn('翻记录')
+    const prefix = `voice_${reader.user.id}_`
+    const now = Date.now()
+    const thread = (minutesAgo: number, name: string, count: number) => {
+      const at = now - minutesAgo * 60_000
+      const messages = Array.from({ length: count }, (_, i) => ({
+        role: i % 2 === 0 ? 'user' : 'assistant',
+        content: `${name}${i}`,
+      }))
+      // Tool calls and results are not shown.
+      messages.splice(1, 0, { role: 'tool', content: 'tool result' })
+      return t.env.DB.prepare(
+        'insert into chat_threads (thread_id, messages_json, updated_at) values (?, ?, ?)',
+      ).bind(`${prefix}${newId(at)}`, JSON.stringify(messages), at)
+    }
+    await t.env.DB.batch([
+      thread(40 * 24 * 60, 'old', 4),
+      thread(5 * 24 * 60, 'b', 12),
+      thread(60, 'c', 6),
+    ])
+    type Page = {
+      lines: Array<{ text: string; threadId: string }>
+      threads: Record<string, { startedAt: number }>
+      next: string | null
+      activeThreadId: string | null
+    }
+    const page = async (before?: string): Promise<Page> =>
+      (
+        await t.request(`/api/voice/chat${before ? `?before=${before}` : ''}`, {
+          headers: reader.headers,
+        })
+      ).json()
+
+    const first = await page()
+    expect(first.lines.map((line) => line.text)).toEqual([
+      'b8',
+      'b9',
+      'b10',
+      'b11',
+      'c0',
+      'c1',
+      'c2',
+      'c3',
+      'c4',
+      'c5',
+    ])
+    expect(Object.keys(first.threads)).toHaveLength(2)
+    expect(first.activeThreadId).toBeNull()
+    const earlier = await page(first.next ?? '')
+    expect(earlier.lines.map((line) => line.text)).toEqual(
+      Array.from({ length: 8 }, (_, i) => `b${i}`),
+    )
+    // Nothing older than 30 days.
+    expect(earlier.next).toBeNull()
   })
 
   it('asks before deleting and waits for yes', async () => {

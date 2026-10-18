@@ -1,7 +1,20 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  type InfiniteData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { clsx } from 'clsx'
-import { type FormEvent, useState } from 'react'
+import {
+  type FormEvent,
+  type ReactNode,
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 
 import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
@@ -14,6 +27,7 @@ import { requestSync } from '../../sync/runner'
 import { useAccess } from '../../sync/use-access'
 import {
   type ChatMessage,
+  type ChatPage,
   SHORTCUT_NAME,
   type ChatTurn,
   type VoiceSettings,
@@ -212,26 +226,53 @@ function Connect({ settings }: { settings: VoiceSettings }) {
   )
 }
 
+const dayOf = (time: number) => new Date(time).toDateString()
+
+/** "今天 21:30", "昨天 08:05", "10月3日 14:20": when a conversation started. */
+function startedLabel(at: number) {
+  const time = formatTime(at)
+  if (dayOf(at) === dayOf(Date.now())) return m.voiceChatToday({ time })
+  if (dayOf(at) === dayOf(Date.now() - 86_400_000)) return m.voiceChatYesterday({ time })
+  return `${formatDate(at)} ${time}`
+}
+
 /**
  * Talks to the family's assistant as Siri would, in the same conversation: what is said here
- * is really recorded, and Siri remembers it for the next half hour.
+ * is really recorded, and Siri remembers it for the next half hour. Shows the latest
+ * messages; scrolling up loads earlier ones, back 30 days.
  */
 function ChatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const queryClient = useQueryClient()
   const key = voiceKeys.chat
-  const { data: messages = [], isError } = useQuery({
+  const history = useInfiniteQuery({
     queryKey: key,
-    queryFn: voiceApi.chat,
+    queryFn: ({ pageParam }) => voiceApi.chat(pageParam),
+    initialPageParam: null as string | null,
+    getNextPageParam: (page) => page.next,
     enabled: open,
   })
   const [text, setText] = useState('')
   const [confirming, setConfirming] = useState(false)
 
-  const append = (message: Omit<ChatMessage, 'id'>) =>
-    queryClient.setQueryData<ChatMessage[]>(key, (current = []) => [
-      ...current,
-      { ...message, id: crypto.randomUUID() },
-    ])
+  // Pages go back in time; the list reads oldest first.
+  const pages = history.data?.pages ?? []
+  const messages = pages.toReversed().flatMap((page) => page.lines)
+  const threads: ChatPage['threads'] = {}
+  for (const page of pages) Object.assign(threads, page.threads)
+  const activeThreadId = pages[0]?.activeThreadId ?? null
+  const lastThreadId = messages.findLast((message) => message.threadId)?.threadId ?? null
+  // The latest conversation is over: the next message starts afresh.
+  const ended = lastThreadId !== null && lastThreadId !== activeThreadId
+
+  /** Shows a message before the server has it, at the end of the latest page. */
+  const append = (message: Omit<ChatMessage, 'id' | 'threadId'>) =>
+    queryClient.setQueryData<InfiniteData<ChatPage, string | null>>(key, (data) => {
+      if (!data) return data
+      const [latest, ...rest] = data.pages
+      if (!latest) return data
+      const line = { ...message, id: crypto.randomUUID(), threadId: null }
+      return { ...data, pages: [{ ...latest, lines: [...latest.lines, line] }, ...rest] }
+    })
   const send = useMutation<ChatTurn, Error, string>({
     mutationFn: voiceApi.send,
     onMutate: (said) => append({ role: 'user', text: said }),
@@ -241,6 +282,8 @@ function ChatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
       // The agent writes on the server; pull now so the records show without waiting.
       void requestSync()
     },
+    // Back in step with the server: which conversation the messages went to.
+    onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
   })
   const say = (said: string) => {
     if (!said || send.isPending) return
@@ -252,24 +295,80 @@ function ChatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
     say(text.trim())
   }
 
+  // Reaching the top loads the page before, keeping what is on screen where it was.
+  const anchor = useRef<{ height: number; top: number } | null>(null)
+  const list = useRef<HTMLDivElement>(null)
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = history
+  const top = useCallback(
+    (node: HTMLDivElement | null) => {
+      const root = node?.closest('dialog')
+      if (!node || !root) return undefined
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          if (!entry?.isIntersecting || !hasNextPage || isFetchingNextPage) return
+          anchor.current = { height: root.scrollHeight, top: root.scrollTop }
+          void fetchNextPage()
+        },
+        { root },
+      )
+      observer.observe(node)
+      return () => observer.disconnect()
+    },
+    [hasNextPage, isFetchingNextPage, fetchNextPage],
+  )
+  // Runs when a page is added: that is when the anchor applies.
+  useLayoutEffect(() => {
+    const root = list.current?.closest('dialog')
+    if (!anchor.current || !root) return
+    root.scrollTop = anchor.current.top + root.scrollHeight - anchor.current.height
+    anchor.current = null
+    // Keyed on the page count on purpose: the anchor applies once the new page is drawn.
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies
+  }, [pages.length])
+
+  const newConversation = (
+    <p key="new" className="m-0 text-center text-caption font-bold text-fg-muted">
+      {m.voiceChatNew()}
+    </p>
+  )
+  const rows = messages.flatMap((message, index) => {
+    const previous = messages[index - 1]
+    const before: ReactNode[] = []
+    if (message.threadId && message.threadId !== previous?.threadId) {
+      const started = threads[message.threadId]?.startedAt
+      if (started !== undefined) {
+        before.push(
+          <p key={`d-${message.threadId}`} className="m-0 text-center text-caption text-fg-muted">
+            {startedLabel(started)}
+          </p>,
+        )
+      }
+    }
+    if (ended && !message.threadId && previous?.threadId) before.push(newConversation)
+    return [...before, <Bubble key={message.id} message={message} />]
+  })
+  if (ended && messages.at(-1)?.threadId) rows.push(newConversation)
+
   return (
     <Sheet open={open} onClose={onClose} title={m.voiceChatTitle()}>
       <div className="flex flex-col gap-3">
-        <div className="flex min-h-40 flex-col gap-2">
+        <div ref={list} className="flex min-h-40 flex-col gap-2">
+          {hasNextPage ? (
+            <div ref={top} className="text-center text-caption text-fg-muted">
+              {isFetchingNextPage ? m.voiceChatLoadingEarlier() : '\u00a0'}
+            </div>
+          ) : (
+            messages.length > 0 && (
+              <p className="m-0 text-center text-caption text-fg-muted">{m.voiceChatOldest()}</p>
+            )
+          )}
           {messages.length === 0 && !send.isPending && (
             <p className="m-0 text-fg-muted">
-              {isError ? m.voiceLoadFailed() : m.voiceChatEmpty()}
+              {history.isError ? m.voiceLoadFailed() : m.voiceChatEmpty()}
             </p>
           )}
-          {messages.map((message) => (
-            <Bubble key={message.id} message={message} />
-          ))}
+          {rows}
           {send.isPending && <p className="m-0 text-caption text-fg-muted">{m.voiceThinking()}</p>}
-          {/* Remounts as the conversation grows, keeping the latest message in view. */}
-          <div
-            key={`${messages.length}-${send.isPending}`}
-            ref={(node) => node?.scrollIntoView({ block: 'end' })}
-          />
         </div>
         {confirming && !send.isPending && (
           <div className="flex gap-2">
@@ -296,6 +395,11 @@ function ChatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
           </Button>
         </form>
         {send.isError && <FormError>{m.actionFailed()}</FormError>}
+        {/* Remounts when a message is added at the end, keeping it and the input in view. */}
+        <div
+          key={`${messages.at(-1)?.id}-${send.isPending}`}
+          ref={(node) => node?.scrollIntoView({ block: 'end' })}
+        />
       </div>
     </Sheet>
   )

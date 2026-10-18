@@ -1,4 +1,4 @@
-import { isValid, monotonicFactory } from 'ulid'
+import { decodeTime, isValid, monotonicFactory } from 'ulid'
 import { z } from 'zod'
 
 const generate = monotonicFactory()
@@ -10,5 +10,8 @@ const generate = monotonicFactory()
 export function newId(now: number = Date.now()): string {
   return generate(now)
 }
+
+/** When an id was made (epoch ms). */
+export const idTime = (id: string): number => decodeTime(id)
 
 export const idSchema = z.string().refine(isValid, { message: 'Invalid ULID' })

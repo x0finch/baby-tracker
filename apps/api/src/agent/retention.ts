@@ -1,7 +1,7 @@
 // Conversations with the voice agent are kept 30 days after they were last used, then
 // deleted: what was said, the runs, the questions waiting for an answer and the undo log.
 
-const KEEP_MS = 30 * 86_400_000
+export const KEEP_MS = 30 * 86_400_000
 
 /** Deletes conversations older than 30 days, with everything about them. */
 export async function deleteOldConversations(db: D1Database, now: number) {
