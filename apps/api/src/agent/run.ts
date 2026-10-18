@@ -13,6 +13,7 @@ import {
   withCompaction,
 } from '@tanstack/ai-compaction'
 import { withPersistence } from '@tanstack/ai-persistence'
+import { z } from 'zod'
 
 import type { Access, FamilyAccess } from '../access'
 import { describe, formatClock, localNow } from '../voice/plan'
@@ -25,8 +26,41 @@ export const SESSION_IDLE_MS = 30 * 60_000
 /** Model calls per message: enough to look something up, act on it and answer. */
 const MAX_STEPS = 6
 
-const YES = /^(对|是|是的|确定|确认|好|好的|可以|行|嗯|没错|删吧|删掉|改吧|改吧)[。！!.，, 吧的]*$/
-const NO = /^(不|不要|不用|别|算了|取消|不对|错了)[。！!.，, 吧了]*$/
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null
+
+const answerSchema = z.object({ answer: z.enum(['yes', 'no', 'other']) })
+
+/**
+ * How the user answered "要修改…吗？", in whatever words or language: yes, no, or null when
+ * they said something else ("不是五点，是六点"), which is then a new message.
+ */
+async function answerTo(
+  adapter: AnyTextAdapter,
+  scope: AgentScope,
+  question: string,
+  text: string,
+): Promise<'yes' | 'no' | null> {
+  try {
+    const { answer } = await chat({
+      adapter,
+      modelOptions: scope.modelOptions,
+      systemPrompts: [
+        'The user was asked to confirm a change to a baby record. Decide whether their reply approves it (yes), refuses it (no), or says something else, such as a correction or a new request (other). The reply may be in any language.',
+      ],
+      messages: [{ role: 'user', content: `Question: ${question}\nReply: ${text}` }],
+      outputSchema: answerSchema,
+    })
+    return answer === 'other' ? null : answer
+  } catch (error) {
+    // Unsure: the change is not made, and the reply is handled as a new message.
+    console.error('Reading the answer failed', error)
+    return null
+  }
+}
+
+/** A model that writes its tool calls as text (DeepSeek's DSML) instead of calling them. */
+const RAW_TOOL_CALL = /｜DSML｜|<\|tool|<\/?(invoke|function_calls|tool_call)\b/
 
 export interface AgentTurn {
   /** What to say back. */
@@ -52,6 +86,8 @@ export interface AgentScope {
   userId: string
   timeZone: string
   phrase: string
+  /** Extra request fields for the provider (modelOptionsFor). */
+  modelOptions?: Record<string, unknown>
 }
 
 function instructions(scope: AgentScope, now: number, babyNames: string[]) {
@@ -144,6 +180,7 @@ async function runChat(
     runId: ctx.runId,
     systemPrompts: [instructions(scope, ctx.now, babyNames)],
     tools: agentTools(ctx),
+    modelOptions: scope.modelOptions,
     agentLoopStrategy: maxIterations(MAX_STEPS),
     middleware: [
       withPersistence(chatPersistence(scope.db)),
@@ -171,8 +208,9 @@ async function runChat(
 }
 
 /**
- * One message from the user. A change waiting for approval is approved by "对" and the like,
- * refused by "不" and the like; anything else refuses it and is then handled as a new message.
+ * One message from the user. While a change waits for approval, the model reads whether the
+ * message approves or refuses it; anything else refuses it and is then handled as a new
+ * message.
  */
 export async function runAgent(
   adapter: AnyTextAdapter,
@@ -195,14 +233,19 @@ export async function runAgent(
 
   let outcome: RunOutcome | null = null
   if (pending.length > 0) {
-    const approved = YES.test(text.trim())
+    const metadata = pending[0]?.payload.metadata
+    const question = isRecord(metadata)
+      ? await confirmQuestion(scope, metadata)
+      : '要修改这条记录吗？'
+    const answer = await answerTo(adapter, scope, question, text)
+    const approved = answer === 'yes'
     const resume: RunAgentResumeItem[] = pending.map((item) => ({
       interruptId: item.interruptId,
       status: 'resolved',
       payload: { approved },
     }))
     outcome = await runChat(adapter, context(), scope, { resume }, babyNames)
-    if (!approved && !NO.test(text.trim())) outcome = null
+    if (answer === null) outcome = null
   }
   outcome ??= await runChat(
     adapter,
@@ -212,7 +255,10 @@ export async function runAgent(
     babyNames,
   )
 
-  if (outcome.error) return { reply: '没处理好，请再说一遍。', done: false, confirming: false }
+  if (outcome.error || RAW_TOOL_CALL.test(outcome.text)) {
+    if (!outcome.error) console.error('Model wrote a tool call as text', outcome.text.slice(0, 200))
+    return { reply: '没处理好，请再说一遍。', done: false, confirming: false }
+  }
   const first = outcome.approvals[0]
   if (first) return { reply: await confirmQuestion(scope, first), done: false, confirming: true }
   return { reply: outcome.text || '好的。', done: state.done, confirming: false }
