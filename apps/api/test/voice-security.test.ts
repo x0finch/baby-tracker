@@ -10,7 +10,6 @@ import { baby, diaper } from './fixtures'
 
 const KEY = 'sk-or-v1-secret-own-key-0001'
 const SHARED_KEY = 'sk-or-v1-secret-shared-key-02'
-const AI = { provider: 'openrouter', model: 'openai/gpt-5.4-mini' }
 
 type Turn = { reply: string; done: boolean; confirming: boolean }
 
@@ -80,7 +79,7 @@ describe('voice logging, adversarially', () => {
   it('never shows anything about a record of another family, whatever id the model passes', async () => {
     const me = await t.signIn('我')
     await newFamily(me.headers, '我家', ['小米粒'])
-    await t.send('PUT', '/api/ai', me.headers, { ...AI, apiKey: KEY })
+    await t.saveAi(me.headers, KEY)
     const stranger = await t.signIn('陌生人')
     const theirs = await newFamily(stranger.headers, '别人家', ['小核桃'])
     const secret = await addEvent(
@@ -115,7 +114,7 @@ describe('voice logging, adversarially', () => {
     const hidden = await addEvent(owner.headers, second?.id ?? '', family.id, '二宝的秘密')
     const nanny = await t.signIn('阿姨')
     await join(owner.headers, family.id, nanny.headers, 'caregiver', [first?.id ?? ''])
-    await t.send('PUT', '/api/ai', nanny.headers, { ...AI, apiKey: KEY })
+    await t.saveAi(nanny.headers, KEY)
 
     callTool('find_events', { baby: null, type: null, hours: 48 })
     await chat(nanny.headers, '最近有什么记录')
@@ -155,7 +154,7 @@ describe('voice logging, adversarially', () => {
   it('never sends a key back, in any answer', async () => {
     const owner = await t.signIn('爸爸')
     const family = await newFamily(owner.headers, '爸爸家', ['小橙子'])
-    await t.send('PUT', '/api/ai', owner.headers, { ...AI, apiKey: SHARED_KEY })
+    await t.saveAi(owner.headers, SHARED_KEY)
     await t.send('PUT', '/api/ai/shares', owner.headers, { familyIds: [family.id] })
     const member = await t.signIn('奶奶')
     await join(owner.headers, family.id, member.headers)
@@ -182,7 +181,7 @@ describe('voice logging, adversarially', () => {
     const member = await t.signIn('小姨')
     await join(owner.headers, family.id, member.headers)
     const share = async () => {
-      await t.send('PUT', '/api/ai', owner.headers, { ...AI, apiKey: SHARED_KEY })
+      await t.saveAi(owner.headers, SHARED_KEY)
       await t.send('PUT', '/api/ai/shares', owner.headers, { familyIds: [family.id] })
     }
     const works = async () => {
@@ -195,13 +194,13 @@ describe('voice logging, adversarially', () => {
     await t.send('PUT', '/api/ai/shares', owner.headers, { familyIds: [] })
     expect(await works()).toBe(false)
     await share()
-    await t.send('DELETE', '/api/ai', owner.headers)
+    await t.send('DELETE', '/api/ai/keys/openrouter', owner.headers)
     expect(await works()).toBe(false)
 
     // A co-owner shares, then is removed from the family.
     const uncle = await t.signIn('舅舅')
     await join(owner.headers, family.id, uncle.headers, 'admin')
-    await t.send('PUT', '/api/ai', uncle.headers, { ...AI, apiKey: SHARED_KEY })
+    await t.saveAi(uncle.headers, SHARED_KEY)
     await t.send('PUT', '/api/ai/shares', uncle.headers, { familyIds: [family.id] })
     expect(await works()).toBe(true)
     await t.send('DELETE', `/api/families/${family.id}/members/${uncle.user.id}`, owner.headers)
@@ -211,18 +210,18 @@ describe('voice logging, adversarially', () => {
   it('starts a new conversation when the key changes, so nothing said reaches the other provider', async () => {
     const owner = await t.signIn('姑姑')
     const family = await newFamily(owner.headers, '姑姑家', ['小柚子'])
-    await t.send('PUT', '/api/ai', owner.headers, { ...AI, apiKey: SHARED_KEY })
+    await t.saveAi(owner.headers, SHARED_KEY)
     await t.send('PUT', '/api/ai/shares', owner.headers, { familyIds: [family.id] })
     const member = await t.signIn('表哥')
     await newFamily(member.headers, '表哥家', ['小芒果'])
     await join(owner.headers, family.id, member.headers)
-    await t.send('PUT', '/api/ai', member.headers, { ...AI, apiKey: KEY })
+    await t.saveAi(member.headers, KEY)
 
     fake.setResponses([{ text: '记住了。' }])
     await chat(member.headers, '我家地址是秘密路 1 号')
     expect(usedKey).toMatch(/0001$/)
     // Without their own key, the family's shared key takes over, in a new conversation.
-    await t.send('DELETE', '/api/ai', member.headers)
+    await t.send('DELETE', '/api/ai/keys/openrouter', member.headers)
     fake.setResponses([
       ({ request }) => {
         sent = JSON.stringify(request.messages)
@@ -238,7 +237,7 @@ describe('voice logging, adversarially', () => {
   it('does not change records on a hostile note or an unclear answer, only on a clear yes', async () => {
     const me = await t.signIn('外婆')
     const family = await newFamily(me.headers, '外婆家', ['小豆子'])
-    await t.send('PUT', '/api/ai', me.headers, { ...AI, apiKey: KEY })
+    await t.saveAi(me.headers, KEY)
     const event = await addEvent(
       me.headers,
       family.babies[0]?.id ?? '',
@@ -257,7 +256,7 @@ describe('voice logging, adversarially', () => {
   it('caps the messages a user sends to the model in a day', async () => {
     const me = await t.signIn('小舅')
     await newFamily(me.headers, '小舅家', ['小苹果'])
-    await t.send('PUT', '/api/ai', me.headers, { ...AI, apiKey: KEY })
+    await t.saveAi(me.headers, KEY)
     fake.setResponses([{ text: '你好。' }])
     await chat(me.headers, '你好')
     await t.env.DB.prepare('update voice_settings set day_count = 200 where user_id = ?')
@@ -277,10 +276,10 @@ describe('voice logging, adversarially', () => {
   it('keeps each user’s conversation to themselves', async () => {
     const a = await t.signIn('甲')
     await newFamily(a.headers, '甲家', ['小甲'])
-    await t.send('PUT', '/api/ai', a.headers, { ...AI, apiKey: KEY })
+    await t.saveAi(a.headers, KEY)
     const b = await t.signIn('乙')
     await newFamily(b.headers, '乙家', ['小乙'])
-    await t.send('PUT', '/api/ai', b.headers, { ...AI, apiKey: KEY })
+    await t.saveAi(b.headers, KEY)
     fake.setResponses([{ text: '好。' }])
     await chat(a.headers, '甲的悄悄话')
     fake.setResponses([

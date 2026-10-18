@@ -18,11 +18,14 @@ export interface SharedAi extends SavedAi {
   name: string
 }
 
+/** The model the user picked, with their key for its provider. */
 export async function readUserAi(db: D1Database, userId: string) {
   return db
     .prepare(
-      `select provider, model, key_cipher as keyCipher, key_hint as keyHint from user_ai
-       where user_id = ?`,
+      `select a.provider, a.model, k.key_cipher as keyCipher, k.key_hint as keyHint
+       from user_ai a
+       join user_ai_keys k on k.user_id = a.user_id and k.provider = a.provider
+       where a.user_id = ?`,
     )
     .bind(userId)
     .first<SavedAi>()
@@ -34,9 +37,10 @@ export async function sharedAis(db: D1Database, familyIds: string[]) {
   const { results } = await db
     .prepare(
       `select s.family_id as familyId, s.user_id as userId, u.name, a.provider, a.model,
-         a.key_cipher as keyCipher, a.key_hint as keyHint
+         k.key_cipher as keyCipher, k.key_hint as keyHint
        from ai_shares s
        join user_ai a on a.user_id = s.user_id
+       join user_ai_keys k on k.user_id = a.user_id and k.provider = a.provider
        join memberships m on m.family_id = s.family_id and m.user_id = s.user_id
        join user u on u.id = s.user_id
        left join family_ai f on f.family_id = s.family_id

@@ -18,7 +18,7 @@ export function FamilyAiCard({ familyId, managing }: { familyId: string; managin
     queryFn: () => aiApi.family(familyId),
   })
   const choose = useMutation({
-    mutationFn: (userId: string) => aiApi.choose(familyId, userId),
+    mutationFn: (userId: string) => aiApi.chooseForFamily(familyId, userId),
     onSuccess: (next) => {
       queryClient.setQueryData(aiKeys.family(familyId), next)
       void queryClient.invalidateQueries({ queryKey: voiceKeys.settings })
