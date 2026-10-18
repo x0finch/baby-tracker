@@ -5,7 +5,7 @@ import { apiFetch } from '../../lib/api'
  * app's add sheet, which asks for the code once. It is added under this name, the default
  * phrase; people with another phrase rename it.
  */
-const SHORTCUT_URL = 'https://www.icloud.com/shortcuts/09428ff8e1e8435a87ced0edfd19aed5'
+const SHORTCUT_URL = 'https://www.icloud.com/shortcuts/99bb2773c34f45348e709d24e82c0af9'
 export const SHORTCUT_NAME = '记录宝宝'
 
 /**
