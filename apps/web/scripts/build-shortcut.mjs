@@ -1,11 +1,12 @@
-// Writes the unsigned Siri shortcut (docs/siri.md). Sign it on a Mac, then commit the result
-// as public/siri/bobo.shortcut:
+// Writes the unsigned Siri shortcut (docs/siri.md). On a Mac, sign it, add it to Shortcuts
+// (leave the code empty) and share it as an iCloud link, which the app opens:
 //
 //   node scripts/build-shortcut.mjs [origin] > 记录宝宝.shortcut
-//   shortcuts sign --mode anyone --input 记录宝宝.shortcut --output public/siri/bobo.shortcut
+//   shortcuts sign --mode anyone --input 记录宝宝.shortcut --output 记录宝宝-signed.shortcut
 //
 // The shortcut asks "要记录什么？", sends the answer to /api/voice/siri with the code pasted
-// on import, reads the reply aloud and asks again until the reply's `next` is "stop".
+// on import, and asks the reply back as the next question until the reply's `next` is
+// "stop", when it says the reply and ends.
 
 import { randomUUID } from 'node:crypto'
 
@@ -40,7 +41,6 @@ const action = (id, parameters = {}) => ({
 
 const codeText = uuid()
 const questionText = uuid()
-const nextQuestion = uuid()
 const asked = uuid()
 const fetched = uuid()
 const reply = uuid()
@@ -73,12 +73,12 @@ const actions = [
     WFDictionaryKey: 'reply',
     WFInput: attachment(output(fetched, 'Contents of URL')),
   }),
-  action('speaktext', { WFText: text(output(reply, 'Dictionary Value')) }),
   action('getvalueforkey', {
     UUID: next,
     WFDictionaryKey: 'next',
     WFInput: attachment(output(fetched, 'Contents of URL')),
   }),
+  // Finished: say the last reply and stop.
   action('conditional', {
     GroupingIdentifier: branch,
     WFControlFlowMode: 0,
@@ -86,13 +86,14 @@ const actions = [
     WFInput: { Type: 'Variable', Variable: attachment(output(next, 'Dictionary Value')) },
     WFConditionalActionString: 'stop',
   }),
+  action('speaktext', { WFText: text(output(reply, 'Dictionary Value')) }),
   action('exit'),
   action('conditional', { GroupingIdentifier: branch, WFControlFlowMode: 2 }),
-  // The reply just spoken already asks the next question ("还有吗？", "要删除…吗？").
-  action('gettext', { UUID: nextQuestion, WFTextActionText: '' }),
+  // Otherwise the reply ("记好了，还有吗？", "要删除…吗？") is the next question. Ask for
+  // Input refuses an empty prompt, and speaking the reply first would say it twice.
   action('setvariable', {
     WFVariableName: '问题',
-    WFInput: attachment(output(nextQuestion, 'Text')),
+    WFInput: attachment(output(reply, 'Dictionary Value')),
   }),
   action('repeat.count', { GroupingIdentifier: repeat, WFControlFlowMode: 2 }),
 ]
