@@ -1,7 +1,16 @@
 import { apiFetch } from '../../lib/api'
 
 /** The signed shortcut people add; it asks for their code once, on adding. */
-export const SHORTCUT_URL = '/siri/bobo.shortcut'
+const SHORTCUT_FILE = '/siri/bobo.shortcut'
+
+/**
+ * Opens the Shortcuts app to import the shortcut, named after the user's phrase. Opening the
+ * file itself would stay inside the installed app, which has no way back.
+ */
+export function shortcutImportUrl(phrase: string) {
+  const file = new URL(SHORTCUT_FILE, window.location.origin).href
+  return `shortcuts://import-shortcut?url=${encodeURIComponent(file)}&name=${encodeURIComponent(phrase)}`
+}
 
 export interface VoiceSettings {
   /** What the user says to Siri, i.e. the name they gave the shortcut. */

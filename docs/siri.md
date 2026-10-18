@@ -85,8 +85,10 @@ with the family if others should use it.
 ### 2. The shortcut (once, on a Mac)
 
 The settings page's "添加到 Siri" button copies the user's code and opens
-`/siri/bobo.shortcut`. That file is one signed shortcut shared by everyone. It asks for the code
-when it is added.
+`shortcuts://import-shortcut?url=<origin>/siri/bobo.shortcut&name=<phrase>`, so the Shortcuts app
+imports the file under the user's phrase. The file is one signed shortcut shared by everyone. It
+asks for the code when it is added. The service worker leaves `/siri/` to the network, so the
+file is never answered with the app shell.
 
 `apps/web/scripts/build-shortcut.mjs` writes the shortcut. Only signing needs the Mac:
 
@@ -112,8 +114,6 @@ What the shortcut does:
       If compares reliably);
    5. clears the question: the reply just spoken already asks the next one ("还有吗？",
       "要删除…吗？").
-
-Users who pick another phrase rename their copy of the shortcut to it.
 
 ### 3. Try it
 

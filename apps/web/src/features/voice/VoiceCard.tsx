@@ -13,9 +13,9 @@ import { useAccess } from '../../sync/use-access'
 import {
   type ChatMessage,
   type ChatTurn,
-  SHORTCUT_URL,
   type VoiceSettings,
   copyWhenReady,
+  shortcutImportUrl,
   voiceApi,
   voiceKeys,
 } from './api'
@@ -133,7 +133,7 @@ function PhraseInput({ settings }: { settings: VoiceSettings }) {
   )
 }
 
-/** Adds the shortcut: creates a code, copies it and opens the shortcut to paste it into. */
+/** Adds the shortcut: creates a code, copies it and opens Shortcuts to import it with the code. */
 function Connect({ settings }: { settings: VoiceSettings }) {
   const queryClient = useQueryClient()
   const refresh = () => queryClient.invalidateQueries({ queryKey: voiceKeys.settings })
@@ -141,7 +141,7 @@ function Connect({ settings }: { settings: VoiceSettings }) {
     mutationFn: async () => {
       const token = voiceApi.createToken().then((created) => created.token)
       await copyWhenReady(token)
-      window.location.assign(SHORTCUT_URL)
+      window.location.assign(shortcutImportUrl(settings.phrase))
     },
     onSettled: refresh,
   })
@@ -153,7 +153,6 @@ function Connect({ settings }: { settings: VoiceSettings }) {
         <ol className="m-0 flex list-decimal flex-col gap-1 pl-5 text-fg-muted">
           <li>{m.voiceStepCopy()}</li>
           <li>{m.voiceStepPaste()}</li>
-          <li>{m.voiceStepRename({ phrase: settings.phrase })}</li>
         </ol>
         <Button
           size="lg"
