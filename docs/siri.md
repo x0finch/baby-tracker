@@ -109,8 +109,9 @@ What the shortcut does:
    1. **Ask for Input** with the question;
    2. **Get Contents of URL**: POST `/api/voice/siri`, header `Authorization` with the code, JSON
       body `{ "text": <the answer> }`;
-   3. when the reply's `next` is `stop` (the same as `done`, as text, which the shortcut's If
-      compares reliably): **Speak Text** with its `reply`, and stop;
+   3. when the reply has `end` (sent only when `done`): **Speak Text** with its `reply`, and
+      stop. The If checks that `end` has any value, which compares nothing: an If comparing
+      text ("is stop") lost the text on current iOS and failed every run;
    4. otherwise the reply ("记好了，还有吗？", "要删除…吗？") becomes the next question. Ask for
       Input refuses an empty prompt, and speaking the reply first would say it twice.
 

@@ -158,6 +158,7 @@ describe('siri voice logging', () => {
       confirming: false,
       reply: expect.stringContaining('口令已失效'),
       next: 'stop',
+      end: '1',
     })
   })
 

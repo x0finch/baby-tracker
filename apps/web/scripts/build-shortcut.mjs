@@ -5,8 +5,8 @@
 //   shortcuts sign --mode anyone --input 记录宝宝.shortcut --output 记录宝宝-signed.shortcut
 //
 // The shortcut asks "要记录什么？", sends the answer to /api/voice/siri with the code pasted
-// on import, and asks the reply back as the next question until the reply's `next` is
-// "stop", when it says the reply and ends.
+// on import, and asks the reply back as the next question until the reply has `end`, when it
+// says the reply and ends.
 
 import { randomUUID } from 'node:crypto'
 
@@ -44,7 +44,7 @@ const questionText = uuid()
 const asked = uuid()
 const fetched = uuid()
 const reply = uuid()
-const next = uuid()
+const end = uuid()
 const repeat = uuid()
 const branch = uuid()
 
@@ -74,17 +74,32 @@ const actions = [
     WFInput: attachment(output(fetched, 'Contents of URL')),
   }),
   action('getvalueforkey', {
-    UUID: next,
-    WFDictionaryKey: 'next',
+    UUID: end,
+    WFDictionaryKey: 'end',
     WFInput: attachment(output(fetched, 'Contents of URL')),
   }),
   // Finished: say the last reply and stop.
+  // Finished when `end` has any value: the condition compares nothing, so it cannot lose a
+  // compared text, as iOS did with "is stop". Current iOS reads WFConditions; the flat keys
+  // are the older form.
   action('conditional', {
     GroupingIdentifier: branch,
     WFControlFlowMode: 0,
-    WFCondition: 4,
-    WFInput: { Type: 'Variable', Variable: attachment(output(next, 'Dictionary Value')) },
-    WFConditionalActionString: 'stop',
+    WFConditions: {
+      Value: {
+        WFActionParameterFilterPrefix: 1,
+        WFActionParameterFilterTemplates: [
+          {
+            WFCondition: 100,
+            WFInput: { Type: 'Variable', Variable: attachment(output(end, 'Dictionary Value')) },
+          },
+        ],
+        WFContentPredicateBoundedDate: false,
+      },
+      WFSerializationType: 'WFContentPredicateTableTemplate',
+    },
+    WFCondition: 100,
+    WFInput: { Type: 'Variable', Variable: attachment(output(end, 'Dictionary Value')) },
   }),
   action('speaktext', { WFText: text(output(reply, 'Dictionary Value')) }),
   action('exit'),
@@ -100,7 +115,7 @@ const actions = [
 
 const shortcut = {
   WFWorkflowActions: actions,
-  WFWorkflowClientVersion: '2302.0.4',
+  WFWorkflowClientVersion: '5037.0.19',
   WFWorkflowMinimumClientVersion: 900,
   WFWorkflowMinimumClientVersionString: '900',
   WFWorkflowHasOutputFallback: false,
