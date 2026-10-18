@@ -27,7 +27,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: 'utf-8' },
       {
         name: 'viewport',
-        content: 'width=device-width, initial-scale=1, viewport-fit=cover',
+        // No pinch zoom, and no zoom into a focused field, like an installed app.
+        content:
+          'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover',
       },
       { name: 'theme-color', content: THEME_COLORS.light },
       { name: 'mobile-web-app-capable', content: 'yes' },
@@ -81,6 +83,12 @@ function RootLayout() {
     const noop = () => undefined
     document.addEventListener('touchstart', noop, { passive: true })
     return () => document.removeEventListener('touchstart', noop)
+  }, [])
+  // iOS ignores user-scalable=no in Safari; its pinch gesture events can still be cancelled.
+  useEffect(() => {
+    const cancel = (event: Event) => event.preventDefault()
+    document.addEventListener('gesturestart', cancel)
+    return () => document.removeEventListener('gesturestart', cancel)
   }, [])
 
   return (
