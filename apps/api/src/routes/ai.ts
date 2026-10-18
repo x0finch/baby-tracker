@@ -2,84 +2,172 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 
 import { type FamilyEnv, familyManager, familyMember, loadAccess } from '../access'
-import { readUserAi, sharedAis } from '../agent/keys'
+import { sharedAis } from '../agent/keys'
 import { fail, json } from '../http'
 import type { AppEnv } from '../types'
-import { AI_PROVIDERS, AiKeyError, decryptKey, encryptKey, keyHint, listModels } from '../voice/ai'
+import {
+  AI_PROVIDERS,
+  type AiModel,
+  AiKeyError,
+  type AiProvider,
+  decryptKey,
+  encryptKey,
+  firstChoice,
+  keyHint,
+  listModels,
+} from '../voice/ai'
 
-const keySchema = z.string().trim().min(8).max(300)
-const modelsSchema = z.object({ provider: z.enum(AI_PROVIDERS), apiKey: keySchema.nullable() })
-const saveSchema = modelsSchema.extend({ model: z.string().trim().min(1).max(120) })
+const providerSchema = z.enum(AI_PROVIDERS)
+const keySchema = z.object({ apiKey: z.string().trim().min(8).max(300) })
+const chooseModelSchema = z.object({
+  provider: providerSchema,
+  model: z.string().trim().min(1).max(120),
+})
 const sharesSchema = z.object({ familyIds: z.array(z.string().max(64)).max(50) })
 const chooseSchema = z.object({ userId: z.string().max(64) })
 
+interface SavedKey {
+  provider: AiProvider
+  keyCipher: string
+  keyHint: string
+}
+
+const readKeys = async (db: D1Database, userId: string) =>
+  (
+    await db
+      .prepare(
+        `select provider, key_cipher as keyCipher, key_hint as keyHint from user_ai_keys
+         where user_id = ? order by provider`,
+      )
+      .bind(userId)
+      .all<SavedKey>()
+  ).results
+
+const saveChoice = (db: D1Database, userId: string, provider: AiProvider, model: string) =>
+  db
+    .prepare(
+      `insert into user_ai (user_id, provider, model, updated_at) values (?, ?, ?, ?)
+       on conflict (user_id) do update set provider = excluded.provider, model = excluded.model,
+         updated_at = excluded.updated_at`,
+    )
+    .bind(userId, provider, model, Date.now())
+
 async function view(db: D1Database, userId: string) {
-  const saved = await readUserAi(db, userId)
-  if (!saved) return null
-  const { results } = await db
-    .prepare('select family_id as familyId from ai_shares where user_id = ? order by created_at')
-    .bind(userId)
-    .all<{ familyId: string }>()
+  const [keys, choice, shares] = await Promise.all([
+    readKeys(db, userId),
+    db
+      .prepare('select provider, model from user_ai where user_id = ?')
+      .bind(userId)
+      .first<{ provider: AiProvider; model: string }>(),
+    db
+      .prepare('select family_id as familyId from ai_shares where user_id = ? order by created_at')
+      .bind(userId)
+      .all<{ familyId: string }>(),
+  ])
   return {
-    provider: saved.provider,
-    model: saved.model,
-    keyHint: saved.keyHint,
-    sharedFamilyIds: results.map((row) => row.familyId),
+    keys: keys.map(({ provider, keyHint: hint }) => ({ provider, keyHint: hint })),
+    /** The model voice commands use; there is always a key for its provider. */
+    choice: choice && keys.some((key) => key.provider === choice.provider) ? choice : null,
+    sharedFamilyIds: shares.results.map((row) => row.familyId),
+  }
+}
+
+type ProviderModels =
+  | { provider: AiProvider; status: 'ok'; models: AiModel[] }
+  | { provider: AiProvider; status: 'invalid' | 'unreachable' }
+
+/** The models each saved key can use; a key that stopped working says so instead. */
+async function modelsFor(secret: string, key: SavedKey): Promise<ProviderModels> {
+  try {
+    const models = await listModels(key.provider, await decryptKey(secret, key.keyCipher))
+    return { provider: key.provider, status: 'ok', models }
+  } catch (error) {
+    if (error instanceof AiKeyError) return { provider: key.provider, status: 'invalid' }
+    console.error('Model list failed', error)
+    return { provider: key.provider, status: 'unreachable' }
   }
 }
 
 /**
- * The user's own AI model for voice logging, which they may share with their families. The
- * key goes in once and never comes back out; only its last characters are shown.
+ * The user's own AI for voice logging: a key per provider, the model in use, and the families
+ * it is shared with. Keys go in once and never come back out; only their last characters are
+ * shown.
  */
 export const userAiRoutes = new Hono<AppEnv>()
   .get('/', async (c) => c.json(await view(c.env.DB, c.get('user').id)))
-  .post('/models', json(modelsSchema), async (c) => {
+  .get('/models', async (c) => {
     const secret = c.env.ENCRYPTION_SECRET
     if (!secret) return c.json({ error: 'not_configured' }, 503)
-    const { provider, apiKey } = c.req.valid('json')
-    let key = apiKey
-    if (key === null) {
-      // Checking again with the saved key, e.g. to pick another model.
-      const saved = await readUserAi(c.env.DB, c.get('user').id)
-      if (!saved || saved.provider !== provider) return c.json({ error: 'invalid_key' }, 400)
-      key = await decryptKey(secret, saved.keyCipher)
-    }
+    const keys = await readKeys(c.env.DB, c.get('user').id)
+    return c.json({ providers: await Promise.all(keys.map((key) => modelsFor(secret, key))) })
+  })
+  // Checks the key, saves it, and on the first key also picks the model to start with.
+  .put('/keys/:provider', json(keySchema), async (c) => {
+    const secret = c.env.ENCRYPTION_SECRET
+    if (!secret) return c.json({ error: 'not_configured' }, 503)
+    const provider = providerSchema.safeParse(c.req.param('provider'))
+    if (!provider.success) fail('not_found')
+    const db = c.env.DB
+    const userId = c.get('user').id
+    const { apiKey } = c.req.valid('json')
+    let models: AiModel[]
     try {
-      return c.json({ models: await listModels(provider, key) })
+      models = await listModels(provider.data, apiKey)
     } catch (error) {
       if (error instanceof AiKeyError) return c.json({ error: 'invalid_key' }, 400)
       throw error
     }
+    const before = await view(db, userId)
+    const first = before.choice ? undefined : firstChoice(models)
+    await db.batch([
+      db
+        .prepare(
+          `insert into user_ai_keys (user_id, provider, key_cipher, key_hint, updated_at)
+           values (?, ?, ?, ?, ?)
+           on conflict (user_id, provider) do update set key_cipher = excluded.key_cipher,
+             key_hint = excluded.key_hint, updated_at = excluded.updated_at`,
+        )
+        .bind(userId, provider.data, await encryptKey(secret, apiKey), keyHint(apiKey), Date.now()),
+      ...(first ? [saveChoice(db, userId, provider.data, first.id)] : []),
+    ])
+    return c.json(await view(db, userId))
   })
-  .put('/', json(saveSchema), async (c) => {
-    const secret = c.env.ENCRYPTION_SECRET
-    if (!secret) return c.json({ error: 'not_configured' }, 503)
+  // Removing the key in use stops voice commands until another model is picked; removing the
+  // last key also ends the shares.
+  .delete('/keys/:provider', async (c) => {
+    const provider = providerSchema.safeParse(c.req.param('provider'))
+    if (!provider.success) fail('not_found')
     const db = c.env.DB
     const userId = c.get('user').id
-    const { provider, model, apiKey } = c.req.valid('json')
-    const saved = await readUserAi(db, userId)
-    let sealed: { keyCipher: string; keyHint: string }
-    if (apiKey !== null)
-      sealed = { keyCipher: await encryptKey(secret, apiKey), keyHint: keyHint(apiKey) }
-    else if (saved && saved.provider === provider) sealed = saved
-    else return c.json({ error: 'invalid_key' }, 400)
-    await db
-      .prepare(
-        `insert into user_ai (user_id, provider, model, key_cipher, key_hint, updated_at)
-         values (?, ?, ?, ?, ?, ?)
-         on conflict (user_id) do update set provider = excluded.provider, model = excluded.model,
-           key_cipher = excluded.key_cipher, key_hint = excluded.key_hint,
-           updated_at = excluded.updated_at`,
-      )
-      .bind(userId, provider, model, sealed.keyCipher, sealed.keyHint, Date.now())
-      .run()
+    await db.batch([
+      db
+        .prepare('delete from user_ai_keys where user_id = ? and provider = ?')
+        .bind(userId, provider.data),
+      db
+        .prepare('delete from user_ai where user_id = ? and provider = ?')
+        .bind(userId, provider.data),
+      db
+        .prepare(
+          `delete from ai_shares where user_id = ?1
+           and not exists (select 1 from user_ai_keys where user_id = ?1)`,
+        )
+        .bind(userId),
+    ])
+    return c.json(await view(db, userId))
+  })
+  .put('/', json(chooseModelSchema), async (c) => {
+    const db = c.env.DB
+    const userId = c.get('user').id
+    const { provider, model } = c.req.valid('json')
+    const keys = await readKeys(db, userId)
+    if (!keys.some((key) => key.provider === provider)) return c.json({ error: 'no_key' }, 400)
+    await saveChoice(db, userId, provider, model).run()
     return c.json(await view(db, userId))
   })
   .put('/shares', json(sharesSchema), async (c) => {
     const db = c.env.DB
     const userId = c.get('user').id
-    if (!(await readUserAi(db, userId))) fail('not_found')
+    if ((await readKeys(db, userId)).length === 0) fail('not_found')
     const access = await loadAccess(db, userId)
     const { familyIds } = c.req.valid('json')
     if (familyIds.some((id) => !access.has(id))) fail('forbidden')
@@ -101,15 +189,6 @@ export const userAiRoutes = new Hono<AppEnv>()
       ),
     ])
     return c.json(await view(db, userId))
-  })
-  .delete('/', async (c) => {
-    const db = c.env.DB
-    const userId = c.get('user').id
-    await db.batch([
-      db.prepare('delete from ai_shares where user_id = ?').bind(userId),
-      db.prepare('delete from user_ai where user_id = ?').bind(userId),
-    ])
-    return c.body(null, 204)
   })
 
 async function familyView(db: D1Database, familyId: string) {

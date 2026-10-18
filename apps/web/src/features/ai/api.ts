@@ -9,11 +9,12 @@ export const PROVIDER_LABEL: Record<AiProvider, string> = {
   openrouter: 'OpenRouter',
 }
 
-/** The user's own AI settings; the key itself never comes back, only its last characters. */
+/** The user's own AI settings; keys never come back, only their last characters. */
 export interface UserAi {
-  provider: AiProvider
-  model: string
-  keyHint: string
+  /** One per provider. */
+  keys: { provider: AiProvider; keyHint: string }[]
+  /** The model voice commands use. */
+  choice: { provider: AiProvider; model: string } | null
   /** Families the user shares it with. */
   sharedFamilyIds: string[]
 }
@@ -25,33 +26,48 @@ export interface FamilyAi {
   shares: { userId: string; name: string; provider: AiProvider; model: string }[]
 }
 
+/** Why a recommended model is recommended. */
+export type ModelTag = 'steady' | 'cheapest' | 'balanced'
+
 export interface AiModel {
   id: string
-  /** Small, fast and good at this job: shown first. */
-  recommended: boolean
+  /** Set on recommended models, which come first. */
+  tag?: ModelTag
+  /** USD per million tokens, where the provider lists it (OpenRouter). */
+  price?: { input: number; output: number }
+  /** False for aliases, snapshots, batch, reasoning and expensive models: shown on request. */
+  everyday: boolean
 }
+
+/** What each saved key can use; a key that stopped working says so. */
+export type ProviderModels =
+  | { provider: AiProvider; status: 'ok'; models: AiModel[] }
+  | { provider: AiProvider; status: 'invalid' | 'unreachable' }
 
 export const aiKeys = {
   mine: ['user-ai'] as const,
+  models: ['user-ai', 'models'] as const,
   family: (familyId: string) => ['family-ai', familyId] as const,
 }
 
 export const aiApi = {
-  get: () => apiFetch<UserAi | null>('/api/ai'),
-  /** Checks a key by listing its models; without a key, uses the saved one. */
-  models: (provider: AiProvider, apiKey: string | null) =>
-    apiFetch<{ models: AiModel[] }>('/api/ai/models', {
-      method: 'POST',
-      body: JSON.stringify({ provider, apiKey }),
+  get: () => apiFetch<UserAi>('/api/ai'),
+  models: () => apiFetch<{ providers: ProviderModels[] }>('/api/ai/models'),
+  /** Checks and saves a key; the first key also picks the model. */
+  saveKey: (provider: AiProvider, apiKey: string) =>
+    apiFetch<UserAi>(`/api/ai/keys/${provider}`, {
+      method: 'PUT',
+      body: JSON.stringify({ apiKey }),
     }),
-  save: (settings: { provider: AiProvider; model: string; apiKey: string | null }) =>
-    apiFetch<UserAi>('/api/ai', { method: 'PUT', body: JSON.stringify(settings) }),
+  removeKey: (provider: AiProvider) =>
+    apiFetch<UserAi>(`/api/ai/keys/${provider}`, { method: 'DELETE' }),
+  choose: (choice: { provider: AiProvider; model: string }) =>
+    apiFetch<UserAi>('/api/ai', { method: 'PUT', body: JSON.stringify(choice) }),
   share: (familyIds: string[]) =>
     apiFetch<UserAi>('/api/ai/shares', { method: 'PUT', body: JSON.stringify({ familyIds }) }),
-  remove: () => apiFetch<void>('/api/ai', { method: 'DELETE' }),
   family: (familyId: string) => apiFetch<FamilyAi>(`/api/families/${familyId}/ai`),
   /** Owners and admins: use this member's shared AI. */
-  choose: (familyId: string, userId: string) =>
+  chooseForFamily: (familyId: string, userId: string) =>
     apiFetch<FamilyAi>(`/api/families/${familyId}/ai`, {
       method: 'PUT',
       body: JSON.stringify({ userId }),

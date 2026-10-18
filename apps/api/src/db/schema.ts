@@ -168,19 +168,30 @@ export const serverKeys = sqliteTable('server_keys', {
   createdAt: integer('created_at').notNull(),
 })
 
-/**
- * A user's own AI model for voice logging. The provider key is encrypted with ENCRYPTION_SECRET
- * (AES-GCM); only its last characters are kept in clear.
- */
+/** The model a user's voice commands use, run with their key for its provider. */
 export const userAi = sqliteTable('user_ai', {
   userId: text('user_id').primaryKey(),
   provider: text('provider', { enum: ['openai', 'openrouter'] }).notNull(),
   model: text('model').notNull(),
-  /** base64url of iv (12 bytes) followed by the ciphertext. */
-  keyCipher: text('key_cipher').notNull(),
-  keyHint: text('key_hint').notNull(),
   updatedAt: integer('updated_at').notNull(),
 })
+
+/**
+ * A user's key for each AI provider, encrypted with ENCRYPTION_SECRET (AES-GCM); only its
+ * last characters are kept in clear.
+ */
+export const userAiKeys = sqliteTable(
+  'user_ai_keys',
+  {
+    userId: text('user_id').notNull(),
+    provider: text('provider', { enum: ['openai', 'openrouter'] }).notNull(),
+    /** base64url of iv (12 bytes) followed by the ciphertext. */
+    keyCipher: text('key_cipher').notNull(),
+    keyHint: text('key_hint').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.provider] })],
+)
 
 /** A user's AI shared with a family: members without their own record there with it. */
 export const aiShares = sqliteTable(

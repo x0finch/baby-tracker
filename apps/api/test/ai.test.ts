@@ -5,15 +5,40 @@ import { createTestApp } from './app'
 
 const SECRET = 'test-ai-key-secret-test-ai-key-secret'
 const KEY = 'sk-or-v1-abcdefghijklmnop1234'
+const OPENAI_KEY = 'sk-proj-abcdefghijklmnopwxyz'
 
-/** OpenRouter as the server sees it: a key check, then the model list. */
-function fakeOpenRouter(valid = true) {
+/** OpenRouter and OpenAI as the server sees them: a key check, then the model list. */
+function fakeProviders(valid = true) {
   return vi.fn<(input: string) => Promise<Response>>(async (url) => {
     if (url.endsWith('/key')) return new Response('{}', { status: valid ? 200 : 401 })
+    if (url.startsWith('https://api.openai.com')) {
+      if (!valid) return new Response('{}', { status: 401 })
+      return Response.json({
+        data: [{ id: 'gpt-5.4-mini' }, { id: 'gpt-5.4-pro' }, { id: 'tts-1' }],
+      })
+    }
     return Response.json({
       data: [
         { id: 'zeta/model', supported_parameters: ['tools'] },
-        { id: 'openai/gpt-5.4-mini', supported_parameters: ['tools'] },
+        {
+          id: 'openai/gpt-5.4-mini',
+          supported_parameters: ['tools'],
+          pricing: { prompt: '0.00000075', completion: '0.0000045' },
+        },
+        {
+          id: 'deepseek/deepseek-v4.1-flash',
+          supported_parameters: ['tools'],
+          pricing: { prompt: '0.00000004', completion: '0.000000144' },
+        },
+        { id: 'deepseek/deepseek-v4.1-flash-1017', supported_parameters: ['tools'] },
+        { id: 'deepseek/deepseek-v4.1-flash:batch', supported_parameters: ['tools'] },
+        { id: '~deepseek/deepseek-flash-latest', supported_parameters: ['tools'] },
+        { id: 'deepseek/deepseek-r1', supported_parameters: ['tools'] },
+        {
+          id: 'big/model',
+          supported_parameters: ['tools'],
+          pricing: { prompt: '0.0000025', completion: '0.000015' },
+        },
         { id: 'old/model', supported_parameters: ['structured_outputs'] },
       ],
     })
@@ -24,10 +49,16 @@ describe('AI settings', () => {
   let t: Awaited<ReturnType<typeof createTestApp>>
   let owner: Headers
   let familyId: string
-  const save = (headers: Headers, model = 'openai/gpt-5.4-mini', apiKey: string | null = KEY) =>
-    t.send('PUT', '/api/ai', headers, { provider: 'openrouter', model, apiKey })
-  const cipher = async () =>
-    (await t.env.DB.prepare('select key_cipher as c from user_ai').first<{ c: string }>())?.c ?? ''
+  const mine = async (headers = owner): Promise<unknown> =>
+    (await t.request('/api/ai', { headers })).json()
+  const addKey = (provider: string, apiKey: string, headers = owner) =>
+    t.send('PUT', `/api/ai/keys/${provider}`, headers, { apiKey })
+  const cipher = async (provider: string) =>
+    (
+      await t.env.DB.prepare('select key_cipher as c from user_ai_keys where provider = ?')
+        .bind(provider)
+        .first<{ c: string }>()
+    )?.c ?? ''
   const family = async (headers = owner): Promise<unknown> =>
     (await t.request(`/api/families/${familyId}/ai`, { headers })).json()
 
@@ -42,45 +73,115 @@ describe('AI settings', () => {
   afterEach(() => vi.unstubAllGlobals())
 
   it('starts empty', async () => {
-    expect(await (await t.request('/api/ai', { headers: owner })).json()).toBeNull()
+    expect(await mine()).toEqual({ keys: [], choice: null, sharedFamilyIds: [] })
     expect(await family()).toEqual({ inUse: null, shares: [] })
   })
 
-  it('checks a key and lists models that can use tools, recommended first', async () => {
-    vi.stubGlobal('fetch', fakeOpenRouter())
-    const res = await t.send('POST', '/api/ai/models', owner, {
-      provider: 'openrouter',
-      apiKey: KEY,
+  it('rejects a bad key without saving it', async () => {
+    vi.stubGlobal('fetch', fakeProviders(false))
+    expect((await addKey('openrouter', KEY)).status).toBe(400)
+    expect(await mine()).toMatchObject({ keys: [], choice: null })
+  })
+
+  it('checks and stores the key encrypted, picking the first recommended model', async () => {
+    vi.stubGlobal('fetch', fakeProviders())
+    expect(await (await addKey('openrouter', KEY)).json()).toEqual({
+      keys: [{ provider: 'openrouter', keyHint: 'sk-or-…1234' }],
+      choice: { provider: 'openrouter', model: 'openai/gpt-5.4-mini' },
+      sharedFamilyIds: [],
     })
+    expect(await cipher('openrouter')).not.toContain(KEY)
+    expect(await decryptKey(SECRET, await cipher('openrouter'))).toBe(KEY)
+  })
+
+  it('keeps a key per provider, and the model in use when adding another', async () => {
+    vi.stubGlobal('fetch', fakeProviders())
+    expect(await (await addKey('openai', OPENAI_KEY)).json()).toMatchObject({
+      keys: [
+        { provider: 'openai', keyHint: 'sk-…wxyz' },
+        { provider: 'openrouter', keyHint: 'sk-or-…1234' },
+      ],
+      choice: { provider: 'openrouter', model: 'openai/gpt-5.4-mini' },
+    })
+    expect(await decryptKey(SECRET, await cipher('openrouter'))).toBe(KEY)
+  })
+
+  it("lists every key's models with prices, recommended first, hiding the unusual", async () => {
+    vi.stubGlobal('fetch', fakeProviders())
+    const res = await t.request('/api/ai/models', { headers: owner })
     expect(await res.json()).toEqual({
-      models: [
-        { id: 'openai/gpt-5.4-mini', recommended: true },
-        { id: 'zeta/model', recommended: false },
+      providers: [
+        {
+          provider: 'openai',
+          status: 'ok',
+          models: [
+            { id: 'gpt-5.4-mini', tag: 'steady', everyday: true },
+            { id: 'gpt-5.4-pro', everyday: false },
+          ],
+        },
+        {
+          provider: 'openrouter',
+          status: 'ok',
+          models: [
+            {
+              id: 'openai/gpt-5.4-mini',
+              tag: 'steady',
+              price: { input: 0.75, output: 4.5 },
+              everyday: true,
+            },
+            {
+              id: 'deepseek/deepseek-v4.1-flash',
+              tag: 'cheapest',
+              price: { input: 0.04, output: 0.144 },
+              everyday: true,
+            },
+            { id: '~deepseek/deepseek-flash-latest', everyday: false },
+            { id: 'big/model', price: { input: 2.5, output: 15 }, everyday: false },
+            { id: 'deepseek/deepseek-r1', everyday: false },
+            { id: 'deepseek/deepseek-v4.1-flash-1017', everyday: false },
+            { id: 'deepseek/deepseek-v4.1-flash:batch', everyday: false },
+            { id: 'zeta/model', everyday: true },
+          ],
+        },
       ],
     })
   })
 
-  it('rejects a bad key', async () => {
-    vi.stubGlobal('fetch', fakeOpenRouter(false))
-    const res = await t.send('POST', '/api/ai/models', owner, {
-      provider: 'openrouter',
-      apiKey: KEY,
-    })
-    expect(res.status).toBe(400)
+  it('says which key stopped working instead of failing the list', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        url.startsWith('https://api.openai.com')
+          ? new Response('{}', { status: 401 })
+          : fakeProviders()(url),
+      ),
+    )
+    const res = await t.request('/api/ai/models', { headers: owner })
+    const { providers } = (await res.json()) as { providers: { status: string }[] }
+    expect(providers.map((entry) => entry.status)).toEqual(['invalid', 'ok'])
   })
 
-  it('stores the key encrypted and only shows its end', async () => {
-    expect(await (await save(owner)).json()).toEqual({
-      provider: 'openrouter',
-      model: 'openai/gpt-5.4-mini',
-      keyHint: 'sk-or-…1234',
+  it('picks a model only for a provider with a key', async () => {
+    const res = await t.send('PUT', '/api/ai', owner, { provider: 'openai', model: 'gpt-5.4-mini' })
+    expect(await res.json()).toMatchObject({
+      choice: { provider: 'openai', model: 'gpt-5.4-mini' },
+    })
+    const other = (await t.signIn('没有 key')).headers
+    const denied = await t.send('PUT', '/api/ai', other, {
+      provider: 'openai',
+      model: 'gpt-5.4-mini',
+    })
+    expect(denied.status).toBe(400)
+  })
+
+  it('removing the key in use clears the model and keeps the other key', async () => {
+    const res = await t.send('DELETE', '/api/ai/keys/openai', owner)
+    expect(await res.json()).toEqual({
+      keys: [{ provider: 'openrouter', keyHint: 'sk-or-…1234' }],
+      choice: null,
       sharedFamilyIds: [],
     })
-    expect(await cipher()).not.toContain(KEY)
-    expect(await decryptKey(SECRET, await cipher())).toBe(KEY)
-    // Changing only the model keeps the saved key.
-    await save(owner, 'zeta/model', null)
-    expect(await decryptKey(SECRET, await cipher())).toBe(KEY)
+    await t.send('PUT', '/api/ai', owner, { provider: 'openrouter', model: 'openai/gpt-5.4-mini' })
   })
 
   it('shares with families the user is in, and families pick whose to use', async () => {
@@ -99,7 +200,7 @@ describe('AI settings', () => {
     })
     const { code } = (await invite.json()) as { code: string }
     await t.send('POST', `/api/invites/${code}/accept`, aunt.headers)
-    await save(aunt.headers)
+    await t.saveAi(aunt.headers, KEY)
     await t.send('PUT', '/api/ai/shares', aunt.headers, { familyIds: [familyId] })
     const shared = (await family(aunt.headers)) as { inUse: string; shares: { name: string }[] }
     expect(shared.shares.map((share) => share.name)).toEqual(['测试家长', '阿姨'])
@@ -119,9 +220,9 @@ describe('AI settings', () => {
     expect(await family()).toMatchObject({ shares: [{ name: '测试家长' }] })
   })
 
-  it('can be removed, which ends its shares', async () => {
-    await t.send('DELETE', '/api/ai', owner)
-    expect(await (await t.request('/api/ai', { headers: owner })).json()).toBeNull()
+  it('removing the last key ends its shares', async () => {
+    await t.send('DELETE', '/api/ai/keys/openrouter', owner)
+    expect(await mine()).toEqual({ keys: [], choice: null, sharedFamilyIds: [] })
     expect(await family()).toEqual({ inUse: null, shares: [] })
   })
 })
