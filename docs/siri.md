@@ -82,44 +82,41 @@ again.
 Then, in the app: Settings → 我的 AI → choose a provider, paste a key, pick a model, and share it
 with the family if others should use it.
 
-### 2. The shortcut (once, on a Mac)
+### 2. The shortcut (shared from iCloud)
 
-The settings page's "添加到 Siri" button copies the user's code and opens
-`/siri/bobo.shortcut` in Safari (from the installed app through `x-safari-https://`, iOS 17+, as
-the app would otherwise open the file inside itself). Safari hands it to the Shortcuts app. The
-file is one signed shortcut shared by everyone, and asks for the code when it is added.
-`public/_headers` serves it as a download named 记录宝宝.shortcut, so it is named after the
-default phrase; users with another phrase rename it. The service worker leaves `/siri/` to the
-network. (The Shortcuts app's `import-shortcut` link only takes iCloud links.)
+The settings page's "添加到 Siri" button copies the user's code and opens the shortcut's iCloud
+link (`SHORTCUT_URL` in `apps/web/src/features/voice/api.ts`). The Shortcuts app shows its add
+sheet, which asks for the code ("请粘贴 Bobo 设置里复制的口令"). The shortcut is shared under the
+name `SHORTCUT_NAME` ("bobo"); people rename it to their phrase.
 
-`apps/web/scripts/build-shortcut.mjs` writes the shortcut. Only signing needs the Mac:
+To change the shortcut:
 
-```sh
-cd apps/web
-node scripts/build-shortcut.mjs > 记录宝宝.shortcut
-shortcuts sign --mode anyone --input 记录宝宝.shortcut --output public/siri/bobo.shortcut
-```
+1. `node apps/web/scripts/build-shortcut.mjs > 记录宝宝.shortcut` writes it (pass another origin
+   to point it at another server). Or edit the shared one in the Shortcuts app.
+2. On a device signed in to iCloud: sign it (`shortcuts sign --mode anyone`, a Mac) and add it,
+   leaving the code empty; check the import question on the first Text action.
+3. Share → Copy iCloud Link, and put the link and the shortcut's name in `api.ts`.
 
-Commit `public/siri/bobo.shortcut`. Until it exists, the "添加到 Siri" button has nothing to
-open. Pass another origin as the script's argument to point the shortcut at another server.
+Signing needs a signed-in iCloud account, so it cannot run on CI. Opening a self-hosted file
+did not work well: an old service worker served the app instead, Safari only downloaded the
+file, and the Shortcuts app's `import-shortcut` link only takes iCloud links.
 
 What the shortcut does:
 
-1. Keeps the code (asked for on import: "请粘贴 Bobo 设置里复制的口令") and the question
-   "要记录什么？".
+1. Keeps the code (asked for on import) and the question "要记录什么？".
 2. Repeats up to 20 times:
    1. **Ask for Input** with the question;
    2. **Get Contents of URL**: POST `/api/voice/siri`, header `Authorization` with the code, JSON
       body `{ "text": <the answer> }`;
-   3. **Speak Text** with the reply's `reply`;
-   4. stops when the reply's `next` is `stop` (the same as `done`, as text, which the shortcut's
-      If compares reliably);
-   5. clears the question: the reply just spoken already asks the next one ("还有吗？",
-      "要删除…吗？").
+   3. when the reply's `next` is `stop` (the same as `done`, as text, which the shortcut's If
+      compares reliably): **Speak Text** with its `reply`, and stop;
+   4. otherwise the reply ("记好了，还有吗？", "要删除…吗？") becomes the next question. Ask for
+      Input refuses an empty prompt, and speaking the reply first would say it twice.
 
 ### 3. Try it
 
 1. Settings → Siri 语音记录 → 试一下, and say something to record.
-2. Tap 添加到 Siri, paste the code when Shortcuts asks, and add the shortcut.
+2. Tap 添加到 Siri, paste the code when Shortcuts asks, add the shortcut and rename it to the
+   phrase.
 3. Say "嘿 Siri，记录宝宝".
 4. Optional: iPhone Settings → Accessibility → Touch → Back Tap → Double Tap → the shortcut.
