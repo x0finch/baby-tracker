@@ -62,6 +62,7 @@ export const accountRoutes = new Hono<AppEnv>().delete('/', async (c) => {
     db.prepare('delete from voice_settings where user_id = ?').bind(userId),
     db.prepare('delete from ai_shares where user_id = ?').bind(userId),
     db.prepare('delete from user_ai where user_id = ?').bind(userId),
+    db.prepare('delete from user_ai_keys where user_id = ?').bind(userId),
     db.prepare('delete from session where user_id = ?').bind(userId),
     db.prepare('delete from account where user_id = ?').bind(userId),
     db.prepare('delete from passkey where user_id = ?').bind(userId),

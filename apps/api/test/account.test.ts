@@ -36,6 +36,12 @@ describe('account deletion', () => {
   it('deletes the user, their sessions and families only they belong to', async () => {
     const { user, headers } = await t.signIn()
     const { familyId, babyId } = await familyWithBaby(headers)
+    await t.env.DB.prepare(
+      `insert into user_ai_keys (user_id, provider, key_cipher, key_hint, updated_at)
+       values (?, 'openai', 'cipher', 'sk-…0000', 0)`,
+    )
+      .bind(user.id)
+      .run()
 
     const res = await t.request('/api/account', { method: 'DELETE', headers })
     expect(res.status).toBe(204)
@@ -44,6 +50,7 @@ describe('account deletion', () => {
     expect(cleared.some((cookie) => cookie.startsWith('better-auth.session_data='))).toBe(true)
 
     expect(await count('select count(*) as n from user where id = ?', user.id)).toBe(0)
+    expect(await count('select count(*) as n from user_ai_keys where user_id = ?', user.id)).toBe(0)
     expect(await count('select count(*) as n from session where user_id = ?', user.id)).toBe(0)
     expect(await count('select count(*) as n from families where id = ?', familyId)).toBe(0)
     expect(await count('select count(*) as n from babies where id = ?', babyId)).toBe(0)

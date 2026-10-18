@@ -69,19 +69,21 @@ function SettingsIndex() {
           summary={remindersSummary}
         />
         <SettingsRow
-          link={{ to: '/settings/voice' }}
-          title={m.voiceTitle()}
-          summary={useVoiceSummary()}
+          link={{ to: '/settings/export' }}
+          title={m.exportTitle()}
+          summary={m.settingsExportSummary()}
         />
+      </SettingsGroup>
+      <SettingsGroup title={m.settingsGroupAi()}>
         <SettingsRow
           link={{ to: '/settings/ai' }}
           title={m.aiMineTitle()}
           summary={useAiSummary()}
         />
         <SettingsRow
-          link={{ to: '/settings/export' }}
-          title={m.exportTitle()}
-          summary={m.settingsExportSummary()}
+          link={{ to: '/settings/voice' }}
+          title={m.voiceTitle()}
+          summary={useVoiceSummary()}
         />
       </SettingsGroup>
       <SettingsGroup title={m.settingsGroupApp()}>
