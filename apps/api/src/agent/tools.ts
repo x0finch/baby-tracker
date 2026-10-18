@@ -224,11 +224,12 @@ export function agentTools(ctx: AgentContext) {
     inputSchema: z.object({}),
     outputSchema: resultSchema,
   }).server(async () => {
-    const result = await undoLastTurn(db, access, userId, ctx.threadId, now)
+    const known = await babies()
+    const babyIds = new Set(known.map((baby) => baby.id))
+    const result = await undoLastTurn(db, access, userId, ctx.threadId, babyIds, now)
     if ('refused' in result)
       return { ok: false, message: REFUSED[result.refused] ?? result.refused }
     if (result.reverted.length === 0) return { ok: false, message: '没有可以撤销的操作。' }
-    const known = await babies()
     return {
       ok: true,
       message: `已撤销：${result.reverted.map((event) => line(event, null, known, timeZone)).join('；')}`,

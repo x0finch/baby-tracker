@@ -9,7 +9,7 @@ import { type AgentScope, type AgentTurn, SESSION_IDLE_MS, runAgent } from '../a
 import type { Env } from '../env'
 import { json } from '../http'
 import type { AppEnv } from '../types'
-import { createToken, revokeToken, tokenStatus, useToken } from '../voice/tokens'
+import { DAILY_LIMIT, createToken, revokeToken, tokenStatus, useToken } from '../voice/tokens'
 
 export const DEFAULT_PHRASE = '记录宝宝'
 const DEFAULT_ZONE = 'Asia/Shanghai'
@@ -115,6 +115,23 @@ async function transcript(db: D1Database, userId: string, now: number) {
   })
 }
 
+/** Counts a message to the model; returns the user's count for the day. */
+async function countMessage(db: D1Database, userId: string, settings: Settings, now: number) {
+  const day = new Date(now).toISOString().slice(0, 10)
+  const row = await db
+    .prepare(
+      `insert into voice_settings (user_id, phrase, time_zone, day, day_count, updated_at)
+       values (?1, ?2, ?3, ?4, 1, ?5)
+       on conflict (user_id) do update set
+         day_count = case when day = excluded.day then day_count + 1 else 1 end,
+         day = excluded.day
+       returning day_count as dayCount`,
+    )
+    .bind(userId, settings.phrase, settings.timeZone, day, now)
+    .first<{ dayCount: number }>()
+  return row?.dayCount ?? 0
+}
+
 /** One message to the user's agent, from the chat box or Siri. */
 async function turn(
   env: Env,
@@ -131,11 +148,14 @@ async function turn(
   const ai = await aiForUser(db, userId, access)
   const adapter = ai ? await adapterFor(env, ai.ai) : null
   if (!ai || !adapter) return stop(REPLIES.noAi)
+  // Siri and the chat box together: nobody runs up their own or a shared key's bill.
+  if ((await countMessage(db, userId, settings, now)) > DAILY_LIMIT) return stop(REPLIES.limited)
   const scope: AgentScope = {
     db,
     access,
     families: families.filter((family) => ai.familyIds.includes(family.id)),
     sharedOnly: ai.kind === 'shared',
+    keyScope: ai.kind === 'own' ? 'own' : `shared:${ai.ai.userId}:${ai.ai.familyId}`,
     userId,
     timeZone: timeZone ?? settings.timeZone,
     phrase: settings.phrase,

@@ -44,6 +44,11 @@ export interface AgentScope {
   families: FamilyAccess[]
   /** Recording only for the family that shared its AI: the user has no key of their own. */
   sharedOnly: boolean
+  /**
+   * Whose key and which families the conversation runs with. A change starts a new
+   * conversation, so what was said with one key never goes to another key's provider.
+   */
+  keyScope: string
   userId: string
   timeZone: string
   phrase: string
@@ -73,20 +78,26 @@ export const threadPrefix = (userId: string) => `voice_${userId}_`
 export async function currentThread(db: D1Database, scope: AgentScope, now: number) {
   const row = await db
     .prepare(
-      'select thread_id as threadId, thread_active_at as activeAt from voice_settings where user_id = ?',
+      `select thread_id as threadId, thread_active_at as activeAt, thread_scope as keyScope
+       from voice_settings where user_id = ?`,
     )
     .bind(scope.userId)
-    .first<{ threadId: string | null; activeAt: number | null }>()
-  const fresh = !row?.threadId || row.activeAt === null || now - row.activeAt > SESSION_IDLE_MS
+    .first<{ threadId: string | null; activeAt: number | null; keyScope: string | null }>()
+  const fresh =
+    !row?.threadId ||
+    row.activeAt === null ||
+    now - row.activeAt > SESSION_IDLE_MS ||
+    row.keyScope !== scope.keyScope
   const threadId = fresh ? `${threadPrefix(scope.userId)}${newId(now)}` : (row.threadId ?? '')
   await db
     .prepare(
-      `insert into voice_settings (user_id, phrase, time_zone, thread_id, thread_active_at, updated_at)
-       values (?1, ?2, ?3, ?4, ?5, ?5)
-       on conflict (user_id) do update set
-         thread_id = excluded.thread_id, thread_active_at = excluded.thread_active_at`,
+      `insert into voice_settings (user_id, phrase, time_zone, thread_id, thread_active_at,
+         thread_scope, updated_at)
+       values (?1, ?2, ?3, ?4, ?5, ?6, ?5)
+       on conflict (user_id) do update set thread_id = excluded.thread_id,
+         thread_active_at = excluded.thread_active_at, thread_scope = excluded.thread_scope`,
     )
-    .bind(scope.userId, scope.phrase, scope.timeZone, threadId, now)
+    .bind(scope.userId, scope.phrase, scope.timeZone, threadId, now, scope.keyScope)
     .run()
   return threadId
 }
@@ -101,9 +112,12 @@ async function confirmQuestion(scope: AgentScope, metadata: Record<string, unkno
       : ''
   const [event] = await eventsByIds(scope.db, [id])
   const babies = await writableBabies(scope.db, scope.families)
-  const what = event
-    ? `${babies.find((baby) => baby.id === event.babyId)?.name ?? ''} ${formatClock(event.startAt, scope.timeZone)} ${describe(event, null)}`
-    : '这条记录'
+  // Nothing about a record outside the user's babies, whatever id the model passed.
+  const baby = event && babies.find((item) => item.id === event.babyId)
+  const what =
+    event && baby
+      ? `${baby.name} ${formatClock(event.startAt, scope.timeZone)} ${describe(event, null)}`
+      : '这条记录'
   return toolName === 'delete_event' ? `要删除「${what}」吗？` : `要修改「${what}」吗？`
 }
 

@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "68d630fb-b7be-439d-973a-51d041bb0b28",
+  "id": "114fd20e-fa0d-418f-b243-b2cafdbdce6d",
   "prevId": "b9cfe7da-1d93-4540-94be-a66851f58036",
   "tables": {
     "ai_shares": {
@@ -1120,6 +1120,29 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "thread_scope": {
+          "name": "thread_scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "day": {
+          "name": "day",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "day_count": {
+          "name": "day_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         },
         "updated_at": {
           "name": "updated_at",

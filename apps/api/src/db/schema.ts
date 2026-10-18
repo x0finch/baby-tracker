@@ -215,6 +215,11 @@ export const voiceSettings = sqliteTable('voice_settings', {
   timeZone: text('time_zone').notNull(),
   threadId: text('thread_id'),
   threadActiveAt: integer('thread_active_at'),
+  /** Whose key and families the thread runs with; a change starts a new thread. */
+  threadScope: text('thread_scope'),
+  /** Messages on `day` (UTC date) from Siri and the chat box, for the daily cap. */
+  day: text('day').notNull().default(''),
+  dayCount: integer('day_count').notNull().default(0),
   updatedAt: integer('updated_at').notNull(),
 })
 

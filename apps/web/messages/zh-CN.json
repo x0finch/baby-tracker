@@ -33,7 +33,7 @@
   "aiRecommended": "{model}（推荐）",
   "aiRemove": "删除我的 AI",
   "aiSetUp": "设置",
-  "aiShareHint": "分享后，家里没填自己 key 的人也能用 Siri 给这个家庭记录，费用从你的 key 扣。key 本身不会给任何人看到。",
+  "aiShareHint": "分享后，家里没填自己 key 的人也能用 Siri 给这个家庭记录，费用从你的 key 扣。他们说的话会经过你的 AI 服务商处理；key 本身不会给任何人看到。",
   "aiShareTitle": "分享给家庭",
   "aiSignedOut": "登录后可以设置自己的 AI，用来让 Siri 帮你记录。",
   "aiSummaryOff": "未设置",

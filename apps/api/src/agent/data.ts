@@ -154,13 +154,14 @@ export async function writeChanges(
 
 /**
  * Reverts the latest turn in the thread that changed anything: added events are deleted,
- * changed ones put back. Returns how many events were reverted.
+ * changed ones put back, if all of them belong to `babyIds`. Returns the events reverted.
  */
 export async function undoLastTurn(
   db: D1Database,
   access: Access,
   userId: string,
   threadId: string,
+  babyIds: ReadonlySet<string>,
   now: number,
 ): Promise<{ reverted: Event[] } | { refused: string }> {
   const last = await db
@@ -186,6 +187,8 @@ export async function undoLastTurn(
   for (const op of ops) {
     const stored = current.get(op.eventId)
     if (!stored) continue
+    // Only babies this turn may act on, even if the thread once had others.
+    if (!babyIds.has(stored.babyId)) return { refused: 'forbidden' }
     const before = op.before === null ? null : parseEvent(JSON.parse(op.before))
     const event = before
       ? { ...before, updatedAt: now }

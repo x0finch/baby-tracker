@@ -53,6 +53,7 @@ describe('voice agent', () => {
       access,
       families: [access.get(family.id)!],
       sharedOnly: false,
+      keyScope: 'own',
       userId: signedIn.user.id,
       timeZone: 'Asia/Shanghai',
       phrase: '记录宝宝',

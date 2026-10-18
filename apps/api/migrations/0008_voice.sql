@@ -78,6 +78,9 @@ CREATE TABLE `voice_settings` (
 	`time_zone` text NOT NULL,
 	`thread_id` text,
 	`thread_active_at` integer,
+	`thread_scope` text,
+	`day` text DEFAULT '' NOT NULL,
+	`day_count` integer DEFAULT 0 NOT NULL,
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
