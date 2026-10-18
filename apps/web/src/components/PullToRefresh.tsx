@@ -20,7 +20,7 @@ type Phase = 'idle' | 'pulling' | 'ready' | 'refreshing' | 'done' | 'failed'
 const rubber = (dy: number) => MAX_PULL * (1 - Math.exp(-dy / (MAX_PULL * 1.6)))
 
 /**
- * Pull down at the top of the page to sync now. The page itself does not bounce (body has
+ * Pull down at the top of the page to sync now; coming back to the app does the same. The page itself does not bounce (body has
  * overscroll-behavior: none), so the pull is drawn here: a bold arrow that turns when
  * letting go would refresh, a spin while syncing, then a tick.
  */
@@ -60,14 +60,8 @@ export function PullToRefresh({ children }: { children: ReactNode }) {
       pull.set(value)
       set(value >= THRESHOLD ? 'ready' : 'pulling')
     }
-    const finish = async () => {
-      if (startY === null) return
-      startY = null
-      if (phaseRef.current !== 'ready') {
-        set('idle')
-        void settle(0)
-        return
-      }
+    /** Holds the page open, syncs, shows how it went, then springs back. */
+    const refresh = async () => {
       set('refreshing')
       void settle(THRESHOLD)
       await Promise.all([requestSync(), new Promise((done) => setTimeout(done, MIN_SPIN_MS))])
@@ -77,6 +71,23 @@ export function PullToRefresh({ children }: { children: ReactNode }) {
       await settle(0)
       set('idle')
     }
+    const finish = async () => {
+      if (startY === null) return
+      startY = null
+      if (phaseRef.current === 'ready') {
+        await refresh()
+        return
+      }
+      set('idle')
+      void settle(0)
+    }
+    // Coming back to the app refreshes as if pulled, so it shows that the records are fresh.
+    // Away from the top, or with a sheet open, the sync runner still syncs quietly.
+    const onForeground = () => {
+      if (document.visibilityState !== 'visible' || phaseRef.current !== 'idle') return
+      if (window.scrollY > 0 || document.querySelector('dialog[open]')) return
+      void refresh()
+    }
 
     const onEnd = () => void finish()
 
@@ -84,7 +95,11 @@ export function PullToRefresh({ children }: { children: ReactNode }) {
     window.addEventListener('touchmove', onMove, { passive: true })
     window.addEventListener('touchend', onEnd)
     window.addEventListener('touchcancel', onEnd)
+    document.addEventListener('visibilitychange', onForeground)
+    window.addEventListener('focus', onForeground)
     return () => {
+      document.removeEventListener('visibilitychange', onForeground)
+      window.removeEventListener('focus', onForeground)
       window.removeEventListener('touchstart', onStart)
       window.removeEventListener('touchmove', onMove)
       window.removeEventListener('touchend', onEnd)
