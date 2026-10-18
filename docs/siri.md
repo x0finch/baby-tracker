@@ -85,10 +85,12 @@ with the family if others should use it.
 ### 2. The shortcut (once, on a Mac)
 
 The settings page's "添加到 Siri" button copies the user's code and opens
-`shortcuts://import-shortcut?url=<origin>/siri/bobo.shortcut&name=<phrase>`, so the Shortcuts app
-imports the file under the user's phrase. The file is one signed shortcut shared by everyone. It
-asks for the code when it is added. The service worker leaves `/siri/` to the network, so the
-file is never answered with the app shell.
+`/siri/bobo.shortcut` in Safari (from the installed app through `x-safari-https://`, iOS 17+, as
+the app would otherwise open the file inside itself). Safari hands it to the Shortcuts app. The
+file is one signed shortcut shared by everyone, and asks for the code when it is added.
+`public/_headers` serves it as a download named 记录宝宝.shortcut, so it is named after the
+default phrase; users with another phrase rename it. The service worker leaves `/siri/` to the
+network. (The Shortcuts app's `import-shortcut` link only takes iCloud links.)
 
 `apps/web/scripts/build-shortcut.mjs` writes the shortcut. Only signing needs the Mac:
 

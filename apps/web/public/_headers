@@ -1,0 +1,5 @@
+# Served by Cloudflare static assets. The Siri shortcut downloads as 记录宝宝.shortcut, so the
+# Shortcuts app names it after the default phrase.
+/siri/*
+  Content-Type: application/octet-stream
+  Content-Disposition: attachment; filename="bobo.shortcut"; filename*=UTF-8''%E8%AE%B0%E5%BD%95%E5%AE%9D%E5%AE%9D.shortcut
