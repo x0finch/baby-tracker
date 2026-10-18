@@ -121,10 +121,10 @@ interface ChatLine {
 }
 
 /** What a conversation shows: what the user said and the answers, not tool calls. */
-function visibleLines(threadId: string, json: string): ChatLine[] {
+function visibleLines(threadId: string, messagesJson: string): ChatLine[] {
   let messages: ModelMessage[]
   try {
-    messages = JSON.parse(json)
+    messages = JSON.parse(messagesJson)
   } catch {
     return []
   }
@@ -154,6 +154,8 @@ async function transcript(db: D1Database, userId: string, now: number, before?: 
   let upTo = fromCursor
   let inclusive = true
   while (wanted > 0) {
+    // One batch after another: each starts where the last ended, and most pages need one.
+    // oxlint-disable-next-line no-await-in-loop
     const { results } = await db
       .prepare(
         `select thread_id as threadId, messages_json as json from chat_threads
@@ -165,10 +167,10 @@ async function transcript(db: D1Database, userId: string, now: number, before?: 
       .all<{ threadId: string; json: string }>()
     for (const row of results) {
       const all = visibleLines(row.threadId, row.json)
-      const stop = row.threadId === fromCursor && end >= 0 ? Math.min(end, all.length) : all.length
-      const start = Math.max(0, stop - wanted)
-      lines.unshift(...all.slice(start, stop))
-      wanted -= stop - start
+      const until = row.threadId === fromCursor && end >= 0 ? Math.min(end, all.length) : all.length
+      const start = Math.max(0, until - wanted)
+      lines.unshift(...all.slice(start, until))
+      wanted -= until - start
       if (wanted === 0) {
         next = `${row.threadId}~${start}`
         break
