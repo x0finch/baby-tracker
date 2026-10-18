@@ -4,11 +4,14 @@ import { openaiCompatibleText } from '@tanstack/ai-openai/compatible'
 export const AI_PROVIDERS = ['openai', 'openrouter'] as const
 export type AiProvider = (typeof AI_PROVIDERS)[number]
 
+/** Why a recommended model is: shown next to it. */
+export type ModelTag = 'steady' | 'cheapest' | 'balanced'
+
 interface ProviderInfo {
   baseURL: string
   api: 'responses' | 'chat-completions'
-  /** Shown first and preselected: small, fast, cheap, with strict structured outputs. */
-  recommended: string[]
+  /** Shown first, in this order: small, fast, cheap, with strict structured outputs. */
+  recommended: [string, ModelTag][]
   /** Which listed models can run the assistant (chat models that call tools). */
   usable: (model: ListedModel) => boolean
   /** A cheap request that fails with a bad key. */
@@ -18,13 +21,18 @@ interface ProviderInfo {
 interface ListedModel {
   id: string
   supported_parameters?: string[]
+  /** OpenRouter only: USD per token, as strings. */
+  pricing?: { prompt?: string; completion?: string }
 }
 
 const PROVIDERS: Record<AiProvider, ProviderInfo> = {
   openai: {
     baseURL: 'https://api.openai.com/v1',
     api: 'responses',
-    recommended: ['gpt-5.4-mini', 'gpt-5.4-nano'],
+    recommended: [
+      ['gpt-5.4-mini', 'steady'],
+      ['gpt-5.4-nano', 'balanced'],
+    ],
     usable: ({ id }) =>
       /^(gpt-|o\d)/.test(id) && !/(audio|realtime|image|tts|transcribe|search)/.test(id),
     keyCheck: 'https://api.openai.com/v1/models',
@@ -32,16 +40,64 @@ const PROVIDERS: Record<AiProvider, ProviderInfo> = {
   openrouter: {
     baseURL: 'https://openrouter.ai/api/v1',
     api: 'chat-completions',
-    recommended: ['openai/gpt-5.4-mini', 'google/gemini-3-flash', 'openai/gpt-5.4-nano'],
+    recommended: [
+      ['openai/gpt-5.4-mini', 'steady'],
+      ['deepseek/deepseek-v4.1-flash', 'cheapest'],
+      ['openai/gpt-5.4-nano', 'balanced'],
+    ],
     usable: ({ supported_parameters: params = [] }) => params.includes('tools'),
     keyCheck: 'https://openrouter.ai/api/v1/key',
   },
 }
 
+/** USD per million tokens. */
+export interface ModelPrice {
+  input: number
+  output: number
+}
+
+export interface AiModel {
+  id: string
+  /** Set on the recommended ones, which come first. */
+  tag?: ModelTag
+  /** Only where the provider lists prices (OpenRouter). */
+  price?: ModelPrice
+  /**
+   * Fits everyday logging. The others are listed only on request: aliases whose model can
+   * change (~…, …-latest), pinned snapshots, batch variants that cannot answer at once,
+   * reasoning models that keep Siri waiting, and expensive ones.
+   */
+  everyday: boolean
+}
+
+/** Over either of these (USD per million tokens), a model costs more than logging needs. */
+const PRICEY = { input: 2, output: 10 }
+
+const perMillion = (value: string | undefined) => {
+  const parsed = Number(value)
+  return value !== undefined && Number.isFinite(parsed) ? Math.round(parsed * 1e9) / 1e3 : null
+}
+
+function priceOf(model: ListedModel): ModelPrice | undefined {
+  const input = perMillion(model.pricing?.prompt)
+  const output = perMillion(model.pricing?.completion)
+  return input !== null && output !== null && input >= 0 && output >= 0
+    ? { input, output }
+    : undefined
+}
+
+function everyday(id: string, price: ModelPrice | undefined) {
+  const name = id.slice(id.indexOf('/') + 1)
+  if (id.startsWith('~') || /:batch$|-latest$/.test(id)) return false
+  if (/-(\d{4}|\d{8}|\d{4}-\d{2}-\d{2})(:|$)/.test(name)) return false
+  if (/(^|-)(o\d|r1|pro)(-|:|$)|thinking|reasoner|deep-research/.test(name)) return false
+  return !price || (price.input <= PRICEY.input && price.output <= PRICEY.output)
+}
+
 export class AiKeyError extends Error {}
 
 /** Checks a key and lists the models it can use for voice commands, recommended first. */
-export async function listModels(provider: AiProvider, apiKey: string) {
+export async function listModels(provider: AiProvider, apiKey: string): Promise<AiModel[]> {
   const info = PROVIDERS[provider]
   const auth = { Authorization: `Bearer ${apiKey}` }
   const check = await fetch(info.keyCheck, { headers: auth })
@@ -54,16 +110,22 @@ export async function listModels(provider: AiProvider, apiKey: string) {
     typeof body === 'object' && body !== null && 'data' in body && Array.isArray(body.data)
       ? body.data
       : []
-  const ids = data
+  const listed = data
     .filter((item): item is ListedModel => typeof item?.id === 'string')
     .filter(info.usable)
-    .map((item) => item.id)
-  const recommended = info.recommended.filter((id) => ids.includes(id))
-  const rest = ids.filter((id) => !recommended.includes(id)).toSorted()
-  return [
-    ...recommended.map((id) => ({ id, recommended: true })),
-    ...rest.map((id) => ({ id, recommended: false })),
-  ]
+  const tags = new Map(info.recommended)
+  const models = listed.map((item) => {
+    const price = priceOf(item)
+    const tag = tags.get(item.id)
+    const model: AiModel = { id: item.id, everyday: Boolean(tag) || everyday(item.id, price) }
+    if (tag) model.tag = tag
+    if (price) model.price = price
+    return model
+  })
+  const rank = (model: AiModel) => info.recommended.findIndex(([id]) => id === model.id)
+  const recommended = models.filter((model) => model.tag).toSorted((a, b) => rank(a) - rank(b))
+  const rest = models.filter((model) => !model.tag).toSorted((a, b) => a.id.localeCompare(b.id))
+  return [...recommended, ...rest]
 }
 
 /**
@@ -73,6 +135,10 @@ export async function listModels(provider: AiProvider, apiKey: string) {
  */
 export const modelOptionsFor = (provider: AiProvider): Record<string, unknown> | undefined =>
   provider === 'openrouter' ? { provider: { require_parameters: true } } : undefined
+
+/** The model to start with: the first recommended one this key can use. */
+export const firstChoice = (models: AiModel[]) =>
+  models.find((model) => model.tag) ?? models.find((model) => model.everyday) ?? models[0]
 
 /** The model adapter for saved AI settings. */
 export function aiAdapter(provider: AiProvider, model: string, apiKey: string) {

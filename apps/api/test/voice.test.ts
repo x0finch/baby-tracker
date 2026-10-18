@@ -28,7 +28,7 @@ const action = (overrides: Partial<VoiceAction>): VoiceAction => ({
   ...overrides,
 })
 
-const AI = { provider: 'openrouter', model: 'openai/gpt-5.4-mini', apiKey: 'sk-or-v1-0123456789' }
+const KEY = 'sk-or-v1-0123456789'
 
 describe('siri voice logging', () => {
   let t: Awaited<ReturnType<typeof createTestApp>>
@@ -115,7 +115,7 @@ describe('siri voice logging', () => {
     expect(result).toMatchObject({ done: true, reply: expect.stringMatching(/还没有可用的 AI/) })
     const settings: unknown = await (await t.request('/api/voice', { headers })).json()
     expect(settings).toMatchObject({ ai: null })
-    await t.send('PUT', '/api/ai', headers, AI)
+    await t.saveAi(headers, KEY)
   })
 
   it('keeps the phrase and shows the code only when created', async () => {
@@ -232,7 +232,7 @@ describe('siri voice logging', () => {
   it('stops working when the password changes', async () => {
     const parent = await t.signIn('爸爸')
     await newFamily(parent.headers, '爸爸家', '小核桃')
-    await t.send('PUT', '/api/ai', parent.headers, AI)
+    await t.saveAi(parent.headers, KEY)
     const ctx = await t.auth.$context
     const userId = parent.user.id
     await ctx.internalAdapter.linkAccount({
@@ -279,7 +279,7 @@ describe('siri voice logging', () => {
     const theirs = await newFamily(grandma.headers, '奶奶家', '小橙子')
     await join(grandma.headers, theirs, aunt.headers)
     // Grandma's family is joined later but is the only one with a shared AI.
-    await t.send('PUT', '/api/ai', grandma.headers, { ...AI, apiKey: 'sk-or-v1-grandma-key' })
+    await t.saveAi(grandma.headers, 'sk-or-v1-grandma-key')
     await t.send('PUT', '/api/ai/shares', grandma.headers, { familyIds: [theirs] })
 
     const settings = await (await t.request('/api/voice', { headers: aunt.headers })).json()
@@ -298,7 +298,7 @@ describe('siri voice logging', () => {
   it('forgets the conversations when the account is deleted', async () => {
     const parent = await t.signIn('舅舅')
     await newFamily(parent.headers, '舅舅家', '小葡萄')
-    await t.send('PUT', '/api/ai', parent.headers, AI)
+    await t.saveAi(parent.headers, KEY)
     fake.setResponses([{ text: '你好。' }])
     await t.send('POST', '/api/voice/chat', parent.headers, { text: '你好' })
     const count = async () =>

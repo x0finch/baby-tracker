@@ -64,5 +64,20 @@ export async function createTestApp(
       body: body === undefined ? undefined : JSON.stringify(body),
     })
 
-  return { app, env, auth, request, send, signIn, queries, dispose }
+  /**
+   * Adds an AI key as the settings page does, with the provider faked: the first key also
+   * picks the model, openai/gpt-5.4-mini on OpenRouter.
+   */
+  async function saveAi(headers: Headers, apiKey: string, provider = 'openrouter') {
+    const real = globalThis.fetch
+    globalThis.fetch = async () =>
+      Response.json({ data: [{ id: 'openai/gpt-5.4-mini', supported_parameters: ['tools'] }] })
+    try {
+      return await send('PUT', `/api/ai/keys/${provider}`, headers, { apiKey })
+    } finally {
+      globalThis.fetch = real
+    }
+  }
+
+  return { app, env, auth, request, send, signIn, saveAi, queries, dispose }
 }
