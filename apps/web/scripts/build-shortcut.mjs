@@ -5,8 +5,8 @@
 //   shortcuts sign --mode anyone --input 记录宝宝.shortcut --output 记录宝宝-signed.shortcut
 //
 // The shortcut asks "要记录什么？", sends the answer to /api/voice/siri with the code pasted
-// on import, and asks the reply back as the next question until the reply's `next` is
-// "stop", when it says the reply and ends.
+// on import, and asks the reply back as the next question until the reply has `end`, when it
+// says the reply and ends.
 
 import { randomUUID } from 'node:crypto'
 
@@ -16,13 +16,6 @@ const uuid = () => randomUUID().toUpperCase()
 // Values inside parameters: a named variable, an earlier action's output, or text with them.
 const variable = (name) => ({ Type: 'Variable', VariableName: name })
 const output = (id, name) => ({ Type: 'ActionOutput', OutputUUID: id, OutputName: name })
-/** An output read as text, so conditions compare it as text. */
-const asText = (value) => ({
-  ...value,
-  Aggrandizements: [
-    { Type: 'WFCoercionVariableAggrandizement', CoercionItemClass: 'WFStringContentItem' },
-  ],
-})
 const attachment = (value) => ({ Value: value, WFSerializationType: 'WFTextTokenAttachment' })
 const text = (value) =>
   typeof value === 'string'
@@ -51,7 +44,7 @@ const questionText = uuid()
 const asked = uuid()
 const fetched = uuid()
 const reply = uuid()
-const next = uuid()
+const end = uuid()
 const repeat = uuid()
 const branch = uuid()
 
@@ -81,13 +74,14 @@ const actions = [
     WFInput: attachment(output(fetched, 'Contents of URL')),
   }),
   action('getvalueforkey', {
-    UUID: next,
-    WFDictionaryKey: 'next',
+    UUID: end,
+    WFDictionaryKey: 'end',
     WFInput: attachment(output(fetched, 'Contents of URL')),
   }),
   // Finished: say the last reply and stop.
-  // Current iOS reads the condition from WFConditions; the flat keys are its older form.
-  // A Dictionary Value has no type of its own, so it is read as text to compare with "stop".
+  // Finished when `end` has any value: the condition compares nothing, so it cannot lose a
+  // compared text, as iOS did with "is stop". Current iOS reads WFConditions; the flat keys
+  // are the older form.
   action('conditional', {
     GroupingIdentifier: branch,
     WFControlFlowMode: 0,
@@ -96,21 +90,16 @@ const actions = [
         WFActionParameterFilterPrefix: 1,
         WFActionParameterFilterTemplates: [
           {
-            WFCondition: 4,
-            WFConditionalActionString: 'stop',
-            WFInput: {
-              Type: 'Variable',
-              Variable: attachment(asText(output(next, 'Dictionary Value'))),
-            },
+            WFCondition: 100,
+            WFInput: { Type: 'Variable', Variable: attachment(output(end, 'Dictionary Value')) },
           },
         ],
         WFContentPredicateBoundedDate: false,
       },
       WFSerializationType: 'WFContentPredicateTableTemplate',
     },
-    WFCondition: 4,
-    WFInput: { Type: 'Variable', Variable: attachment(asText(output(next, 'Dictionary Value'))) },
-    WFConditionalActionString: 'stop',
+    WFCondition: 100,
+    WFInput: { Type: 'Variable', Variable: attachment(output(end, 'Dictionary Value')) },
   }),
   action('speaktext', { WFText: text(output(reply, 'Dictionary Value')) }),
   action('exit'),
