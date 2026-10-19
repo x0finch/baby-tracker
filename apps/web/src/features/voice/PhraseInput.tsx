@@ -1,20 +1,19 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
-import { FormError } from '../../components/ui/FormError'
 import { Input } from '../../components/ui/Input'
+import { useOptimisticMutation } from '../../lib/optimistic'
 import { m } from '../../paraglide/messages.js'
 import { type VoiceSettings, voiceApi } from './api'
 import { voiceKeys } from './queries'
 
 /** What the user says to Siri; the shortcut must carry the same name. */
 export function PhraseInput({ settings }: { settings: VoiceSettings }) {
-  const queryClient = useQueryClient()
   const [phrase, setPhrase] = useState(settings.phrase)
-  const save = useMutation({
+  const save = useOptimisticMutation({
+    queryKey: voiceKeys.settings,
     mutationFn: voiceApi.rename,
-    onSuccess: (next) => queryClient.setQueryData(voiceKeys.settings, next),
-    onError: () => setPhrase(settings.phrase),
+    apply: (current: VoiceSettings, next: string) => ({ ...current, phrase: next }),
+    onRefused: (restored) => setPhrase(restored?.phrase ?? settings.phrase),
   })
   return (
     <div className="flex flex-col gap-2">
@@ -30,7 +29,6 @@ export function PhraseInput({ settings }: { settings: VoiceSettings }) {
         }}
       />
       <p className="m-0 text-fg-muted">{m.voiceSay({ phrase: settings.phrase })}</p>
-      {save.isError && <FormError>{m.actionFailed()}</FormError>}
     </div>
   )
 }

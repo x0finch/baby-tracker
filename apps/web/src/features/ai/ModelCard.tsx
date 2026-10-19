@@ -1,11 +1,9 @@
-import { useMutation } from '@tanstack/react-query'
 import { clsx } from 'clsx'
 import { useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
 import { Card, CardTitle } from '../../components/ui/Card'
 import { Chevron } from '../../components/ui/Chevron'
-import { FormError } from '../../components/ui/FormError'
 import { Input } from '../../components/ui/Input'
 import { ListRow } from '../../components/ui/ListRow'
 import { Pill } from '../../components/ui/Pill'
@@ -20,7 +18,7 @@ import {
   type UserAi,
   aiApi,
 } from './api'
-import { useSaved } from './use-saved'
+import { useAiChange } from './use-saved'
 
 /** The model in use; tapping opens the picker. */
 export function ModelCard({
@@ -105,16 +103,12 @@ function ModelPicker({
   loading: boolean
   onDone: () => void
 }) {
-  const onSaved = useSaved()
   const [query, setQuery] = useState('')
   const [showAll, setShowAll] = useState(false)
-  const pick = useMutation({
-    mutationFn: aiApi.choose,
-    onSuccess: (saved) => {
-      onSaved(saved)
-      onDone()
-    },
-  })
+  const pick = useAiChange(aiApi.choose, (ai, picked: { provider: AiProvider; model: string }) => ({
+    ...ai,
+    choice: picked,
+  }))
 
   const all: Listed[] = providers.flatMap((entry) =>
     entry.status === 'ok'
@@ -157,8 +151,10 @@ function ModelPicker({
       label={inGroup ? model.id.replace(`${vendorOf(model)}/`, '') : model.id}
       showProvider={bothKeys && !inGroup}
       selected={isChoice(model)}
-      disabled={pick.isPending}
-      onPick={() => pick.mutate({ provider: model.provider, model: model.id })}
+      onPick={() => {
+        pick.mutate({ provider: model.provider, model: model.id })
+        onDone()
+      }}
     />
   )
 
@@ -176,7 +172,6 @@ function ModelPicker({
           {m.aiModelsMissing({ provider: PROVIDER_LABEL[entry.provider] })}
         </p>
       ))}
-      {pick.isError && <FormError>{m.actionFailed()}</FormError>}
       {loading ? (
         <p className="m-0 text-fg-muted">{m.aiModelsLoading()}</p>
       ) : (
@@ -220,14 +215,12 @@ function ModelRow({
   label,
   showProvider,
   selected,
-  disabled,
   onPick,
 }: {
   model: Listed
   label: string
   showProvider: boolean
   selected: boolean
-  disabled: boolean
   onPick: () => void
 }) {
   const { price, tag } = model
@@ -237,7 +230,6 @@ function ModelRow({
         // Picking saves at once, so these stay buttons (radio arrow keys would save on every
         // key); the model in use is marked current.
         aria-current={selected || undefined}
-        disabled={disabled}
         onClick={onPick}
         title={
           <>
