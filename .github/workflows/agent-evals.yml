@@ -19,6 +19,10 @@ on:
         description: Only scenarios whose name contains this
         required: false
         default: ''
+      concurrency:
+        description: Scenarios played at once (1 for a key with a low rate limit)
+        required: false
+        default: '4'
   schedule:
     # Mondays 02:17 UTC.
     - cron: '17 2 * * 1'
@@ -37,6 +41,7 @@ jobs:
       EVAL_MODELS: ${{ inputs.models }}
       EVAL_RUNS: ${{ inputs.runs || '3' }}
       EVAL_ONLY: ${{ inputs.only }}
+      EVAL_CONCURRENCY: ${{ inputs.concurrency || '4' }}
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6

@@ -245,7 +245,7 @@ async function turn(
     userId,
     timeZone: timeZone ?? settings.timeZone,
     phrase: settings.phrase,
-    modelOptions: modelOptionsFor(ai.ai.provider),
+    modelOptions: modelOptionsFor(ai.ai.provider, ai.ai.model),
   }
   return runAgent(adapter, scope, text, now)
 }
