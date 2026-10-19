@@ -3,7 +3,7 @@ import { clsx } from 'clsx'
 import { useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
-import { Card } from '../../components/ui/Card'
+import { Card, CardTitle } from '../../components/ui/Card'
 import { FormError } from '../../components/ui/FormError'
 import { Input } from '../../components/ui/Input'
 import { Sheet } from '../../components/ui/Sheet'
@@ -29,7 +29,7 @@ export function KeysCard({ ai, providers }: { ai: UserAi; providers?: ProviderMo
   }
   return (
     <Card as="section" className="flex flex-col gap-1">
-      <h2 className="m-0 text-body font-extrabold">{m.aiKeysTitle()}</h2>
+      <CardTitle small>{m.aiKeysTitle()}</CardTitle>
       <ul className="m-0 flex list-none flex-col p-0">
         {AI_PROVIDERS.map((provider) => {
           const key = ai.keys.find((item) => item.provider === provider)

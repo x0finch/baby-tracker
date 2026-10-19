@@ -1,10 +1,11 @@
 import { clsx } from 'clsx'
 import type { ReactNode } from 'react'
 
-export type PillTone = 'muted' | 'danger'
+export type PillTone = 'muted' | 'primary' | 'danger'
 
 const tones: Record<PillTone, string> = {
   muted: 'bg-surface text-fg-muted',
+  primary: 'bg-primary-soft text-primary-text',
   danger: 'bg-danger-soft text-danger-text',
 }
 

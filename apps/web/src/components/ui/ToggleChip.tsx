@@ -1,5 +1,5 @@
 import { clsx } from 'clsx'
-import type { ButtonHTMLAttributes } from 'react'
+import { type ButtonHTMLAttributes, useId } from 'react'
 
 import { popElement } from '../../lib/motion'
 
@@ -58,7 +58,10 @@ export interface ChipGroupProps<T> {
   tone?: ChipTone
 }
 
-/** Single-choice chips in a three-column grid, for quick picks like "5 分钟前". */
+/**
+ * Single-choice chips in a three-column grid, for quick picks like "5 分钟前". Native radio
+ * buttons underneath give the group its name, arrow keys and one tab stop.
+ */
 export function ChipGroup<T extends string | number | null>({
   legend,
   showLegend = true,
@@ -66,23 +69,43 @@ export function ChipGroup<T extends string | number | null>({
   value,
   onChange,
   optionLabel,
-  tone,
+  tone = 'primary',
 }: ChipGroupProps<T>) {
+  const name = useId()
   return (
     <fieldset className="m-0 min-w-0 border-0 p-0">
       <legend className={showLegend ? 'mb-1.5 p-0 font-bold' : 'sr-only'}>{legend}</legend>
       <div className="grid grid-cols-3 gap-2">
-        {options.map((option) => (
-          <ToggleChip
-            key={String(option)}
-            pressed={value === option}
-            tone={tone}
-            onClick={() => onChange(option)}
-            className="min-h-11 rounded-lg font-extrabold"
-          >
-            {optionLabel(option)}
-          </ToggleChip>
-        ))}
+        {options.map((option) => {
+          const checked = value === option
+          return (
+            <label
+              key={String(option)}
+              className={clsx(
+                'press flex min-h-11 items-center justify-center rounded-lg border-2 border-b-4 px-2 text-center font-extrabold',
+                'has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-diaper',
+                checked
+                  ? [pressedTones[tone].box, pressedTones[tone].text]
+                  : 'border-border bg-surface text-fg-muted',
+              )}
+            >
+              <input
+                type="radio"
+                name={name}
+                className="sr-only"
+                checked={checked}
+                // Click, not change: picking the chosen chip again still counts ("5 分钟前" from now).
+                onClick={(event) => {
+                  const chip = event.currentTarget.parentElement
+                  if (!checked && chip) popElement(chip)
+                  onChange(option)
+                }}
+                onChange={() => undefined}
+              />
+              {optionLabel(option)}
+            </label>
+          )
+        })}
       </div>
     </fieldset>
   )

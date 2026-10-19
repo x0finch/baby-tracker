@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 
-import { Card } from '../../components/ui/Card'
+import { Card, CardTitle } from '../../components/ui/Card'
 import { FormError } from '../../components/ui/FormError'
 import { ToggleChip } from '../../components/ui/ToggleChip'
 import { m } from '../../paraglide/messages.js'
@@ -23,7 +23,7 @@ export function ShareCard({ ai }: { ai: UserAi }) {
   }
   return (
     <Card as="section" className="flex flex-col gap-3">
-      <h2 className="m-0 text-body font-extrabold">{m.aiShareTitle()}</h2>
+      <CardTitle small>{m.aiShareTitle()}</CardTitle>
       <div className="flex flex-wrap gap-2">
         {access.map((family) => (
           <ToggleChip

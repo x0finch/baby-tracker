@@ -1,5 +1,5 @@
 import { clsx } from 'clsx'
-import { type PointerEvent, type ReactNode, useEffect, useRef, useState } from 'react'
+import { type PointerEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 
 import { prefersReducedMotion } from '../../lib/motion'
 
@@ -54,6 +54,7 @@ function useLastOpen<T>(open: boolean, value: T): T {
  */
 export function Sheet({ open, onClose, title, children }: SheetProps) {
   const ref = useRef<HTMLDialogElement>(null)
+  const titleId = useId()
   // Mirrors `open` so the native close event can tell a user dismissal (Escape) from the
   // parent closing the sheet, which must not call onClose again (e.g. when one sheet
   // hands over to another).
@@ -147,7 +148,7 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
     <dialog
       ref={ref}
       tabIndex={-1}
-      aria-label={shown.title}
+      aria-labelledby={titleId}
       onCancel={(event) => {
         // Escape: let the sheet slide away like any other close.
         event.preventDefault()
@@ -174,7 +175,9 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
           onPointerCancel={endDrag}
         >
           <div aria-hidden className="mx-auto h-1.5 w-10 rounded-full bg-border" />
-          <h2 className="text-title font-extrabold">{shown.title}</h2>
+          <h2 id={titleId} className="text-title font-extrabold">
+            {shown.title}
+          </h2>
         </div>
         {open || shownInDialog ? shown.children : null}
       </div>

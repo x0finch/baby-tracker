@@ -2,6 +2,7 @@ import type { Baby } from '@bobo/shared'
 import { useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
+import { ListRow } from '../../components/ui/ListRow'
 import { Sheet } from '../../components/ui/Sheet'
 import { useLocalStore } from '../../db'
 import { m } from '../../paraglide/messages.js'
@@ -15,18 +16,13 @@ import { useBabies } from './use-babies'
 
 function BabyRow({ baby, onClick }: { baby: Baby; onClick?: () => void }) {
   return (
-    <button
-      type="button"
+    <ListRow
       disabled={!onClick}
       onClick={onClick}
-      className="press-row flex min-h-touch w-full items-center gap-3 py-1 text-left"
-    >
-      <BabyAvatar name={baby.name} color={baby.avatarColor} />
-      <span className="flex flex-col">
-        <span className="font-extrabold">{baby.name}</span>
-        <span className="text-caption text-fg-muted">{ageLabel(baby.birthDate)}</span>
-      </span>
-    </button>
+      leading={<BabyAvatar name={baby.name} color={baby.avatarColor} />}
+      title={<span className="truncate">{baby.name}</span>}
+      detail={ageLabel(baby.birthDate)}
+    />
   )
 }
 

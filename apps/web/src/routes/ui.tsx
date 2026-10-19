@@ -4,15 +4,17 @@ import { useState } from 'react'
 import { PageHeader } from '../components/PageHeader'
 import { SettingsGroup, SettingsRow } from '../components/SettingsLayout'
 import { Button, type ButtonTone } from '../components/ui/Button'
-import { Card } from '../components/ui/Card'
+import { Card, CardTitle, NoticeCard } from '../components/ui/Card'
 import { Chevron } from '../components/ui/Chevron'
 import { DeleteConfirmSheet } from '../components/ui/DeleteConfirmSheet'
 import { Input } from '../components/ui/Input'
+import { ListRow } from '../components/ui/ListRow'
 import { Pill } from '../components/ui/Pill'
 import { RollingText } from '../components/ui/RollingText'
 import { SegmentedControl } from '../components/ui/SegmentedControl'
 import { Sheet } from '../components/ui/Sheet'
 import { showToast } from '../components/ui/Toast'
+import { ChipGroup } from '../components/ui/ToggleChip'
 import { m } from '../paraglide/messages.js'
 
 // Component preview for development; linked from settings in dev builds only.
@@ -34,6 +36,7 @@ function UiPreviewPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [count, setCount] = useState(1)
+  const [minutes, setMinutes] = useState<number | null>(5)
 
   return (
     <section className="flex flex-col gap-6">
@@ -85,6 +88,13 @@ function UiPreviewPage() {
           value={side}
           onChange={setSide}
         />
+        <ChipGroup<number>
+          legend={m.uiChoices()}
+          options={[0, 5, 15]}
+          value={minutes}
+          onChange={setMinutes}
+          optionLabel={(value) => m.durationMinutes({ minutes: value })}
+        />
         <Input label={m.uiNameLabel()} hint={m.uiNameHint()} />
       </Card>
 
@@ -92,10 +102,35 @@ function UiPreviewPage() {
         <h2 className="text-title font-extrabold">{m.uiPills()}</h2>
         <div className="flex items-center gap-3">
           <Pill>{m.roleOwner()}</Pill>
+          <Pill tone="primary">{m.growthPercentile({ value: 50 })}</Pill>
           <Pill tone="danger">{m.timerRunning()}</Pill>
           <Chevron direction="left" />
           <Chevron />
         </div>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <h2 className="text-title font-extrabold">{m.uiCardsAndRows()}</h2>
+        <Card as="section" className="flex flex-col gap-1">
+          <CardTitle small>{m.uiNameLabel()}</CardTitle>
+          <ul className="m-0 flex list-none flex-col p-0">
+            <li className="border-b-2 border-border">
+              <ListRow title={m.actionSave()} detail={m.uiRowSummary()} trailing={<Chevron />} />
+            </li>
+            <li>
+              <ListRow
+                title={
+                  <>
+                    <span className="truncate">{m.uiNameLabel()}</span>
+                    <Pill>{m.roleOwner()}</Pill>
+                  </>
+                }
+                detail={m.uiRowSummary()}
+              />
+            </li>
+          </ul>
+        </Card>
+        <NoticeCard>{m.uiRowSummary()}</NoticeCard>
       </div>
 
       <div className="flex flex-col gap-3">

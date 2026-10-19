@@ -87,7 +87,14 @@ export function ChatSheet({ open, onClose }: { open: boolean; onClose: () => voi
   return (
     <Sheet open={open} onClose={onClose} title={m.voiceChatTitle()}>
       <div className="flex flex-col gap-3">
-        <div ref={list} className="flex min-h-40 flex-col gap-2">
+        {/* New messages are read out as they arrive. */}
+        <div
+          ref={list}
+          role="log"
+          aria-live="polite"
+          aria-label={m.voiceChatTitle()}
+          className="flex min-h-40 flex-col gap-2"
+        >
           {hasEarlier ? (
             <div ref={top} className="text-center text-caption text-fg-muted">
               {loadingEarlier ? m.voiceChatLoadingEarlier() : '\u00a0'}
@@ -103,7 +110,9 @@ export function ChatSheet({ open, onClose }: { open: boolean; onClose: () => voi
             </p>
           )}
           {rows}
-          {send.isPending && <p className="m-0 text-caption text-fg-muted">{m.voiceThinking()}</p>}
+          {send.isPending && (
+            <output className="m-0 block text-caption text-fg-muted">{m.voiceThinking()}</output>
+          )}
         </div>
         {confirming && !send.isPending && (
           <div className="flex gap-2">
@@ -152,6 +161,9 @@ function Bubble({ message }: { message: ChatMessage }) {
           : 'self-start rounded-bl-md bg-surface',
       )}
     >
+      <span className="sr-only">
+        {mine ? m.voiceChatSpeakerMe() : m.voiceChatSpeakerAssistant()}
+      </span>
       {message.text}
     </p>
   )

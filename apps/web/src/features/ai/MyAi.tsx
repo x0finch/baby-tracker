@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 
-import { Card } from '../../components/ui/Card'
+import { Card, NoticeCard } from '../../components/ui/Card'
 import { m } from '../../paraglide/messages.js'
 import { useAccess } from '../../sync/use-access'
 import { KeysCard } from './KeysCard'
@@ -20,11 +20,7 @@ export function useAiSummary() {
 export function MyAi() {
   const { userId } = useAccess()
   if (!userId) {
-    return (
-      <Card>
-        <p className="m-0 text-fg-muted">{m.aiSignedOut()}</p>
-      </Card>
-    )
+    return <NoticeCard>{m.aiSignedOut()}</NoticeCard>
   }
   return <MyAiCards />
 }
@@ -34,11 +30,7 @@ function MyAiCards() {
   // Loaded with the saved keys as soon as the page opens, so picking needs no extra step.
   const models = useQuery({ ...aiQueries.models(), enabled: (ai?.keys.length ?? 0) > 0 })
   if (isPending || isError) {
-    return (
-      <Card>
-        <p className="m-0 text-fg-muted">{isError ? m.voiceLoadFailed() : m.joinLoading()}</p>
-      </Card>
-    )
+    return <NoticeCard>{isError ? m.voiceLoadFailed() : m.joinLoading()}</NoticeCard>
   }
   const providers = models.data?.providers
   return (

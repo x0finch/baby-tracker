@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { ConfirmSheet } from '../../components/ui/ConfirmSheet'
 import { FormError } from '../../components/ui/FormError'
+import { ListRow } from '../../components/ui/ListRow'
 import { Pill } from '../../components/ui/Pill'
 import { toastIfRefused } from '../../lib/server-collection'
 import { m } from '../../paraglide/messages.js'
@@ -104,24 +105,19 @@ export function FamilyDetail({ family, userId }: { family: FamilySummary; userId
               const editable = member.userId !== userId && canManageMember(family.role, member.role)
               return (
                 <li key={member.userId}>
-                  <button
-                    type="button"
+                  <ListRow
                     disabled={!editable}
                     aria-label={`${member.name} ${roleLabel[member.role]()}`}
                     onClick={() => setEditingId(member.userId)}
-                    className="press-row flex min-h-touch w-full items-center gap-3 py-1 text-left"
-                  >
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate font-extrabold">
+                    title={
+                      <span className="truncate">
                         {member.userId === userId
                           ? `${member.name}（${m.familyMemberYou()}）`
                           : member.name}
                       </span>
-                      <span className="truncate text-caption text-fg-muted">
-                        {`${roleLabel[member.role]()} · ${scopeLabel(member.babyIds, babies)}`}
-                      </span>
-                    </span>
-                  </button>
+                    }
+                    detail={`${roleLabel[member.role]()} · ${scopeLabel(member.babyIds, babies)}`}
+                  />
                 </li>
               )
             })}

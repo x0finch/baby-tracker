@@ -39,7 +39,7 @@ export function BabySwitcher() {
         type="button"
         onClick={() => setSheet('pick')}
         aria-label={m.babySwitcherLabel({ name: baby.name })}
-        className="mb-4 flex min-h-touch w-full items-center gap-3 rounded-xl border-2 border-b-4 border-border px-3 py-2 text-left active:translate-y-0.5 active:border-b-2"
+        className="mb-4 flex min-h-touch w-full items-center gap-3 press rounded-xl border-2 border-b-4 border-border px-3 py-2 text-left"
       >
         <span className="relative">
           <BabyAvatar name={baby.name} color={baby.avatarColor} />

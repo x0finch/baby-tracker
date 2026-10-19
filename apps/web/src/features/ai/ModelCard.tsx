@@ -3,10 +3,11 @@ import { clsx } from 'clsx'
 import { useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
-import { Card } from '../../components/ui/Card'
+import { Card, CardTitle } from '../../components/ui/Card'
 import { Chevron } from '../../components/ui/Chevron'
 import { FormError } from '../../components/ui/FormError'
 import { Input } from '../../components/ui/Input'
+import { ListRow } from '../../components/ui/ListRow'
 import { Pill } from '../../components/ui/Pill'
 import { Sheet } from '../../components/ui/Sheet'
 import { m } from '../../paraglide/messages.js'
@@ -36,29 +37,24 @@ export function ModelCard({
   if (ai.keys.length === 0) {
     return (
       <Card as="section" className="flex flex-col gap-1">
-        <h2 className="m-0 text-body font-extrabold">{m.aiModelTitle()}</h2>
+        <CardTitle small>{m.aiModelTitle()}</CardTitle>
         <p className="m-0 text-caption text-fg-muted">{m.aiModelNeedsKey()}</p>
       </Card>
     )
   }
   return (
     <Card as="section" className="flex flex-col gap-1">
-      <h2 className="m-0 text-body font-extrabold">{m.aiModelTitle()}</h2>
-      <button
-        type="button"
-        className="press-row flex min-h-touch items-center gap-3 py-2 text-left"
+      <CardTitle small>{m.aiModelTitle()}</CardTitle>
+      <ListRow
         onClick={() => setOpen(true)}
-      >
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className={clsx('truncate font-extrabold', !choice && 'text-fg-muted')}>
+        title={
+          <span className={clsx('truncate', !choice && 'text-fg-muted')}>
             {choice ? choice.model : m.aiModelNone()}
           </span>
-          {choice && (
-            <span className="text-caption text-fg-muted">{PROVIDER_LABEL[choice.provider]}</span>
-          )}
-        </span>
-        <Chevron />
-      </button>
+        }
+        detail={choice ? PROVIDER_LABEL[choice.provider] : undefined}
+        trailing={<Chevron />}
+      />
       <Sheet open={open} onClose={() => setOpen(false)} title={m.aiModelPick()}>
         {open && (
           <ModelPicker
@@ -150,6 +146,8 @@ function ModelPicker({
     groups.set(key, group)
   }
   const hidden = all.filter((model) => !model.everyday).length
+  const isChoice = (model: Listed) =>
+    choice?.provider === model.provider && choice.model === model.id
 
   const row = (model: Listed, inGroup = false) => (
     <ModelRow
@@ -158,7 +156,7 @@ function ModelPicker({
       // In a group the heading says the provider and maker.
       label={inGroup ? model.id.replace(`${vendorOf(model)}/`, '') : model.id}
       showProvider={bothKeys && !inGroup}
-      selected={choice?.provider === model.provider && choice.model === model.id}
+      selected={isChoice(model)}
       disabled={pick.isPending}
       onPick={() => pick.mutate({ provider: model.provider, model: model.id })}
     />
@@ -183,16 +181,18 @@ function ModelPicker({
         <p className="m-0 text-fg-muted">{m.aiModelsLoading()}</p>
       ) : (
         <>
-          {recommended.length > 0 && (
-            <ModelGroup title={m.aiModelRecommended()}>
-              {recommended.map((model) => row(model))}
-            </ModelGroup>
-          )}
-          {[...groups].map(([key, group]) => (
-            <ModelGroup key={key} title={group.title}>
-              {group.models.map((model) => row(model, true))}
-            </ModelGroup>
-          ))}
+          <div className="flex flex-col gap-4">
+            {recommended.length > 0 && (
+              <ModelGroup title={m.aiModelRecommended()}>
+                {recommended.map((model) => row(model))}
+              </ModelGroup>
+            )}
+            {[...groups].map(([key, group]) => (
+              <ModelGroup key={key} title={group.title}>
+                {group.models.map((model) => row(model, true))}
+              </ModelGroup>
+            ))}
+          </div>
           {shown.length === 0 && <p className="m-0 text-fg-muted">{m.aiModelsNone()}</p>}
           {!search && hidden > 0 && (
             <Button variant="ghost" onClick={() => setShowAll(!showAll)}>
@@ -233,21 +233,22 @@ function ModelRow({
   const { price, tag } = model
   return (
     <li className="border-b-2 border-border last:border-b-0">
-      <button
-        type="button"
-        aria-pressed={selected}
+      <ListRow
+        // Picking saves at once, so these stay buttons (radio arrow keys would save on every
+        // key); the model in use is marked current.
+        aria-current={selected || undefined}
         disabled={disabled}
-        className="press-row flex min-h-touch w-full items-center gap-3 py-2 text-left"
         onClick={onPick}
-      >
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="flex items-center gap-2">
-            <span className="truncate font-extrabold">{label}</span>
+        title={
+          <>
+            <span className="truncate">{label}</span>
             {showProvider && <Pill>{PROVIDER_LABEL[model.provider]}</Pill>}
-          </span>
-          {(tag || price) && (
-            <span className="text-caption text-fg-muted">
-              {[
+          </>
+        }
+        detailWraps
+        detail={
+          tag || price
+            ? [
                 tag && TAG_LABEL[tag](),
                 price &&
                   (price.input === 0 && price.output === 0
@@ -259,12 +260,11 @@ function ModelRow({
                 tag && price && monthly(price),
               ]
                 .filter(Boolean)
-                .join(' · ')}
-            </span>
-          )}
-        </span>
-        {selected && <Tick />}
-      </button>
+                .join(' · ')
+            : undefined
+        }
+        trailing={selected && <Tick />}
+      />
     </li>
   )
 }
