@@ -1,5 +1,15 @@
 # Deploying
 
+There are two ways to deploy:
+
+- **Deploy to Cloudflare button** (README): for running your own copy. Cloudflare copies the
+  repository to your GitHub account, creates the database and redeploys on every push. Its
+  settings are `wrangler.jsonc` at the repository root, the `deploy` script in the root
+  `package.json` (migrations, then `wrangler deploy`), and `.dev.vars.example` for the secrets
+  it asks for. Optional features below (Google sign-in, email, custom domain) are set in the
+  Worker's **Settings → Variables and Secrets** instead of GitHub.
+- **GitHub Actions**, described here, which is how the main instance deploys.
+
 Bobo deploys from GitHub Actions (`.github/workflows/deploy.yml`): every push to `main` is
 built, migrated and deployed to Cloudflare. Changes reach `main` through pull requests whose CI
 passed on the merged result, so the deploy does not wait for CI to run again on `main`. Turn on
@@ -73,7 +83,7 @@ Sign-up and sign-in work without email. "Forgot password" needs it:
 - **Free plan:** create a Resend account, verify your domain, and set `RESEND_API_KEY` and
   `EMAIL_FROM`.
 - **Workers Paid:** you can use Cloudflare Email Service instead by adding
-  `"send_email": [{ "name": "EMAIL" }]` to `apps/api/wrangler.jsonc`.
+  `"send_email": [{ "name": "EMAIL" }]` to `wrangler.jsonc`.
 
 ## Optional: Siri voice logging
 

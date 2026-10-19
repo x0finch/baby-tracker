@@ -97,8 +97,8 @@ jobs:
             id=$(db_id)
           fi
           # The repository keeps a placeholder; account-specific IDs stay out of git.
-          sed -i "s/00000000-0000-0000-0000-000000000000/$id/" wrangler.jsonc
-          grep -q "$id" wrangler.jsonc
+          sed -i "s/00000000-0000-0000-0000-000000000000/$id/" ../../wrangler.jsonc
+          grep -q "$id" ../../wrangler.jsonc
 
       - name: Apply database migrations
         if: steps.config.outputs.ready == 'true'
