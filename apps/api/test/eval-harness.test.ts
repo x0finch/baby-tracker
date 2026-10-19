@@ -51,6 +51,12 @@ describe('eval harness', () => {
     expect(asksQuestion('记好了。还有别的要记的吗？')).toBe(false)
   })
 
+  it("fails a reply that carries the model's English notes", () => {
+    const reply = 'Need update latest diaper to mixed. Find recent diaper.好，已改成尿便。还有吗？'
+    expect(judge({ asks: true }, reply, []).why).toBe('回复夹带英文')
+    expect(judge({ asks: true }, '用 Siri 说就行，是 50 毫升吗？', []).pass).toBe(true)
+  })
+
   it('judges asking and recording from the reply and what was added', () => {
     const added = [{ type: 'feeding', data: { kind: 'bottle', amountMl: 500 } }]
     expect(judge({ asks: true }, '是 50 毫升吗？', [])).toEqual({ pass: true })
