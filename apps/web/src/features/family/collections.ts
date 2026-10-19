@@ -7,7 +7,8 @@ import { useEffect } from 'react'
 
 import { collectionCache } from '../../lib/server-collection'
 import { useAccess } from '../../sync/use-access'
-import { familyApi, familyKeys } from './api'
+import { familyApi } from './api'
+import { familyKeys } from './queries'
 
 /**
  * A family's members, from the server. Changing a member's role or babies, or removing

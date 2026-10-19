@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, notFound } from '@tanstack/react-router'
 import { useState } from 'react'
 
 import { PageHeader } from '../components/PageHeader'
@@ -17,6 +17,9 @@ import { m } from '../paraglide/messages.js'
 
 // Component preview for development; linked from settings in dev builds only.
 export const Route = createFileRoute('/ui')({
+  beforeLoad: () => {
+    if (!import.meta.env.DEV) throw notFound()
+  },
   component: UiPreviewPage,
 })
 

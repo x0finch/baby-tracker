@@ -1,3 +1,4 @@
+import { useRouter } from '@tanstack/react-router'
 import { useEffect } from 'react'
 
 import { Button } from '../components/ui/Button'
@@ -35,18 +36,19 @@ export function SyncRunner() {
   const choice = useClaimChoice()
   useRejectedToast()
 
+  const router = useRouter()
+
   useEffect(() => {
     const stop = startSync(store)
     // The join page links the account itself, after the invite is accepted.
-    if (!window.location.pathname.startsWith('/join/')) {
-      void connectIfSignedIn(store)
-    }
-    const unwatch = reloadWhenSignedInElsewhere(store)
+    const joining = () => router.state.matches.some((match) => match.routeId === '/join/$code')
+    if (!joining()) void connectIfSignedIn(store)
+    const unwatch = reloadWhenSignedInElsewhere(store, joining)
     return () => {
       stop()
       unwatch()
     }
-  }, [store])
+  }, [store, router])
 
   return (
     <>

@@ -6,6 +6,7 @@ import { type QueryClient, useQueryClient } from '@tanstack/react-query'
 
 import { collectionCache } from '../../lib/server-collection'
 import { reminderApi } from './notifications'
+import { reminderKeys } from './queries'
 
 export const reminderKey = (reminder: Pick<Reminder, 'babyId' | 'kind'>) =>
   `${reminder.babyId}:${reminder.kind}`
@@ -21,7 +22,7 @@ async function saveReminders({
 function createReminders(queryClient: QueryClient, userId: string) {
   return createCollection(
     queryCollectionOptions({
-      queryKey: ['reminders', userId],
+      queryKey: reminderKeys.list(userId),
       queryFn: (): Promise<Reminder[]> => reminderApi.list(),
       queryClient,
       getKey: reminderKey,

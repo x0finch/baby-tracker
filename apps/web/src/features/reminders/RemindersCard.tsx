@@ -14,10 +14,10 @@ import {
   type PushState,
   disablePush,
   enablePush,
-  getPushState,
   refreshPushSubscription,
   sendTestNotification,
 } from './notifications'
+import { reminderKeys, reminderQueries } from './queries'
 
 /** Interval choices in minutes; 0 turns the reminder off. */
 const CHOICES: Record<ReminderKind, number[]> = {
@@ -31,8 +31,6 @@ const KIND_LABEL: Record<ReminderKind, () => string> = {
 /** Interval kept when a reminder is off, so turning it on again restores it. */
 const DEFAULT_MINUTES: Record<ReminderKind, number> = { feeding: 180, diaper: 180 }
 
-const PUSH_STATE_KEY = ['push-state']
-
 const pushHint: Partial<Record<PushState, () => string>> = {
   unsupported: m.pushUnsupported,
   'needs-install': m.pushNeedsInstall,
@@ -40,7 +38,7 @@ const pushHint: Partial<Record<PushState, () => string>> = {
 }
 
 /** Whether this device can and does receive notifications. */
-export const usePushState = () => useQuery({ queryKey: PUSH_STATE_KEY, queryFn: getPushState }).data
+export const usePushState = () => useQuery(reminderQueries.pushState()).data
 
 /** Device notifications and per-baby "it's been a while" reminders; signed-in users only. */
 export function RemindersCard() {
@@ -76,7 +74,7 @@ function Reminders({ userId }: { userId: string }) {
       return 'off'
     },
     onMutate: () => setMessage(undefined),
-    onSuccess: (state) => queryClient.setQueryData(PUSH_STATE_KEY, state),
+    onSuccess: (state) => queryClient.setQueryData(reminderKeys.pushState, state),
     onError: () => setMessage(m.pushFailed()),
   })
 

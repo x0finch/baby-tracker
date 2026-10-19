@@ -1,5 +1,5 @@
 import { type Event, isRunning } from '@bobo/shared'
-import { and, eq, inArray, isNull } from '@tanstack/db'
+import { and, count, eq, inArray, isNull } from '@tanstack/db'
 import { useLiveQuery } from '@tanstack/react-db'
 import { useMemo } from 'react'
 
@@ -73,8 +73,10 @@ export function useRecordCount(scope: { babyId: string } | { familyId: string } 
             isNull(event.deletedAt),
           ),
         )
+        .select(({ event }) => ({ n: count(event.id) }))
+        .findOne()
     },
     [events, babyId, familyId],
   )
-  return data?.length ?? 0
+  return data?.n ?? 0
 }

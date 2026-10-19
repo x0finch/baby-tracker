@@ -11,7 +11,8 @@ import { useLocalStore } from '../db'
 import { httpAccountApi, signInWithGoogle } from '../features/account/account'
 import { connectIfSignedIn } from '../features/account/connection'
 import { SignInOptions } from '../features/account/SignInOptions'
-import { familyApi, invitePreviewQuery } from '../features/family/api'
+import { familyApi } from '../features/family/api'
+import { familyQueries } from '../features/family/queries'
 import { roleLabel } from '../features/family/roles'
 import { HttpError } from '../lib/api'
 import { m } from '../paraglide/messages.js'
@@ -20,7 +21,7 @@ import { requestSync } from '../sync/runner'
 
 export const Route = createFileRoute('/join/$code')({
   loader: ({ context: { queryClient }, params }) =>
-    queryClient.ensureQueryData(invitePreviewQuery(params.code)),
+    queryClient.ensureQueryData(familyQueries.invitePreview(params.code)),
   pendingComponent: () => (
     <JoinLayout>
       <p className="text-fg-muted">{m.joinLoading()}</p>
@@ -75,7 +76,7 @@ function JoinLayout({ children }: { children: ReactNode }) {
 
 function JoinPage() {
   const { code } = Route.useParams()
-  const { data: preview } = useSuspenseQuery(invitePreviewQuery(code))
+  const { data: preview } = useSuspenseQuery(familyQueries.invitePreview(code))
   const store = useLocalStore()
 
   const join = useMutation({

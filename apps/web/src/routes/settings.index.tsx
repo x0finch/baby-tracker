@@ -4,7 +4,6 @@ import { useVersionSummary } from '../components/AppVersion'
 import { useDisplaySummary } from '../components/DisplaySettings'
 import { PageHeader } from '../components/PageHeader'
 import { SettingsGroup, SettingsRow } from '../components/SettingsLayout'
-import { useLocalStore } from '../db'
 import { useSyncStatusText } from '../features/account/AccountCard'
 import { useAiSummary } from '../features/ai/MyAi'
 import { useBabies } from '../features/babies/use-babies'
@@ -12,17 +11,15 @@ import { FamilyList } from '../features/family/FamilyList'
 import { usePushState } from '../features/reminders/RemindersCard'
 import { useVoiceSummary } from '../features/voice/VoiceCard'
 import { m } from '../paraglide/messages.js'
-import { getAccount } from '../sync/local'
-import { useAccess } from '../sync/use-access'
+import { useAccess, useAccount } from '../sync/use-access'
 
 export const Route = createFileRoute('/settings/')({
   component: SettingsIndex,
 })
 
 function SettingsIndex() {
-  const store = useLocalStore()
   const { userId } = useAccess()
-  const account = getAccount(store)
+  const account = useAccount()
   const syncStatus = useSyncStatusText()
   const { active, archived } = useBabies()
   const push = usePushState()

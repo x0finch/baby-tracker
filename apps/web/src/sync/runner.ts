@@ -71,7 +71,7 @@ async function fileUnclaimed(store: LocalStore, account: SyncAccount) {
     method: 'POST',
     body: JSON.stringify({ name: ownFamilyName({ name: account.userName ?? '' }) }),
   })
-  claimLocalData(store, family.id)
+  await claimLocalData(store, family.id).isPersisted.promise
   setAccount(store, { ...account, familyId: family.id })
 }
 
