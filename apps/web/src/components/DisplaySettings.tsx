@@ -3,7 +3,7 @@ import type { ThemePreference } from '../lib/theme'
 import { unitLabel, useUnits } from '../lib/units'
 import { useTheme } from '../lib/use-theme'
 import { m } from '../paraglide/messages.js'
-import { Card } from './ui/Card'
+import { Card, CardTitle } from './ui/Card'
 import { SegmentedControl } from './ui/SegmentedControl'
 
 const themeLabel: Record<ThemePreference, () => string> = {
@@ -26,7 +26,7 @@ export function ThemeCard() {
   const { preference, setPreference } = useTheme()
   return (
     <Card className="flex flex-col gap-3">
-      <h2 className="text-title font-extrabold">{m.settingsTheme()}</h2>
+      <CardTitle>{m.settingsTheme()}</CardTitle>
       <SegmentedControl
         label={m.settingsTheme()}
         options={themes.map((value) => ({ value, label: themeLabel[value]() }))}
@@ -42,7 +42,7 @@ export function LanguageCard() {
   if (locales.length < 2) return null
   return (
     <Card className="flex flex-col gap-3">
-      <h2 className="text-title font-extrabold">{m.settingsLanguage()}</h2>
+      <CardTitle>{m.settingsLanguage()}</CardTitle>
       <SegmentedControl<Locale>
         label={m.settingsLanguage()}
         options={locales.map((locale) => ({ value: locale, label: localeDisplayName(locale) }))}

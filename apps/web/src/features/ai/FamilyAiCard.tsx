@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 
-import { Card } from '../../components/ui/Card'
+import { Card, CardTitle } from '../../components/ui/Card'
 import { FormError } from '../../components/ui/FormError'
 import { m } from '../../paraglide/messages.js'
 import { voiceKeys } from '../voice/queries'
@@ -26,7 +26,7 @@ export function FamilyAiCard({ familyId, managing }: { familyId: string; managin
   const inUse = data.shares.find((share) => share.userId === data.inUse)
   return (
     <Card as="section" className="flex flex-col gap-3">
-      <h2 className="m-0 text-body font-extrabold">{m.aiTitle()}</h2>
+      <CardTitle small>{m.aiTitle()}</CardTitle>
       {inUse ? (
         <p className="m-0">
           {m.familyAiInUse({ name: inUse.name })}

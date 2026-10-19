@@ -1,6 +1,6 @@
 import { type Quantity, type UnitPreferences, setUnits, unitLabel, useUnits } from '../lib/units'
 import { m } from '../paraglide/messages.js'
-import { Card } from './ui/Card'
+import { Card, CardTitle } from './ui/Card'
 import { SegmentedControl } from './ui/SegmentedControl'
 
 const rows: { [Q in Quantity]: { label: () => string; options: UnitPreferences[Q][] } } = {
@@ -17,7 +17,7 @@ export function UnitsCard() {
   const units = useUnits()
   return (
     <Card className="flex flex-col gap-3">
-      <h2 className="text-title font-extrabold">{m.settingsUnits()}</h2>
+      <CardTitle>{m.settingsUnits()}</CardTitle>
       {quantities.map((quantity) => (
         <SegmentedControl<string>
           key={quantity}

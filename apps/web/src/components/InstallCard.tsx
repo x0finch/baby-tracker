@@ -1,7 +1,7 @@
 import { isIos, isStandalone, useInstallPrompt } from '../lib/pwa'
 import { m } from '../paraglide/messages.js'
 import { Button } from './ui/Button'
-import { Card } from './ui/Card'
+import { Card, CardTitle } from './ui/Card'
 
 /** Encourages installing the PWA; hidden once running from the home screen. */
 export function InstallCard() {
@@ -10,7 +10,7 @@ export function InstallCard() {
 
   return (
     <Card className="flex flex-col gap-3">
-      <h2 className="text-title font-extrabold">{m.installTitle()}</h2>
+      <CardTitle>{m.installTitle()}</CardTitle>
       <p className="m-0 text-fg-muted">{m.installBody()}</p>
       {install ? (
         <Button block onClick={() => void install()}>

@@ -5,6 +5,7 @@ import { m } from '../paraglide/messages.js'
 import { PageHeader } from './PageHeader'
 import { Card } from './ui/Card'
 import { Chevron } from './ui/Chevron'
+import { ListRow } from './ui/ListRow'
 
 /** A link back to the settings index, for pages opened from it. */
 export function BackLink() {
@@ -59,20 +60,17 @@ export function SettingsRow({
 }) {
   return (
     <li className="border-b-2 border-border last:border-b-0">
-      <Link {...link} className="press-row flex min-h-touch items-center gap-3 py-3">
-        <span className="flex min-w-0 flex-1 flex-col">
-          {badge ? (
-            <span className="flex items-center gap-2">
-              <span className="truncate font-extrabold">{title}</span>
-              {badge}
-            </span>
-          ) : (
-            <span className="truncate font-extrabold">{title}</span>
-          )}
-          <span className="truncate text-caption text-fg-muted">{summary}</span>
-        </span>
-        <Chevron />
-      </Link>
+      <ListRow
+        link={link}
+        title={
+          <>
+            <span className="truncate">{title}</span>
+            {badge}
+          </>
+        }
+        detail={summary}
+        trailing={<Chevron />}
+      />
     </li>
   )
 }

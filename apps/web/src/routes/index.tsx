@@ -2,7 +2,7 @@ import type { Baby } from '@bobo/shared'
 import { createFileRoute } from '@tanstack/react-router'
 
 import { PullToRefresh } from '../components/PullToRefresh'
-import { Card } from '../components/ui/Card'
+import { NoticeCard } from '../components/ui/Card'
 import { BadgeToast } from '../features/achievements/BadgeToast'
 import { RequireBaby } from '../features/babies/RequireBaby'
 import { useSelectedBaby } from '../features/babies/use-babies'
@@ -46,9 +46,7 @@ function BabyToday({ baby }: { baby: Baby }) {
       {canLog ? (
         <QuickActions baby={baby} events={events} />
       ) : (
-        <Card>
-          <p className="m-0 text-fg-muted">{m.roleViewerNotice()}</p>
-        </Card>
+        <NoticeCard>{m.roleViewerNotice()}</NoticeCard>
       )}
       <TodayList events={events} />
       <BadgeToast baby={baby} events={events} />

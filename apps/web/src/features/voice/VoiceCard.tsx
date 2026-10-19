@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
-import { Card } from '../../components/ui/Card'
+import { Card, NoticeCard } from '../../components/ui/Card'
 import { m } from '../../paraglide/messages.js'
 import { useAccess } from '../../sync/use-access'
 import { type VoiceSettings } from './api'
@@ -24,11 +24,7 @@ export function useVoiceSummary() {
 export function VoiceCard() {
   const { userId } = useAccess()
   if (!userId) {
-    return (
-      <Card>
-        <p className="m-0 text-fg-muted">{m.voiceSignedOut()}</p>
-      </Card>
-    )
+    return <NoticeCard>{m.voiceSignedOut()}</NoticeCard>
   }
   return <Voice />
 }
@@ -36,11 +32,7 @@ export function VoiceCard() {
 function Voice() {
   const { data: settings, isError } = useQuery(voiceQueries.settings())
   if (!settings) {
-    return (
-      <Card>
-        <p className="m-0 text-fg-muted">{isError ? m.voiceLoadFailed() : m.joinLoading()}</p>
-      </Card>
-    )
+    return <NoticeCard>{isError ? m.voiceLoadFailed() : m.joinLoading()}</NoticeCard>
   }
   return (
     <>

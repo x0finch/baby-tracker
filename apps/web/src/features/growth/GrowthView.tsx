@@ -1,8 +1,9 @@
 import type { Baby, Event, GrowthEvent } from '@bobo/shared'
-import { clsx } from 'clsx'
 import { useState } from 'react'
 
 import { Card } from '../../components/ui/Card'
+import { ListRow } from '../../components/ui/ListRow'
+import { Pill } from '../../components/ui/Pill'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { formatDate, formatNumber } from '../../lib/i18n'
 import { convertToDisplay, formatQuantity, unitLabel } from '../../lib/units'
@@ -288,32 +289,23 @@ export function GrowthView({ baby, events }: { baby: Baby; events: readonly Even
           <ul className="m-0 flex list-none flex-col p-0">
             {points.toReversed().map((point) => (
               <li key={point.event.id} className="border-b-2 border-border">
-                <button
-                  type="button"
+                <ListRow
                   onClick={() => setEditingId(point.event.id)}
-                  className="press-row flex min-h-touch w-full items-center gap-3 py-3 text-left"
-                >
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="font-extrabold tabular-nums">
-                      {formatMeasure(measure, point.value)}
-                    </span>
-                    <span className="text-caption text-fg-muted">
-                      {`${formatDate(point.event.startAt, { year: 'numeric', month: 'short', day: 'numeric' })} · ${m.ageMonths({ months: formatNumber(point.months, { maximumFractionDigits: 1 }) })}`}
-                    </span>
-                  </span>
-                  {point.percentile !== undefined && (
-                    <span
-                      className={clsx(
-                        'shrink-0 rounded-full px-2 text-caption font-bold',
-                        point.percentile < 3 || point.percentile > 97
-                          ? 'bg-danger-soft text-danger-text'
-                          : 'bg-primary-soft text-primary-text',
-                      )}
-                    >
-                      {m.growthPercentile({ value: Math.round(point.percentile) })}
-                    </span>
-                  )}
-                </button>
+                  title={
+                    <span className="tabular-nums">{formatMeasure(measure, point.value)}</span>
+                  }
+                  detail={`${formatDate(point.event.startAt, { year: 'numeric', month: 'short', day: 'numeric' })} · ${m.ageMonths({ months: formatNumber(point.months, { maximumFractionDigits: 1 }) })}`}
+                  trailing={
+                    point.percentile !== undefined && (
+                      <Pill
+                        tone={point.percentile < 3 || point.percentile > 97 ? 'danger' : 'primary'}
+                        className="shrink-0"
+                      >
+                        {m.growthPercentile({ value: Math.round(point.percentile) })}
+                      </Pill>
+                    )
+                  }
+                />
               </li>
             ))}
           </ul>
