@@ -10,7 +10,8 @@
     "db:migrate:local": "wrangler d1 migrations apply bobo-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply bobo-db --remote",
     "codegen": "wrangler types --env-interface Bindings",
-    "typecheck": "tsc && tsc -p test"
+    "typecheck": "tsc && tsc -p test",
+    "eval": "vitest run --config evals/vitest.config.ts"
   },
   "dependencies": {
     "@better-auth/passkey": "catalog:",

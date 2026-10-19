@@ -1,0 +1,61 @@
+name: Agent evals
+
+# Plays the voice assistant's scenarios (apps/api/evals) against real models and writes pass
+# rates to the run summary. Costs real tokens, so it runs on request and once a week, never on
+# pull requests. Needs the EVAL_OPENROUTER_API_KEY secret (or EVAL_OPENAI_API_KEY for
+# openai:… models); without one it skips.
+on:
+  workflow_dispatch:
+    inputs:
+      models:
+        description: 'Models, "provider:model" comma-separated (empty: the defaults)'
+        required: false
+        default: ''
+      runs:
+        description: Runs per scenario
+        required: false
+        default: '3'
+      only:
+        description: Only scenarios whose name contains this
+        required: false
+        default: ''
+  schedule:
+    # Mondays 02:17 UTC.
+    - cron: '17 2 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  evals:
+    name: Agent evals
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      EVAL_OPENROUTER_API_KEY: ${{ secrets.EVAL_OPENROUTER_API_KEY }}
+      EVAL_OPENAI_API_KEY: ${{ secrets.EVAL_OPENAI_API_KEY }}
+      EVAL_MODELS: ${{ inputs.models }}
+      EVAL_RUNS: ${{ inputs.runs || '3' }}
+      EVAL_ONLY: ${{ inputs.only }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run evals
+        working-directory: apps/api
+        run: |
+          if [ -z "$EVAL_OPENROUTER_API_KEY$EVAL_OPENAI_API_KEY" ]; then
+            echo "No eval API key secret is set; skipping." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          pnpm eval
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-report
+          path: apps/api/eval-report.md
+          if-no-files-found: ignore
