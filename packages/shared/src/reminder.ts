@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { base64UrlDecode } from './base64url'
+
 /** Kinds of "it's been a while" reminders: since the last event of that type started. */
 export const reminderKindSchema = z.enum(['feeding', 'diaper'])
 export type ReminderKind = z.infer<typeof reminderKindSchema>
@@ -15,12 +17,26 @@ export const reminderSchema = z.object({
 })
 export type Reminder = z.infer<typeof reminderSchema>
 
+/** Base64url text that decodes to exactly `length` bytes. */
+const base64UrlBytes = (length: number) =>
+  z
+    .string()
+    .regex(/^[A-Za-z0-9_-]+={0,2}$/)
+    .refine((value) => {
+      try {
+        return base64UrlDecode(value).length === length
+      } catch {
+        return false
+      }
+    })
+
 /** A browser's PushSubscription as sent by the app (PushSubscription.toJSON()). */
 export const pushSubscriptionSchema = z.object({
   endpoint: z.url({ protocol: /^https$/ }).max(2048),
   keys: z.object({
-    p256dh: z.string().min(1).max(256),
-    auth: z.string().min(1).max(64),
+    // An uncompressed P-256 public key and a 16-byte secret, as the Push API defines them.
+    p256dh: base64UrlBytes(65),
+    auth: base64UrlBytes(16),
   }),
 })
 export type PushSubscriptionInput = z.infer<typeof pushSubscriptionSchema>

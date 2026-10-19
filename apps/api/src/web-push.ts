@@ -171,8 +171,9 @@ export async function sendPush(
   now: number,
   fetcher: typeof fetch = fetch,
 ): Promise<PushResult> {
-  const body = await encryptPayload(target, encode(JSON.stringify(message)))
   try {
+    // Inside the try: a subscription with keys that don't import fails alone, not the batch.
+    const body = await encryptPayload(target, encode(JSON.stringify(message)))
     const res = await fetcher(target.endpoint, {
       method: 'POST',
       headers: {

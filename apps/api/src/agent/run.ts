@@ -25,6 +25,8 @@ import { type AgentContext, agentTools } from './tools'
 export const SESSION_IDLE_MS = 30 * 60_000
 /** Model calls per message: enough to look something up, act on it and answer. */
 const MAX_STEPS = 6
+/** A whole turn, every model call in it, gets this long: Siri does not wait much longer. */
+export const TURN_TIMEOUT_MS = 25_000
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
@@ -40,10 +42,12 @@ async function answerTo(
   scope: AgentScope,
   question: string,
   text: string,
+  abortController: AbortController,
 ): Promise<'yes' | 'no' | null> {
   try {
     const { answer } = await chat({
       adapter,
+      abortController,
       modelOptions: scope.modelOptions,
       systemPrompts: [
         'The user was asked to confirm a change to a baby record. Decide whether their reply approves it (yes), refuses it (no), or says something else, such as a correction or a new request (other). The reply may be in any language.',
@@ -88,6 +92,8 @@ export interface AgentScope {
   phrase: string
   /** Extra request fields for the provider (modelOptionsFor). */
   modelOptions?: Record<string, unknown>
+  /** Overrides TURN_TIMEOUT_MS; tests use a short one. */
+  timeoutMs?: number
 }
 
 function instructions(scope: AgentScope, now: number, babyNames: string[]) {
@@ -170,6 +176,7 @@ async function runChat(
   scope: AgentScope,
   input: { messages: Array<{ role: 'user'; content: string }> } | { resume: RunAgentResumeItem[] },
   babyNames: string[],
+  abortController: AbortController,
 ): Promise<RunOutcome> {
   let text = ''
   const approvals: Array<Record<string, unknown>> = []
@@ -180,6 +187,7 @@ async function runChat(
     runId: ctx.runId,
     systemPrompts: [instructions(scope, ctx.now, babyNames)],
     tools: agentTools(ctx),
+    abortController,
     modelOptions: scope.modelOptions,
     agentLoopStrategy: maxIterations(MAX_STEPS),
     middleware: [
@@ -194,16 +202,22 @@ async function runChat(
     'messages' in input
       ? chat({ ...options, messages: input.messages })
       : chat({ ...options, messages: [], resume: input.resume })
-  for await (const chunk of stream) {
-    if (chunk.type === EventType.TEXT_MESSAGE_START) text = ''
-    if (chunk.type === EventType.TEXT_MESSAGE_CONTENT) text += chunk.delta
-    if (chunk.type === EventType.RUN_ERROR) error = chunk.message
-    if (chunk.type === EventType.RUN_FINISHED && chunk.outcome?.type === 'interrupt') {
-      for (const interrupt of chunk.outcome.interrupts) {
-        if (interrupt.metadata) approvals.push(interrupt.metadata)
+  try {
+    for await (const chunk of stream) {
+      if (chunk.type === EventType.TEXT_MESSAGE_START) text = ''
+      if (chunk.type === EventType.TEXT_MESSAGE_CONTENT) text += chunk.delta
+      if (chunk.type === EventType.RUN_ERROR) error = chunk.message
+      if (chunk.type === EventType.RUN_FINISHED && chunk.outcome?.type === 'interrupt') {
+        for (const interrupt of chunk.outcome.interrupts) {
+          if (interrupt.metadata) approvals.push(interrupt.metadata)
+        }
       }
     }
+  } catch (thrown) {
+    if (!abortController.signal.aborted) throw thrown
   }
+  // Out of time: whatever was said so far is not an answer.
+  if (abortController.signal.aborted) error = 'timed out'
   return { text: text.trim(), approvals, error }
 }
 
@@ -230,36 +244,44 @@ export async function runAgent(
   const babyNames = (await writableBabies(scope.db, scope.families)).map((baby) => baby.name)
   const persistence = chatPersistence(scope.db)
   const pending = await persistence.stores.interrupts.listPending(threadId)
+  const abort = new AbortController()
+  const timer = setTimeout(() => abort.abort(), scope.timeoutMs ?? TURN_TIMEOUT_MS)
+  try {
+    let outcome: RunOutcome | null = null
+    if (pending.length > 0) {
+      const metadata = pending[0]?.payload.metadata
+      const question = isRecord(metadata)
+        ? await confirmQuestion(scope, metadata)
+        : '要修改这条记录吗？'
+      const answer = await answerTo(adapter, scope, question, text, abort)
+      const approved = answer === 'yes'
+      // The question named only the first change: a yes approves that one, never the others.
+      const resume: RunAgentResumeItem[] = pending.map((item, index) => ({
+        interruptId: item.interruptId,
+        status: 'resolved',
+        payload: { approved: approved && index === 0 },
+      }))
+      outcome = await runChat(adapter, context(), scope, { resume }, babyNames, abort)
+      if (answer === null) outcome = null
+    }
+    outcome ??= await runChat(
+      adapter,
+      context(),
+      scope,
+      { messages: [{ role: 'user', content: text }] },
+      babyNames,
+      abort,
+    )
 
-  let outcome: RunOutcome | null = null
-  if (pending.length > 0) {
-    const metadata = pending[0]?.payload.metadata
-    const question = isRecord(metadata)
-      ? await confirmQuestion(scope, metadata)
-      : '要修改这条记录吗？'
-    const answer = await answerTo(adapter, scope, question, text)
-    const approved = answer === 'yes'
-    const resume: RunAgentResumeItem[] = pending.map((item) => ({
-      interruptId: item.interruptId,
-      status: 'resolved',
-      payload: { approved },
-    }))
-    outcome = await runChat(adapter, context(), scope, { resume }, babyNames)
-    if (answer === null) outcome = null
+    if (outcome.error || RAW_TOOL_CALL.test(outcome.text)) {
+      if (!outcome.error)
+        console.error('Model wrote a tool call as text', outcome.text.slice(0, 200))
+      return { reply: '没处理好，请再说一遍。', done: false, confirming: false }
+    }
+    const first = outcome.approvals[0]
+    if (first) return { reply: await confirmQuestion(scope, first), done: false, confirming: true }
+    return { reply: outcome.text || '好的。', done: state.done, confirming: false }
+  } finally {
+    clearTimeout(timer)
   }
-  outcome ??= await runChat(
-    adapter,
-    context(),
-    scope,
-    { messages: [{ role: 'user', content: text }] },
-    babyNames,
-  )
-
-  if (outcome.error || RAW_TOOL_CALL.test(outcome.text)) {
-    if (!outcome.error) console.error('Model wrote a tool call as text', outcome.text.slice(0, 200))
-    return { reply: '没处理好，请再说一遍。', done: false, confirming: false }
-  }
-  const first = outcome.approvals[0]
-  if (first) return { reply: await confirmQuestion(scope, first), done: false, confirming: true }
-  return { reply: outcome.text || '好的。', done: state.done, confirming: false }
 }
