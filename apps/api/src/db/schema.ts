@@ -224,6 +224,8 @@ export const voiceSettings = sqliteTable('voice_settings', {
   userId: text('user_id').primaryKey(),
   phrase: text('phrase').notNull(),
   timeZone: text('time_zone').notNull(),
+  /** The app language the assistant replies in (BCP 47, e.g. "zh-CN"). */
+  locale: text('locale').notNull().default('zh-CN'),
   threadId: text('thread_id'),
   threadActiveAt: integer('thread_active_at'),
   /** Whose key and families the thread runs with; a change starts a new thread. */

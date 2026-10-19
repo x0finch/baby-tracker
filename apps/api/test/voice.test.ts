@@ -175,6 +175,22 @@ describe('siri voice logging', () => {
     expect(stored.every((event) => event.createdBy !== null)).toBe(true)
   })
 
+  it("replies in the app's language, as the app last set it", async () => {
+    const { token } = await newToken()
+    await record(token, '换尿布', [action({ type: 'diaper' })])
+    expect(system).toContain('用中文回答')
+
+    const changed = await t.send('PATCH', '/api/voice', headers, { locale: 'en-US' })
+    expect(changed.status).toBe(200)
+    await record(token, '换尿布', [action({ type: 'diaper' })])
+    expect(system).toContain('用英语回答')
+
+    expect((await t.send('PATCH', '/api/voice', headers, { locale: 'not a locale' })).status).toBe(
+      400,
+    )
+    await t.send('PATCH', '/api/voice', headers, { locale: 'zh-CN' })
+  })
+
   it('ends when the agent says the user is done', async () => {
     const { token } = await newToken()
     fake.setResponses([

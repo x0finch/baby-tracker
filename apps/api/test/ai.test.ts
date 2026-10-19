@@ -230,10 +230,24 @@ describe('AI settings', () => {
 describe('model request options', () => {
   // Without a cap, OpenRouter reserves the model's maximum output and refuses small balances.
   it('caps output tokens under the name each API uses', () => {
-    expect(modelOptionsFor('openrouter')).toEqual({
+    expect(modelOptionsFor('openrouter', 'deepseek/deepseek-v4.1-flash')).toEqual({
       max_tokens: MAX_OUTPUT_TOKENS,
       provider: { require_parameters: true },
     })
-    expect(modelOptionsFor('openai')).toEqual({ max_output_tokens: MAX_OUTPUT_TOKENS })
+    expect(modelOptionsFor('openai', 'gpt-4.1-mini')).toEqual({
+      max_output_tokens: MAX_OUTPUT_TOKENS,
+    })
+  })
+
+  // GPT-5 without a reasoning effort writes its plan into the reply, and Siri reads it out.
+  it('asks OpenAI reasoning models for low effort, directly or through OpenRouter', () => {
+    expect(modelOptionsFor('openai', 'gpt-5.4-mini')).toEqual({
+      max_output_tokens: MAX_OUTPUT_TOKENS,
+      reasoning: { effort: 'low' },
+    })
+    expect(modelOptionsFor('openrouter', 'openai/gpt-5.4-mini')).toMatchObject({
+      reasoning: { effort: 'low' },
+    })
+    expect(modelOptionsFor('openai', 'o4-mini')).toHaveProperty('reasoning')
   })
 })

@@ -60,6 +60,7 @@ describe('voice agent', () => {
       keyScope: 'own',
       userId: signedIn.user.id,
       timeZone: 'Asia/Shanghai',
+      locale: 'zh-CN',
       phrase: '记录宝宝',
     }
   })

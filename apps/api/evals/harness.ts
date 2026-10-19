@@ -52,12 +52,19 @@ export function asksQuestion(reply: string): boolean {
   return /[？?]|吗|么/.test(rest)
 }
 
+/** English words in a reply, besides names said in Chinese too (Siri, Bobo) and units. */
+export const speaksEnglish = (reply: string) =>
+  /[A-Za-z]{3,}/.test(reply.replaceAll(/\b(Siri|Bobo|AI)\b/g, ''))
+
 /** Whether a turn did what was expected, from its reply and the records it added. */
 export function judge(
   expect: Expect,
   reply: string,
   added: Stored[],
 ): { pass: boolean; why?: string } {
+  // Siri reads replies aloud in Chinese; English words are usually the model's notes to
+  // itself ("Need update latest diaper…") leaking into the reply.
+  if (speaksEnglish(reply)) return { pass: false, why: '回复夹带英文' }
   if ('asks' in expect) {
     const forbidden = expect.forbid
       ? added.filter((stored) => matches(stored, expect.forbid!))
@@ -158,6 +165,7 @@ export async function runScenario(
     keyScope: 'own',
     userId: user.id,
     timeZone: ZONE,
+    locale: 'zh-CN',
     phrase: '记录宝宝',
     modelOptions,
   }

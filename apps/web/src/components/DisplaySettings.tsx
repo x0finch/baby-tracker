@@ -1,8 +1,10 @@
+import { voiceApi } from '../features/voice/api'
 import { type Locale, getLocale, localeDisplayName, locales, setLocale } from '../lib/i18n'
 import type { ThemePreference } from '../lib/theme'
 import { unitLabel, useUnits } from '../lib/units'
 import { useTheme } from '../lib/use-theme'
 import { m } from '../paraglide/messages.js'
+import { useAccount } from '../sync/use-access'
 import { Card, CardTitle } from './ui/Card'
 import { SegmentedControl } from './ui/SegmentedControl'
 
@@ -39,7 +41,13 @@ export function ThemeCard() {
 
 /** Hidden until a second locale ships; switching reloads the app in that locale. */
 export function LanguageCard() {
+  const signedIn = useAccount() !== undefined
   if (locales.length < 2) return null
+  const change = async (locale: Locale) => {
+    // Siri replies in the app's language; the reload below would cut this request short.
+    if (signedIn) await voiceApi.saveLocale(locale).catch(() => undefined)
+    await setLocale(locale)
+  }
   return (
     <Card className="flex flex-col gap-3">
       <CardTitle>{m.settingsLanguage()}</CardTitle>
@@ -47,7 +55,7 @@ export function LanguageCard() {
         label={m.settingsLanguage()}
         options={locales.map((locale) => ({ value: locale, label: localeDisplayName(locale) }))}
         value={getLocale()}
-        onChange={(locale) => void setLocale(locale)}
+        onChange={(locale) => void change(locale)}
       />
     </Card>
   )

@@ -1,4 +1,5 @@
 import { apiFetch } from '../../lib/api'
+import { getLocale } from '../../lib/i18n'
 
 /**
  * The Siri shortcut, shared from iCloud (docs/siri.md). Opening it shows the Shortcuts
@@ -94,18 +95,25 @@ export async function revokeThisDeviceToken() {
   saveDeviceTokenIds([])
 }
 
-// Times said aloud ("三点") are read in this device's zone.
-const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone
+// Times said aloud ("三点") are read in this device's zone, and the assistant replies in the
+// app's language.
+const device = () => ({
+  timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  locale: getLocale(),
+})
 
 export const voiceApi = {
   settings: () => apiFetch<VoiceSettings>('/api/voice'),
   rename: (phrase: string) =>
     apiFetch<VoiceSettings>('/api/voice', { method: 'PATCH', body: JSON.stringify({ phrase }) }),
+  /** The language Siri's replies are in, when the app's language changes. */
+  saveLocale: (locale: string) =>
+    apiFetch<VoiceSettings>('/api/voice', { method: 'PATCH', body: JSON.stringify({ locale }) }),
   /** Replaces any earlier code; the old one stops working at once. */
   createToken: async () => {
     const created = await apiFetch<{ id: string; token: string }>('/api/voice/token', {
       method: 'POST',
-      body: JSON.stringify({ timeZone: timeZone() }),
+      body: JSON.stringify(device()),
     })
     saveDeviceTokenIds([...deviceTokenIds(), created.id])
     return created
@@ -119,7 +127,7 @@ export const voiceApi = {
   send: (text: string) =>
     apiFetch<ChatTurn>('/api/voice/chat', {
       method: 'POST',
-      body: JSON.stringify({ text, timeZone: timeZone() }),
+      body: JSON.stringify({ text, ...device() }),
     }),
 }
 

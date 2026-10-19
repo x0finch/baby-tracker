@@ -137,18 +137,31 @@ export async function listModels(provider: AiProvider, apiKey: string): Promise<
 export const MAX_OUTPUT_TOKENS = 4096
 
 /**
- * Request options for the provider: the output cap under the name its API uses. OpenRouter
- * routes only to hosts that support every parameter sent, tools included: a host without
- * tool calling has models write their calls as text (DeepSeek's DSML), which the user would
- * then hear.
+ * OpenAI's reasoning models (GPT-5, o-series), directly or through OpenRouter. Without a
+ * reasoning effort they plan out loud in the reply ("Need update latest diaper…"), which
+ * Siri then reads; older GPT models reject the parameter.
  */
-export const modelOptionsFor = (provider: AiProvider): Record<string, unknown> =>
-  PROVIDERS[provider].api === 'responses'
-    ? { max_output_tokens: MAX_OUTPUT_TOKENS }
+const thinksAloud = (model: string) => /^(openai\/)?(gpt-5|o\d)/.test(model)
+
+/**
+ * Request options for the provider and model:
+ * - the output cap, under the name its API uses
+ * - low reasoning effort for OpenAI's reasoning models, so their thinking stays out of the
+ *   reply
+ * - on OpenRouter, only hosts that support every parameter sent, tools included: a host
+ *   without tool calling has models write their calls as text (DeepSeek's DSML), which the
+ *   user would then hear
+ */
+export function modelOptionsFor(provider: AiProvider, model: string): Record<string, unknown> {
+  const reasoning = thinksAloud(model) ? { reasoning: { effort: 'low' } } : {}
+  return PROVIDERS[provider].api === 'responses'
+    ? { max_output_tokens: MAX_OUTPUT_TOKENS, ...reasoning }
     : {
         max_tokens: MAX_OUTPUT_TOKENS,
+        ...reasoning,
         ...(provider === 'openrouter' ? { provider: { require_parameters: true } } : {}),
       }
+}
 
 /** The model to start with: the first recommended one this key can use. */
 export const firstChoice = (models: AiModel[]) =>

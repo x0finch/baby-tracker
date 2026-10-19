@@ -11,7 +11,8 @@ import { SCENARIOS } from './scenarios'
 // Costs real tokens, so it only runs on request:
 //   EVAL_OPENROUTER_API_KEY=... pnpm --filter @bobo/api eval
 // EVAL_MODELS picks the models ("provider:model", comma-separated), EVAL_RUNS the runs per
-// scenario, EVAL_ONLY a substring of the scenario names to run.
+// scenario, EVAL_ONLY a substring of the scenario names to run, EVAL_CONCURRENCY how many play
+// at once.
 
 const KEYS: Record<AiProvider, string | undefined> = {
   openrouter: process.env.EVAL_OPENROUTER_API_KEY,
@@ -23,6 +24,8 @@ const MODELS = (process.env.EVAL_MODELS || 'openrouter:deepseek/deepseek-v4.1-fl
   .filter(Boolean)
 const RUNS = Number(process.env.EVAL_RUNS || 3)
 const ONLY = process.env.EVAL_ONLY ?? ''
+/** Scenarios played at once; 1 for keys with a low rate limit. */
+const CONCURRENCY = Number(process.env.EVAL_CONCURRENCY || 4)
 const REPORT = process.env.EVAL_REPORT || 'eval-report.md'
 
 function parseModel(entry: string) {
@@ -55,12 +58,12 @@ it.skipIf(runnable.length === 0)(
               aiAdapter(provider, model, key!),
               entry,
               scenario,
-              modelOptionsFor(provider),
+              modelOptionsFor(provider, model),
             ),
         ),
       ),
     )
-    const results = await pool(tasks, 4)
+    const results = await pool(tasks, CONCURRENCY)
     const markdown = report(results, RUNS)
     await writeFile(REPORT, markdown)
     if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, markdown)

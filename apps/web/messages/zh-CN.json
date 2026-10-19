@@ -49,6 +49,7 @@
   "aiModelsMissing": "{provider} 的密钥用不了，它的模型没列出来。",
   "aiModelsNone": "没有找到模型。",
   "aiModelsShowAll": "显示全部（另有 {count} 个推理、快照或较贵的模型）",
+  "aiModelsUnverified": "推荐的模型都测试过；下面的模型没有测试，回复可能不稳定。",
   "aiMonthly": "约 ¥{amount}/月",
   "aiMonthlyUnder": "不到 ¥1/月",
   "aiPrice": "{input} / {output}",

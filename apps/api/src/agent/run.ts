@@ -90,11 +90,38 @@ export interface AgentScope {
   keyScope: string
   userId: string
   timeZone: string
+  /** The app language replies are in (BCP 47); see replyLanguage. */
+  locale: string
   phrase: string
   /** Extra request fields for the provider (modelOptionsFor). */
   modelOptions?: Record<string, unknown>
   /** Overrides TURN_TIMEOUT_MS; tests use a short one. */
   timeoutMs?: number
+}
+
+/**
+ * The language replies are in, named in Chinese for the instructions ("中文", "英语"). Only
+ * the language matters, not the region: zh-CN and zh-TW are both 中文.
+ */
+export function replyLanguage(locale: string): string {
+  try {
+    const { language } = new Intl.Locale(locale)
+    return new Intl.DisplayNames('zh-CN', { type: 'language' }).of(language) ?? '中文'
+  } catch {
+    return '中文'
+  }
+}
+
+/**
+ * The reply without a model's thinking: `<think>…</think>` blocks, and everything before a
+ * `</think>` whose opening tag the host dropped. Other models keep their thinking out of the
+ * reply on their own (reasoning effort, see modelOptionsFor).
+ */
+export function withoutThinking(text: string): string {
+  const closed = text.replaceAll(/<think>[\s\S]*?<\/think>/g, '')
+  const dangling = closed.lastIndexOf('</think>')
+  const rest = dangling === -1 ? closed : closed.slice(dangling + '</think>'.length)
+  return rest.replace(/<think>[\s\S]*$/, '').trim()
 }
 
 function instructions(scope: AgentScope, now: number, babyLines: string[]) {
@@ -105,7 +132,7 @@ function instructions(scope: AgentScope, now: number, babyLines: string[]) {
       : ''
   return `你是 Bobo 的育儿记录助手。家长通过 Siri 或 App 跟你说话，你用工具查看和记录宝宝的喂养、睡眠、尿布等。
 规则：
-- 用中文回答，口语化、简短（一两句），因为常常是 Siri 读出来的。不要用列表或 Markdown。
+- 用${replyLanguage(scope.locale)}回答，口语化、简短（一两句），因为常常是 Siri 读出来的。不要用列表或 Markdown。回复里只写要对家长说的话，不要写你的分析、计划或工具名。
 - 能直接记就直接记，不要反复确认（疑似听错的除外，见下面）。一句话里的几件事用一次 record 调用。
 - 修改或删除前先用 find_events 找到那条记录。修改直接调用 update_event，不用问家长，改完用一句话说清改了什么（改之前和改之后）。删除调用 delete_event，系统会自动请家长确认，你不用自己问。
 - 回答问题时先用 find_events 查，再根据结果回答，不要编造。
@@ -234,7 +261,7 @@ async function runChat(
   }
   // Out of time: whatever was said so far is not an answer.
   if (abortController.signal.aborted) error = 'timed out'
-  return { text: text.trim(), approvals, error }
+  return { text: withoutThinking(text), approvals, error }
 }
 
 /**
