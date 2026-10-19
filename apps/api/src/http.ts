@@ -1,14 +1,31 @@
 import { HTTPException } from 'hono/http-exception'
 import { validator } from 'hono/validator'
 
-/** Error codes the API answers with, as `{ error }`. */
-export type ErrorCode = 'invalid' | 'forbidden' | 'not_found'
+const STATUS = {
+  invalid: 400,
+  invalid_key: 400,
+  no_key: 400,
+  unauthorized: 401,
+  forbidden: 403,
+  not_found: 404,
+  already_member: 409,
+  expired: 410,
+  revoked: 410,
+  used: 410,
+  too_large: 413,
+  not_configured: 503,
+} as const
 
-const STATUS = { invalid: 400, forbidden: 403, not_found: 404 } as const
+/** Error codes the API answers with, as `{ error }`, each with its status. */
+export type ErrorCode = keyof typeof STATUS
 
-/** Stops the request with `{ error: code }`; `onError` turns it into the response. */
-export function fail(code: ErrorCode): never {
-  throw new HTTPException(STATUS[code], { message: code })
+/** Stops the request with `{ error: code, ...details }`; `onError` sends it. */
+export function fail(code: ErrorCode, details?: Record<string, unknown>): never {
+  const status = STATUS[code]
+  throw new HTTPException(status, {
+    message: code,
+    res: Response.json({ error: code, ...details }, { status }),
+  })
 }
 
 interface Schema<T> {
@@ -26,7 +43,9 @@ export const json = <T>(schema: Schema<T>) =>
 /** Maps thrown errors to JSON: HTTP errors keep their status, anything else is a 500. */
 export function errorResponse(error: Error): Response {
   if (error instanceof HTTPException) {
-    // Hono's own 400s (malformed JSON, wrong content type) carry prose, not a code.
+    // fail() built the response; Hono's own errors (malformed JSON, wrong content type)
+    // carry prose, not a code.
+    if (error.res) return error.res
     const code = error.status === 400 ? 'invalid' : error.message
     return Response.json({ error: code }, { status: error.status })
   }

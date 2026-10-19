@@ -116,6 +116,16 @@ function instructions(scope: AgentScope, now: number, babyNames: string[]) {
 /** Every thread of a user starts with this, so deleting the account can find them all. */
 export const threadPrefix = (userId: string) => `voice_${userId}_`
 
+/**
+ * Every thread of a user as a key range, `thread_id >= ?from and thread_id < ?to`, which
+ * the thread_id indexes serve (a substr() match would scan the table).
+ */
+export function threadRange(userId: string) {
+  const from = threadPrefix(userId)
+  const to = from.slice(0, -1) + String.fromCharCode(from.charCodeAt(from.length - 1) + 1)
+  return { from, to }
+}
+
 /** The thread the user's next message goes to: the current one, or a new one after a pause. */
 export async function currentThread(db: D1Database, scope: AgentScope, now: number) {
   const row = await db

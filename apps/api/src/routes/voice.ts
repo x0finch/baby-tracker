@@ -12,6 +12,7 @@ import {
   SESSION_IDLE_MS,
   runAgent,
   threadPrefix,
+  threadRange,
 } from '../agent/run'
 import type { Env } from '../env'
 import { json } from '../http'
@@ -144,6 +145,7 @@ function visibleLines(threadId: string, messagesJson: string): ChatLine[] {
  */
 async function transcript(db: D1Database, userId: string, now: number, before?: string) {
   const prefix = threadPrefix(userId)
+  const range = threadRange(userId)
   const [cursorThread = '', cursorIndex = ''] = before?.split('~') ?? []
   const fromCursor = cursorThread.startsWith(prefix) ? cursorThread : null
   const end = Number.parseInt(cursorIndex, 10)
@@ -159,11 +161,11 @@ async function transcript(db: D1Database, userId: string, now: number, before?: 
     const { results } = await db
       .prepare(
         `select thread_id as threadId, messages_json as json from chat_threads
-         where substr(thread_id, 1, length(?1)) = ?1 and updated_at >= ?2
+         where thread_id >= ?1 and thread_id < ?6 and updated_at >= ?2
            and (?3 is null or thread_id < ?3 or (?4 and thread_id = ?3))
          order by thread_id desc limit ?5`,
       )
-      .bind(prefix, now - KEEP_MS, upTo, inclusive ? 1 : 0, THREAD_BATCH)
+      .bind(range.from, now - KEEP_MS, upTo, inclusive ? 1 : 0, THREAD_BATCH, range.to)
       .all<{ threadId: string; json: string }>()
     for (const row of results) {
       const all = visibleLines(row.threadId, row.json)

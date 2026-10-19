@@ -10,7 +10,7 @@ import {
 import { Hono } from 'hono'
 
 import { checkBabyWrite, checkEventWrite, loadAccess, readScope, toSummaries } from '../access'
-import { json } from '../http'
+import { fail, json } from '../http'
 import {
   type ExistingRow,
   type SyncCursor,
@@ -57,7 +57,7 @@ function toEvent({ seq: _seq, data, ...event }: EventRow): Event {
 export const syncRoutes = new Hono<AppEnv>()
   .post('/push', json(pushRequestSchema), async (c) => {
     const { babies, events } = c.req.valid('json')
-    if (babies.length + events.length > SYNC_PUSH_LIMIT) return c.json({ error: 'too_large' }, 413)
+    if (babies.length + events.length > SYNC_PUSH_LIMIT) fail('too_large')
 
     const db = c.env.DB
     const userId = c.get('user').id

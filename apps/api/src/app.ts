@@ -1,8 +1,10 @@
 import { Hono } from 'hono'
+import { bodyLimit } from 'hono/body-limit'
+import { except } from 'hono/combine'
 import { cors } from 'hono/cors'
 
 import { getAuth, trustedOrigins } from './auth'
-import { errorResponse } from './http'
+import { errorResponse, fail } from './http'
 import { requireUser } from './middleware'
 import { authRateLimit } from './rate-limit'
 import { accountRoutes } from './routes/account'
@@ -14,6 +16,9 @@ import { syncRoutes } from './routes/sync'
 import { type AdapterFor, siriRoutes, voiceRoutes } from './routes/voice'
 import type { AppEnv, AuthFor } from './types'
 import { decryptKey, aiAdapter } from './voice/ai'
+
+/** Request bodies above this are refused before they are read in full. */
+const MAX_BODY_BYTES = 1024 * 1024
 
 export interface AppOptions {
   auth?: AuthFor
@@ -43,6 +48,9 @@ export function createApp(options: AppOptions = {}) {
     }),
   )
 
+  // The largest legitimate body is a sync push of SYNC_PUSH_LIMIT records, well under this.
+  app.use('*', bodyLimit({ maxSize: MAX_BODY_BYTES, onError: () => fail('too_large') }))
+
   app.get('/health', async (c) => {
     // Touch D1 so the check covers the binding, not just the Worker.
     await c.env.DB.prepare('select 1').first()
@@ -52,44 +60,42 @@ export function createApp(options: AppOptions = {}) {
   app.use('/auth/*', authRateLimit)
   app.on(['GET', 'POST'], '/auth/*', (c) => authFor(c.env).handler(c.req.raw))
 
-  const auth = requireUser(authFor)
+  // Every route needs a session except these: a new route is private unless listed here.
+  app.use(
+    '*',
+    except(
+      [
+        '/api/health',
+        '/api/auth/*',
+        // Who invited you, shown before signing in; accepting needs a session.
+        '/api/invites/:code',
+        // The shortcut authenticates with its own code.
+        '/api/voice/siri',
+      ],
+      requireUser(authFor),
+    ),
+  )
 
-  app.get('/me', auth, (c) => {
+  app.get('/me', (c) => {
     const user = c.get('user')
     return c.json({ id: user.id, name: user.name, email: user.email, image: user.image ?? null })
   })
 
-  app.use('/ai', auth)
-  app.use('/ai/*', auth)
   app.route('/ai', userAiRoutes)
-  app.use('/account', auth)
   app.route('/account', accountRoutes)
-  app.use('/families', auth)
-  app.use('/families/*', auth)
   app.route('/families/:familyId/invites', familyInviteRoutes)
   app.route('/families/:familyId/ai', familyAiRoutes)
   app.route('/families', familyRoutes)
   app.route('/invites', invitePreviewRoutes)
-  app.use('/invites/:code/accept', auth)
   app.route('/invites', inviteAcceptRoutes)
-  app.use('/sync/*', auth)
   app.route('/sync', syncRoutes)
-  app.use('/push/*', auth)
   app.route('/push', pushRoutes)
-  app.use('/reminders', auth)
   app.route('/reminders', reminderRoutes)
-  // The shortcut authenticates with its own code, not a session.
   app.route('/voice/siri', siriRoutes(voiceAdapter))
-  app.use('/voice', auth)
-  app.use('/voice/token', auth)
-  app.use('/voice/tokens/*', auth)
-  app.use('/voice/chat', auth)
   app.route('/voice', voiceRoutes(voiceAdapter))
 
-  app.notFound((c) => c.json({ error: 'not_found' }, 404))
+  app.notFound(() => fail('not_found'))
   app.onError(errorResponse)
 
   return app
 }
-
-export type App = ReturnType<typeof createApp>

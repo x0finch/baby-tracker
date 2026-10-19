@@ -166,4 +166,13 @@ describe('families and sync', () => {
     )
     expect(res.status).toBe(413)
   })
+
+  it('refuses bodies over the size limit before reading them', async () => {
+    const res = await t.request(
+      '/api/sync/push',
+      json({ events: [{ note: 'x'.repeat(2 * 1024 * 1024) }] }),
+    )
+    expect(res.status).toBe(413)
+    expect(await res.json()).toEqual({ error: 'too_large' })
+  })
 })
