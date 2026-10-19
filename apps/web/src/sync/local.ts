@@ -1,6 +1,7 @@
 import type { Baby, Event, FamilySummary } from '@bobo/shared'
+import { createTransaction } from '@tanstack/db'
 
-import type { LocalStore } from '../db'
+import { type LocalStore, getLocalStore } from '../db'
 
 export type SyncTable = 'babies' | 'events'
 
@@ -16,9 +17,9 @@ export interface SyncAccount {
   familyId: string | null
 }
 
-const ACCOUNT_KEY = 'account'
+export const ACCOUNT_KEY = 'account'
 const CURSOR_KEY = 'cursor'
-const ACCESS_KEY = 'access'
+export const ACCESS_KEY = 'access'
 
 const outboxKey = (table: SyncTable, id: string) => `${table}:${id}`
 
@@ -48,6 +49,15 @@ export function getAccount(store: LocalStore): SyncAccount | undefined {
   return isAccount(value) ? value : undefined
 }
 
+/**
+ * Whether this device is signed in, for route loaders (outside React): they prefetch
+ * account-side data only then.
+ */
+export async function isSignedIn(): Promise<boolean> {
+  if (typeof window === 'undefined') return false
+  return getAccount(await getLocalStore()) !== undefined
+}
+
 export function setAccount(store: LocalStore, account: SyncAccount | undefined) {
   if (account) setMeta(store, ACCOUNT_KEY, account)
   else if (store.meta.has(ACCOUNT_KEY)) store.meta.delete(ACCOUNT_KEY)
@@ -60,6 +70,30 @@ export function getCursor(store: LocalStore): string {
 
 export function setCursor(store: LocalStore, cursor: string) {
   setMeta(store, CURSOR_KEY, cursor)
+}
+
+/**
+ * Applies local changes as one TanStack DB transaction: records and their outbox entries are
+ * kept or rolled back together, so a record is never saved without being queued for sync.
+ * Changes show at once; like TanStack DB's own writes, await `isPersisted.promise` to know
+ * they are stored.
+ */
+export function writeLocal(store: LocalStore, change: () => void) {
+  const transaction = createTransaction({
+    autoCommit: false,
+    mutationFn: async ({ transaction: tx }) => {
+      await Promise.all([
+        store.babies.utils.acceptMutations(tx),
+        store.events.utils.acceptMutations(tx),
+        store.outbox.utils.acceptMutations(tx),
+      ])
+    },
+  })
+  // A record that fails validation throws here, and TanStack DB drops the whole change.
+  transaction.mutate(change)
+  // A failure rolls the changes back and rejects isPersisted, as automatic writes do.
+  transaction.commit().catch(() => {})
+  return transaction
 }
 
 /** Records a local change for the next push. Remote changes must not go through here. */
@@ -152,21 +186,23 @@ export function unclaimedCount(store: LocalStore): number {
  * Events follow their baby, so a family's events always travel with its babies.
  */
 export function claimLocalData(store: LocalStore, familyId: string, now: number = Date.now()) {
-  for (const baby of store.babies.toArray) {
-    if (baby.familyId !== null) continue
-    const updatedAt = Math.max(now, baby.updatedAt)
-    store.babies.update(baby.id, (draft) => Object.assign(draft, { familyId, updatedAt }))
-    markDirty(store, 'babies', { ...baby, familyId, updatedAt })
-  }
-  for (const event of store.events.toArray) {
-    if (event.familyId !== null) continue
-    const babyFamily = store.babies.get(event.babyId)?.familyId ?? familyId
-    const updatedAt = Math.max(now, event.updatedAt)
-    store.events.update(event.id, (draft) =>
-      Object.assign(draft, { familyId: babyFamily, updatedAt }),
-    )
-    markDirty(store, 'events', { ...event, familyId: babyFamily, updatedAt })
-  }
+  return writeLocal(store, () => {
+    for (const baby of store.babies.toArray) {
+      if (baby.familyId !== null) continue
+      const updatedAt = Math.max(now, baby.updatedAt)
+      store.babies.update(baby.id, (draft) => Object.assign(draft, { familyId, updatedAt }))
+      markDirty(store, 'babies', { ...baby, familyId, updatedAt })
+    }
+    for (const event of store.events.toArray) {
+      if (event.familyId !== null) continue
+      const babyFamily = store.babies.get(event.babyId)?.familyId ?? familyId
+      const updatedAt = Math.max(now, event.updatedAt)
+      store.events.update(event.id, (draft) =>
+        Object.assign(draft, { familyId: babyFamily, updatedAt }),
+      )
+      markDirty(store, 'events', { ...event, familyId: babyFamily, updatedAt })
+    }
+  })
 }
 
 /** Drops a baby's events from this device only; used when the baby is deleted. */

@@ -5,7 +5,6 @@ import type {
   Invite,
   InvitePreview,
 } from '@bobo/shared'
-import { queryOptions } from '@tanstack/react-query'
 
 import { apiFetch } from '../../lib/api'
 
@@ -55,15 +54,3 @@ export const familyApi = {
 export function inviteUrl(code: string): string {
   return new URL(`/join/${code}`, window.location.origin).toString()
 }
-
-export const familyKeys = {
-  members: (familyId: string) => ['family', familyId, 'members'] as const,
-  invites: (familyId: string) => ['family', familyId, 'invites'] as const,
-}
-
-export const invitePreviewQuery = (code: string) =>
-  queryOptions({
-    queryKey: ['invite', code],
-    queryFn: () => familyApi.previewInvite(code),
-    staleTime: 0,
-  })

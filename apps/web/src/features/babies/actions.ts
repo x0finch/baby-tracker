@@ -1,5 +1,5 @@
 import type { LocalStore } from '../../db'
-import { currentFamilyId, markDirty, purgeBabyEvents } from '../../sync/local'
+import { currentFamilyId, markDirty, purgeBabyEvents, writeLocal } from '../../sync/local'
 import { type BabyInput, buildBaby } from './records'
 
 /** Adds a baby to `familyId`; null keeps it local until it is claimed (see claimLocalData). */
@@ -9,8 +9,10 @@ export function createBaby(
   familyId: string | null = currentFamilyId(store),
 ) {
   const baby = { ...buildBaby(input), familyId }
-  store.babies.insert(baby)
-  markDirty(store, 'babies', baby)
+  writeLocal(store, () => {
+    store.babies.insert(baby)
+    markDirty(store, 'babies', baby)
+  })
   return baby
 }
 
@@ -25,26 +27,32 @@ function updateAndMark(
 }
 
 export function updateBaby(store: LocalStore, id: string, input: BabyInput) {
-  updateAndMark(store, id, (draft) => {
-    Object.assign(draft, input)
-    draft.updatedAt = Date.now()
-  })
+  return writeLocal(store, () =>
+    updateAndMark(store, id, (draft) => {
+      Object.assign(draft, input)
+      draft.updatedAt = Date.now()
+    }),
+  )
 }
 
 export function setBabyArchived(store: LocalStore, id: string, archived: boolean) {
   const now = Date.now()
-  updateAndMark(store, id, (draft) => {
-    Object.assign(draft, { archivedAt: archived ? now : null })
-    draft.updatedAt = now
-  })
+  return writeLocal(store, () =>
+    updateAndMark(store, id, (draft) => {
+      Object.assign(draft, { archivedAt: archived ? now : null })
+      draft.updatedAt = now
+    }),
+  )
 }
 
 /** Deletes a baby for everyone; its records go too (on the server when the deletion syncs). */
 export function deleteBaby(store: LocalStore, id: string) {
   const now = Date.now()
-  updateAndMark(store, id, (draft) => {
-    Object.assign(draft, { deletedAt: now })
-    draft.updatedAt = now
+  return writeLocal(store, () => {
+    updateAndMark(store, id, (draft) => {
+      Object.assign(draft, { deletedAt: now })
+      draft.updatedAt = now
+    })
+    purgeBabyEvents(store, id)
   })
-  purgeBabyEvents(store, id)
 }

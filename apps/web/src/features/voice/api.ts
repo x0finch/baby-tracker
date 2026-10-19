@@ -94,11 +94,6 @@ export async function revokeThisDeviceToken() {
   saveDeviceTokenIds([])
 }
 
-export const voiceKeys = {
-  settings: ['voice-settings'] as const,
-  chat: ['voice-chat'] as const,
-}
-
 // Times said aloud ("三点") are read in this device's zone.
 const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone
 

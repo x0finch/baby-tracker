@@ -9,19 +9,17 @@ import {
   addPasskey,
   deletePasskey,
   isPasskeyCancel,
-  listPasskeys,
   needsFreshSignIn,
   passkeysSupported,
 } from './passkey'
-
-const PASSKEYS_KEY = ['passkeys']
+import { accountKeys, accountQueries } from './queries'
 
 /** The signed-in account's passkeys: add one for this device, or remove old ones. */
 export function PasskeySection() {
   const queryClient = useQueryClient()
-  const list = useQuery({ queryKey: PASSKEYS_KEY, queryFn: listPasskeys })
+  const list = useQuery(accountQueries.passkeys())
   const [message, setMessage] = useState<string>()
-  const refresh = () => queryClient.invalidateQueries({ queryKey: PASSKEYS_KEY })
+  const refresh = () => queryClient.invalidateQueries({ queryKey: accountKeys.passkeys })
 
   const add = useMutation({
     mutationFn: () => addPasskey(m.passkeyDefaultName({ date: formatDate(Date.now()) })),

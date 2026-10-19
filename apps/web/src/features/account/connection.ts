@@ -54,10 +54,10 @@ export async function resolveClaimChoice(store: LocalStore, family: FamilySummar
  * signed out here, ask the server; if there is a session, start over from the saved data,
  * which also links the account if the other window hadn't.
  */
-export function reloadWhenSignedInElsewhere(store: LocalStore) {
+export function reloadWhenSignedInElsewhere(store: LocalStore, joining: () => boolean) {
   const check = async () => {
     // Signed in but deliberately not linked yet: choosing where records go, or joining.
-    if (getAccount(store) || claimChoice.get() || window.location.pathname.startsWith('/join/')) {
+    if (getAccount(store) || claimChoice.get() || joining()) {
       return
     }
     try {

@@ -23,6 +23,7 @@ import { useInvites, useMembers } from './collections'
 import { DeleteFamilySheet } from './DeleteFamilySheet'
 import { InviteSheet } from './InviteSheet'
 import { MemberSheet } from './MemberSheet'
+import { familyKeys } from './queries'
 import { RenameSheet } from './RenameSheet'
 import { roleLabel } from './roles'
 
@@ -41,7 +42,7 @@ export function FamilyDetail({ family, userId }: { family: FamilySummary; userId
   const [editingId, setEditingId] = useState<string | null>(null)
   const editing = members?.find((member) => member.userId === editingId)
   // Members and invites both change after inviting, editing or revoking.
-  const refresh = () => void queryClient.invalidateQueries({ queryKey: ['family', family.id] })
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: familyKeys.all(family.id) })
 
   const navigate = useNavigate()
   const leave = useMutation({

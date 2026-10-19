@@ -1,4 +1,4 @@
-import { useLiveQuery } from '@tanstack/react-db'
+import { count, useLiveQuery } from '@tanstack/react-db'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
@@ -9,13 +9,14 @@ import { Sheet } from '../../components/ui/Sheet'
 import { useLocalStore } from '../../db'
 import { formatTime } from '../../lib/i18n'
 import { m } from '../../paraglide/messages.js'
-import { getAccount } from '../../sync/local'
 import { requestSync, useSyncState } from '../../sync/runner'
+import { useAccount } from '../../sync/use-access'
 import { disablePush } from '../reminders/notifications'
 import { revokeThisDeviceToken } from '../voice/api'
-import { deleteAccountRemote, disconnectLocal, httpAccountApi, signOutRemote } from './account'
+import { deleteAccountRemote, disconnectLocal, signOutRemote } from './account'
 import { connectIfSignedIn } from './connection'
 import { PasskeySection } from './PasskeySection'
+import { accountQueries } from './queries'
 import { SignInOptions } from './SignInOptions'
 
 /** One line describing the sync state, for the account page and its settings row. */
@@ -41,18 +42,23 @@ function SyncStatusLine() {
 /** Sign-in, sync status and sign-out in settings. */
 export function AccountCard() {
   const store = useLocalStore()
-  // Re-render when the account meta record changes (sign-in completes, sign-out).
-  useLiveQuery({ query: (q) => q.from({ meta: store.meta }) })
-  const { data: pending } = useLiveQuery({ query: (q) => q.from({ entry: store.outbox }) })
-  const account = getAccount(store)
+  const account = useAccount()
+  const { data: outbox } = useLiveQuery(
+    (q) =>
+      q
+        .from({ entry: store.outbox })
+        .select(({ entry }) => ({ n: count(entry.key) }))
+        .findOne(),
+    [store],
+  )
+  const pending = outbox?.n ?? 0
   const queryClient = useQueryClient()
   const [signingOut, setSigningOut] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
   const userId = account?.userId
   const { data: user } = useQuery({
-    queryKey: ['me', userId],
-    queryFn: () => httpAccountApi.me(),
+    ...accountQueries.me(),
     enabled: Boolean(userId),
   })
 
@@ -94,10 +100,8 @@ export function AccountCard() {
             </div>
           )}
           <SyncStatusLine />
-          {(pending?.length ?? 0) > 0 && (
-            <p className="m-0 text-caption text-fg-muted">
-              {m.syncPending({ count: pending?.length ?? 0 })}
-            </p>
+          {pending > 0 && (
+            <p className="m-0 text-caption text-fg-muted">{m.syncPending({ count: pending })}</p>
           )}
           <div className="grid grid-cols-2 gap-3">
             <Button variant="soft" tone="diaper" onClick={() => void requestSync()}>

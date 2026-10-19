@@ -44,12 +44,6 @@ export type ProviderModels =
   | { provider: AiProvider; status: 'ok'; models: AiModel[] }
   | { provider: AiProvider; status: 'invalid' | 'unreachable' }
 
-export const aiKeys = {
-  mine: ['user-ai'] as const,
-  models: ['user-ai', 'models'] as const,
-  family: (familyId: string) => ['family-ai', familyId] as const,
-}
-
 export const aiApi = {
   get: () => apiFetch<UserAi>('/api/ai'),
   models: () => apiFetch<{ providers: ProviderModels[] }>('/api/ai/models'),
@@ -65,10 +59,11 @@ export const aiApi = {
     apiFetch<UserAi>('/api/ai', { method: 'PUT', body: JSON.stringify(choice) }),
   share: (familyIds: string[]) =>
     apiFetch<UserAi>('/api/ai/shares', { method: 'PUT', body: JSON.stringify({ familyIds }) }),
-  family: (familyId: string) => apiFetch<FamilyAi>(`/api/families/${familyId}/ai`),
+  family: (familyId: string) =>
+    apiFetch<FamilyAi>(`/api/families/${encodeURIComponent(familyId)}/ai`),
   /** Owners and admins: use this member's shared AI. */
   chooseForFamily: (familyId: string, userId: string) =>
-    apiFetch<FamilyAi>(`/api/families/${familyId}/ai`, {
+    apiFetch<FamilyAi>(`/api/families/${encodeURIComponent(familyId)}/ai`, {
       method: 'PUT',
       body: JSON.stringify({ userId }),
     }),

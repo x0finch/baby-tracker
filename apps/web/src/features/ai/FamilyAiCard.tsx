@@ -4,8 +4,9 @@ import { Link } from '@tanstack/react-router'
 import { Card } from '../../components/ui/Card'
 import { FormError } from '../../components/ui/FormError'
 import { m } from '../../paraglide/messages.js'
-import { voiceKeys } from '../voice/api'
-import { PROVIDER_LABEL, aiApi, aiKeys } from './api'
+import { voiceKeys } from '../voice/queries'
+import { PROVIDER_LABEL, aiApi } from './api'
+import { aiKeys, aiQueries } from './queries'
 
 /**
  * On the family page: whose shared AI members without a key of their own use here. Owners
@@ -13,10 +14,7 @@ import { PROVIDER_LABEL, aiApi, aiKeys } from './api'
  */
 export function FamilyAiCard({ familyId, managing }: { familyId: string; managing: boolean }) {
   const queryClient = useQueryClient()
-  const { data } = useQuery({
-    queryKey: aiKeys.family(familyId),
-    queryFn: () => aiApi.family(familyId),
-  })
+  const { data } = useQuery(aiQueries.family(familyId))
   const choose = useMutation({
     mutationFn: (userId: string) => aiApi.chooseForFamily(familyId, userId),
     onSuccess: (next) => {
