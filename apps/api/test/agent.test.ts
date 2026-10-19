@@ -137,6 +137,17 @@ describe('voice agent', () => {
     expect(await events()).toHaveLength(1)
   })
 
+  it('gives up when the model takes longer than the turn may', async () => {
+    fake.setResponses([
+      async () => {
+        await new Promise((done) => setTimeout(done, 300))
+        return { text: '太晚了。' }
+      },
+    ])
+    const turn = await runAgent(fake, { ...scope, timeoutMs: 50 }, '你好', NOW + 228_000)
+    expect(turn).toEqual({ reply: '没处理好，请再说一遍。', done: false, confirming: false })
+  })
+
   it('never says a tool call the model wrote as text', async () => {
     fake.setResponses([
       {
@@ -157,6 +168,30 @@ describe('voice agent', () => {
     fake.setResponses([{ toolCalls: [{ name: 'undo', input: {} }] }, { text: '撤销了。' }])
     await runAgent(fake, scope, '撤销', NOW + 310_000)
     expect(await events()).toHaveLength(1)
+  })
+
+  it('deletes only the record it asked about when the model asks to delete two', async () => {
+    fake.setResponses([
+      { toolCalls: [{ name: 'record', input: { actions: [diaper, diaper] } }] },
+      { text: '记好了。' },
+    ])
+    await runAgent(fake, scope, '换了两次尿布', NOW + 312_000)
+    const [first, second] = (await events()).toSorted((a, b) => a.createdAt - b.createdAt).slice(-2)
+    fake.setResponses([
+      {
+        toolCalls: [
+          { name: 'delete_event', input: { id: first?.id } },
+          { name: 'delete_event', input: { id: second?.id } },
+        ],
+      },
+    ])
+    const ask = await runAgent(fake, scope, '把这两条删了', NOW + 314_000)
+    expect(ask.confirming).toBe(true)
+    fake.setResponses([{ text: '{"answer":"yes"}' }, { text: '删掉了一条。' }])
+    await runAgent(fake, scope, '是', NOW + 316_000)
+    const left = (await events()).map((event) => event.id)
+    expect(left).not.toContain(first?.id)
+    expect(left).toContain(second?.id)
   })
 
   it('changes a record at once and says what changed', async () => {

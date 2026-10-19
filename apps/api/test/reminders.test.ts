@@ -130,6 +130,7 @@ function pushService(status = 201) {
 describe('reminders', () => {
   let t: Awaited<ReturnType<typeof createTestApp>>
   let headers: Headers
+  let userId: string
   let familyId: string
   const now = Date.now()
 
@@ -156,7 +157,9 @@ describe('reminders', () => {
 
   beforeAll(async () => {
     t = await createTestApp()
-    headers = (await t.signIn()).headers
+    const me = await t.signIn()
+    headers = me.headers
+    userId = me.user.id
     const res = await send('POST', '/api/families', { name: '我们家' })
     const family: { id: string } = await res.json()
     familyId = family.id
@@ -182,6 +185,18 @@ describe('reminders', () => {
       400,
     )
     expect((await t.request('/api/reminders')).status).toBe(401)
+    // Keys must have the sizes the Push API gives them.
+    const { keys } = await fakeBrowser()
+    for (const bad of [
+      { ...keys, p256dh: 'x' },
+      { ...keys, auth: keys.p256dh },
+    ]) {
+      const res = await send('PUT', '/api/push/subscription', {
+        endpoint: 'https://push.example.com/bad',
+        keys: bad,
+      })
+      expect(res.status).toBe(400)
+    }
   })
 
   it('notifies once per gap after the interval since the last feeding', async () => {
@@ -287,5 +302,32 @@ describe('reminders', () => {
     const next = pushService()
     expect(await dispatchReminders(t.env, now + HOUR + 60_000, next.fetcher)).toBe(devices)
     expect(await dispatchReminders(t.env, now + HOUR + 120_000, pushService().fetcher)).toBe(0)
+  })
+
+  it('sends the rest when one saved subscription has keys that cannot be used', async () => {
+    const b = baby()
+    await send('POST', '/api/sync/push', { babies: [b], events: [feeding(b.id, now)] })
+    await t.env.DB.prepare('delete from push_subscriptions').run()
+    // Saved before keys were checked.
+    await t.env.DB.prepare(
+      'insert into push_subscriptions (endpoint, user_id, p256dh, auth, created_at) values (?, ?, ?, ?, ?)',
+    )
+      .bind('https://push.example.com/broken', userId, 'x', 'y', now)
+      .run()
+    const browser = await fakeBrowser()
+    await send('PUT', '/api/push/subscription', {
+      endpoint: `https://push.example.com/${newId()}`,
+      keys: browser.keys,
+    })
+    await send('PUT', '/api/reminders', {
+      babyId: b.id,
+      kind: 'feeding',
+      intervalMinutes: 30,
+      enabled: true,
+    })
+    const service = pushService()
+    expect(await dispatchReminders(t.env, now + HOUR, service.fetcher)).toBe(1)
+    // Marked as sent: the next run doesn't repeat it.
+    expect(await dispatchReminders(t.env, now + HOUR + 60_000, pushService().fetcher)).toBe(0)
   })
 })
