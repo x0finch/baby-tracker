@@ -143,7 +143,14 @@ export const firstChoice = (models: AiModel[]) =>
 /** The model adapter for saved AI settings. */
 export function aiAdapter(provider: AiProvider, model: string, apiKey: string) {
   const info = PROVIDERS[provider]
-  return openaiCompatibleText(model, { baseURL: info.baseURL, apiKey, api: info.api })
+  // One slow provider call must not use up the whole turn (TURN_TIMEOUT_MS); one retry at most.
+  return openaiCompatibleText(model, {
+    baseURL: info.baseURL,
+    apiKey,
+    api: info.api,
+    timeout: 15_000,
+    maxRetries: 1,
+  })
 }
 
 // Provider keys are encrypted at rest with a key derived from ENCRYPTION_SECRET.
