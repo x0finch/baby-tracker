@@ -1,0 +1,1 @@
+ALTER TABLE `voice_settings` ADD `locale` text DEFAULT 'zh-CN' NOT NULL;

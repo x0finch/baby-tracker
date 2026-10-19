@@ -165,6 +165,7 @@ export async function runScenario(
     keyScope: 'own',
     userId: user.id,
     timeZone: ZONE,
+    locale: 'zh-CN',
     phrase: '记录宝宝',
     modelOptions,
   }

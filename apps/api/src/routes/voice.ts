@@ -13,6 +13,7 @@ import {
   runAgent,
   threadPrefix,
   threadRange,
+  withoutThinking,
 } from '../agent/run'
 import type { Env } from '../env'
 import { json } from '../http'
@@ -22,6 +23,7 @@ import { DAILY_LIMIT, createToken, revokeToken, tokenStatus, useToken } from '..
 
 export const DEFAULT_PHRASE = '记录宝宝'
 const DEFAULT_ZONE = 'Asia/Shanghai'
+const DEFAULT_LOCALE = 'zh-CN'
 const MAX_TEXT = 300
 
 /** The model behind a saved AI setting; tests pass a fake instead of calling a provider. */
@@ -36,11 +38,29 @@ const isTimeZone = (zone: string) => {
 }
 
 const timeZoneSchema = z.string().max(64).refine(isTimeZone)
-const phraseSchema = z.object({ phrase: z.string().trim().min(1).max(20) })
-const tokenCreateSchema = z.object({ timeZone: timeZoneSchema.optional() })
+/** The app's language, which the assistant replies in. */
+const localeSchema = z
+  .string()
+  .max(35)
+  .refine((locale) => {
+    try {
+      return Intl.getCanonicalLocales(locale).length === 1
+    } catch {
+      return false
+    }
+  })
+const settingsSchema = z.object({
+  phrase: z.string().trim().min(1).max(20).optional(),
+  locale: localeSchema.optional(),
+})
+const tokenCreateSchema = z.object({
+  timeZone: timeZoneSchema.optional(),
+  locale: localeSchema.optional(),
+})
 const textSchema = z.object({
   text: z.string().trim().min(1).max(MAX_TEXT),
   timeZone: timeZoneSchema.optional(),
+  locale: localeSchema.optional(),
 })
 
 const REPLIES = {
@@ -58,25 +78,28 @@ const stop = (reply: string): AgentTurn => ({ reply, done: true, confirming: fal
 interface Settings {
   phrase: string
   timeZone: string
+  locale: string
 }
 
 async function readSettings(db: D1Database, userId: string): Promise<Settings> {
   const row = await db
-    .prepare('select phrase, time_zone as timeZone from voice_settings where user_id = ?')
+    .prepare('select phrase, time_zone as timeZone, locale from voice_settings where user_id = ?')
     .bind(userId)
     .first<Settings>()
-  return row ?? { phrase: DEFAULT_PHRASE, timeZone: DEFAULT_ZONE }
+  return row ?? { phrase: DEFAULT_PHRASE, timeZone: DEFAULT_ZONE, locale: DEFAULT_LOCALE }
 }
 
 /** Saves the user's shortcut settings, keeping their conversation. */
 function saveSettings(db: D1Database, userId: string, settings: Settings, now: number) {
   return db
     .prepare(
-      `insert into voice_settings (user_id, phrase, time_zone, updated_at) values (?, ?, ?, ?)
+      `insert into voice_settings (user_id, phrase, time_zone, locale, updated_at)
+       values (?, ?, ?, ?, ?)
        on conflict (user_id) do update set phrase = excluded.phrase,
-         time_zone = excluded.time_zone, updated_at = excluded.updated_at`,
+         time_zone = excluded.time_zone, locale = excluded.locale,
+         updated_at = excluded.updated_at`,
     )
-    .bind(userId, settings.phrase, settings.timeZone, now)
+    .bind(userId, settings.phrase, settings.timeZone, settings.locale, now)
     .run()
 }
 
@@ -103,9 +126,11 @@ async function settingsView(db: D1Database, userId: string, now: number) {
 }
 
 const messageText = (message: ModelMessage) =>
-  typeof message.content === 'string'
-    ? message.content
-    : (message.content ?? []).map((part) => (part.type === 'text' ? part.content : '')).join('')
+  withoutThinking(
+    typeof message.content === 'string'
+      ? message.content
+      : (message.content ?? []).map((part) => (part.type === 'text' ? part.content : '')).join(''),
+  )
 
 /** Messages on the chat box's first page, and on each earlier one. */
 const FIRST_PAGE = 10
@@ -225,7 +250,7 @@ async function turn(
   userId: string,
   text: string,
   now: number,
-  timeZone?: string,
+  device: { timeZone?: string; locale?: string } = {},
 ): Promise<AgentTurn> {
   const db = env.DB
   const [access, settings] = await Promise.all([loadAccess(db, userId), readSettings(db, userId)])
@@ -243,7 +268,8 @@ async function turn(
     sharedOnly: ai.kind === 'shared',
     keyScope: ai.kind === 'own' ? 'own' : `shared:${ai.ai.userId}:${ai.ai.familyId}`,
     userId,
-    timeZone: timeZone ?? settings.timeZone,
+    timeZone: device.timeZone ?? settings.timeZone,
+    locale: device.locale ?? settings.locale,
     phrase: settings.phrase,
     modelOptions: modelOptionsFor(ai.ai.provider, ai.ai.model),
   }
@@ -254,22 +280,28 @@ async function turn(
 export function voiceRoutes(adapterFor: AdapterFor) {
   return new Hono<AppEnv>()
     .get('/', async (c) => c.json(await settingsView(c.env.DB, c.get('user').id, Date.now())))
-    .patch('/', json(phraseSchema), async (c) => {
+    .patch('/', json(settingsSchema), async (c) => {
       const db = c.env.DB
       const userId = c.get('user').id
       const now = Date.now()
       const current = await readSettings(db, userId)
-      await saveSettings(db, userId, { ...current, phrase: c.req.valid('json').phrase }, now)
+      const { phrase = current.phrase, locale = current.locale } = c.req.valid('json')
+      await saveSettings(db, userId, { ...current, phrase, locale }, now)
       return c.json(await settingsView(db, userId, now))
     })
     .post('/token', json(tokenCreateSchema), async (c) => {
       const db = c.env.DB
       const userId = c.get('user').id
       const now = Date.now()
-      const { timeZone } = c.req.valid('json')
-      if (timeZone) {
+      const { timeZone, locale } = c.req.valid('json')
+      if (timeZone || locale) {
         const current = await readSettings(db, userId)
-        await saveSettings(db, userId, { ...current, timeZone }, now)
+        await saveSettings(
+          db,
+          userId,
+          { ...current, timeZone: timeZone ?? current.timeZone, locale: locale ?? current.locale },
+          now,
+        )
       }
       return c.json(await createToken(db, userId, now))
     })
@@ -289,9 +321,9 @@ export function voiceRoutes(adapterFor: AdapterFor) {
       // Each message calls the model.
       const burst = await c.env.VOICE_RATE_LIMIT?.limit({ key: userId })
       if (burst && !burst.success) return c.json(stop(REPLIES.slowDown), 429)
-      const { text, timeZone } = c.req.valid('json')
+      const { text, timeZone, locale } = c.req.valid('json')
       try {
-        return c.json(await turn(c.env, adapterFor, userId, text, Date.now(), timeZone))
+        return c.json(await turn(c.env, adapterFor, userId, text, Date.now(), { timeZone, locale }))
       } catch (error) {
         console.error('Voice chat failed', error)
         return c.json(stop(REPLIES.unavailable), 503)

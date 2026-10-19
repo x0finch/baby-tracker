@@ -182,6 +182,9 @@ function ModelPicker({
                 {recommended.map((model) => row(model))}
               </ModelGroup>
             )}
+            {recommended.length > 0 && groups.size > 0 && (
+              <p className="m-0 text-caption text-fg-muted">{m.aiModelsUnverified()}</p>
+            )}
             {[...groups].map(([key, group]) => (
               <ModelGroup key={key} title={group.title}>
                 {group.models.map((model) => row(model, true))}

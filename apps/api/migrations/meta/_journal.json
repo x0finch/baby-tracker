@@ -71,6 +71,13 @@
       "when": 1792346563008,
       "tag": "0009_ai_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1792449797215,
+      "tag": "0010_voice_locale",
+      "breakpoints": true
     }
   ]
 }
