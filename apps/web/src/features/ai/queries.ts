@@ -5,6 +5,9 @@ import { aiApi } from './api'
 // Account-side caches don't carry the user id: signing out clears the whole query cache
 // (features/account/AccountCard.tsx). `all` keys are roots for invalidating a whole group.
 
+/** Kept on the device across reloads and offline (lib/persist-queries.ts). */
+const persist = { persist: true }
+
 export const aiKeys = {
   all: ['ai'] as const,
   mine: ['ai', 'mine'] as const,
@@ -15,11 +18,15 @@ export const aiKeys = {
 
 export const aiQueries = {
   /** The user's keys, model and shares. */
-  mine: () => queryOptions({ queryKey: aiKeys.mine, queryFn: aiApi.get }),
+  mine: () => queryOptions({ queryKey: aiKeys.mine, queryFn: aiApi.get, meta: persist }),
   /** Every saved key's models; slow to list, so kept for an hour. */
   models: () =>
     queryOptions({ queryKey: aiKeys.models, queryFn: aiApi.models, staleTime: 60 * 60 * 1000 }),
   /** The AIs shared with a family, and the one it uses. */
   family: (familyId: string) =>
-    queryOptions({ queryKey: aiKeys.family(familyId), queryFn: () => aiApi.family(familyId) }),
+    queryOptions({
+      queryKey: aiKeys.family(familyId),
+      queryFn: () => aiApi.family(familyId),
+      meta: persist,
+    }),
 }

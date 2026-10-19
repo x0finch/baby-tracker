@@ -1,11 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 
 import { Card, CardTitle } from '../../components/ui/Card'
-import { FormError } from '../../components/ui/FormError'
+import { useOptimisticMutation } from '../../lib/optimistic'
 import { m } from '../../paraglide/messages.js'
 import { voiceKeys } from '../voice/queries'
-import { PROVIDER_LABEL, aiApi } from './api'
+import { type FamilyAi, PROVIDER_LABEL, aiApi } from './api'
 import { aiKeys, aiQueries } from './queries'
 
 /**
@@ -15,12 +15,11 @@ import { aiKeys, aiQueries } from './queries'
 export function FamilyAiCard({ familyId, managing }: { familyId: string; managing: boolean }) {
   const queryClient = useQueryClient()
   const { data } = useQuery(aiQueries.family(familyId))
-  const choose = useMutation({
+  const choose = useOptimisticMutation({
+    queryKey: aiKeys.family(familyId),
     mutationFn: (userId: string) => aiApi.chooseForFamily(familyId, userId),
-    onSuccess: (next) => {
-      queryClient.setQueryData(aiKeys.family(familyId), next)
-      void queryClient.invalidateQueries({ queryKey: voiceKeys.settings })
-    },
+    apply: (current: FamilyAi, userId) => ({ ...current, inUse: userId }),
+    onSaved: () => void queryClient.invalidateQueries({ queryKey: voiceKeys.settings }),
   })
   if (!data) return null
   const inUse = data.shares.find((share) => share.userId === data.inUse)
@@ -43,7 +42,6 @@ export function FamilyAiCard({ familyId, managing }: { familyId: string; managin
           <select
             className="min-h-touch rounded-lg border-2 border-border bg-surface px-4 text-fg"
             value={data.inUse ?? ''}
-            disabled={choose.isPending}
             onChange={(event) => choose.mutate(event.target.value)}
           >
             {data.shares.map((share) => (
@@ -60,7 +58,6 @@ export function FamilyAiCard({ familyId, managing }: { familyId: string; managin
           {m.aiMineTitle()}
         </Link>
       </p>
-      {choose.isError && <FormError>{m.actionFailed()}</FormError>}
     </Card>
   )
 }

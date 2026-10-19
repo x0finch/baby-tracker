@@ -17,7 +17,7 @@ import {
   aiApi,
 } from './api'
 import { aiKeys } from './queries'
-import { useSaved } from './use-saved'
+import { useAiChange, useSaved } from './use-saved'
 
 /** A key per provider: whether it works, and adding or replacing it. */
 export function KeysCard({ ai, providers }: { ai: UserAi; providers?: ProviderModels[] }) {
@@ -108,7 +108,20 @@ function KeyForm({
     mutationFn: () => aiApi.saveKey(provider, apiKey.trim()),
     onSuccess: done,
   })
-  const remove = useMutation({ mutationFn: () => aiApi.removeKey(provider), onSuccess: done })
+  // Removing shows at once, as the server will: the model goes with its key, and the shares
+  // with the last key.
+  const remove = useAiChange(
+    () => aiApi.removeKey(provider),
+    (ai) => {
+      const keys = ai.keys.filter((key) => key.provider !== provider)
+      return {
+        keys,
+        choice: ai.choice?.provider === provider ? null : ai.choice,
+        sharedFamilyIds: keys.length > 0 ? ai.sharedFamilyIds : [],
+      }
+    },
+    () => void queryClient.invalidateQueries({ queryKey: aiKeys.models }),
+  )
   return (
     <form
       className="flex flex-col gap-4"
@@ -138,13 +151,14 @@ function KeyForm({
           type="button"
           variant="ghost"
           tone="danger"
-          disabled={remove.isPending}
-          onClick={() => remove.mutate()}
+          onClick={() => {
+            remove.mutate()
+            onDone()
+          }}
         >
           {m.aiKeyRemove()}
         </Button>
       )}
-      {remove.isError && <FormError>{m.actionFailed()}</FormError>}
     </form>
   )
 }

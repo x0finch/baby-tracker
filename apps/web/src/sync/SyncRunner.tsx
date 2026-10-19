@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from '@tanstack/react-router'
 import { useEffect } from 'react'
 
@@ -11,8 +12,10 @@ import {
   resolveClaimChoice,
   useClaimChoice,
 } from '../features/account/connection'
+import { persistQueries } from '../lib/persist-queries'
 import { m } from '../paraglide/messages.js'
 import { startSync, useSyncState } from './runner'
+import { useAccount } from './use-access'
 
 const REJECTED_TOAST_MS = 5000
 
@@ -35,6 +38,11 @@ export function SyncRunner() {
   const store = useLocalStore()
   const choice = useClaimChoice()
   useRejectedToast()
+
+  // The signed-in user's settings data stays on the device; another account starts empty.
+  const queryClient = useQueryClient()
+  const userId = useAccount()?.userId
+  useEffect(() => persistQueries(queryClient, userId), [queryClient, userId])
 
   const router = useRouter()
 
