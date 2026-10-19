@@ -101,3 +101,7 @@ UI strings live in `apps/web/messages/{locale}.json` and are compiled by [Paragl
 - Never hard-code user-facing text in JSX; `react/jsx-no-literals` enforces this.
 - Format numbers and dates with the helpers in `apps/web/src/lib/i18n.ts`, which use `Intl` with the active locale.
 - To add a locale, add it to `apps/web/project.inlang/settings.json` and create `messages/<locale>.json`. The language picker in settings appears once there is more than one locale.
+
+## License
+
+[Apache License 2.0](LICENSE). You may use, change and sell Bobo, including in closed-source and commercial products. If you distribute it or a work based on it, keep the license and the [NOTICE](NOTICE) file, which credits this project, and say which files you changed.
