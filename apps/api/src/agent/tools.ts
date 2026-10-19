@@ -14,6 +14,7 @@ import {
   writableBabies,
   writeChanges,
 } from './data'
+import { implausible } from './guide'
 
 /** Everything a turn's tools act on: one user, their families, one thread. */
 export interface AgentContext {
@@ -46,6 +47,25 @@ function line(event: Event, before: Event | null, babies: VoiceBaby[], timeZone:
   const name = babies.find((baby) => baby.id === event.babyId)?.name ?? ''
   const at = before && event.endAt !== null && before.endAt === null ? event.endAt : event.startAt
   return `${name} ${formatClock(at, timeZone)} ${describe(event, before)}`
+}
+
+const confirmedSchema = z
+  .boolean()
+  .meta({ description: 'True only after the parent confirmed a value that looked misheard' })
+
+/** The first change that looks misheard, as a refusal telling the assistant to ask. */
+function doubt(changes: Change[], babies: VoiceBaby[], now: number, timeZone: string) {
+  for (const { event, before } of changes) {
+    const birthDate = babies.find((baby) => baby.id === event.babyId)?.birthDate
+    const reason = birthDate ? implausible(event, before, birthDate, now, timeZone) : null
+    if (reason) {
+      return {
+        ok: false,
+        message: `没有记录：${reason}，可能听错了。先用一句话问家长（说出你猜的正确值），家长确认后再带上 confirmed: true 调用。`,
+      }
+    }
+  }
+  return null
 }
 
 const REFUSED: Record<string, string> = {
@@ -133,9 +153,12 @@ export function agentTools(ctx: AgentContext) {
     description:
       'Add records, or start and stop timers (type sleep starts a sleep, wake ends it). Use ' +
       'one call for everything said in one sentence.',
-    inputSchema: z.object({ actions: z.array(voiceActionSchema).min(1) }),
+    inputSchema: z.object({
+      actions: z.array(voiceActionSchema).min(1),
+      confirmed: confirmedSchema,
+    }),
     outputSchema: resultSchema,
-  }).server(async ({ actions }) => {
+  }).server(async ({ actions, confirmed }) => {
     const known = await babies()
     const running = await runningEvents(db, known)
     const plan = planActions(
@@ -152,6 +175,10 @@ export function agentTools(ctx: AgentContext) {
     )
     if (plan.kind !== 'changes')
       return { ok: false, message: plan.kind === 'reply' ? plan.reply : '' }
+    if (!confirmed) {
+      const doubted = doubt(plan.changes, known, now, timeZone)
+      if (doubted) return doubted
+    }
     const refused = await writeChanges(db, access, userId, log, plan.changes, now)
     if (refused) return { ok: false, message: REFUSED[refused] ?? refused }
     return { ok: true, message: `已记录：${plan.lines.join('；')}` }
@@ -169,9 +196,10 @@ export function agentTools(ctx: AgentContext) {
       amountMl: z.number().nullable(),
       diaper: z.enum(['wet', 'dirty', 'mixed']).nullable(),
       note: z.string().nullable(),
+      confirmed: confirmedSchema,
     }),
     outputSchema: resultSchema,
-  }).server(async ({ id, time, endTime, amountMl, diaper, note }) => {
+  }).server(async ({ id, time, endTime, amountMl, diaper, note, confirmed }) => {
     const found = await ownEvent(id)
     if (!found) return { ok: false, message: '找不到这条记录。' }
     const { event, known } = found
@@ -194,6 +222,11 @@ export function agentTools(ctx: AgentContext) {
     const parsed = eventSchema.safeParse(next)
     if (!parsed.success) return { ok: false, message: '这样改不行，请换个说法。' }
     const change: Change = { event: parsed.data, before: event }
+    if (!confirmed) {
+      // Checked as said, not as a stopped timer: an edit sets the times on purpose.
+      const doubted = doubt([{ event: parsed.data, before: null }], known, now, timeZone)
+      if (doubted) return doubted
+    }
     const refused = await writeChanges(db, access, userId, log, [change], now)
     if (refused) return { ok: false, message: REFUSED[refused] ?? refused }
     const was = line(event, null, known, timeZone)

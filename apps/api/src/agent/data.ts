@@ -30,7 +30,7 @@ export async function writableBabies(
   if (recording.length === 0) return []
   const { results } = await db
     .prepare(
-      `select id, name, family_id as familyId from babies
+      `select id, name, family_id as familyId, birth_date as birthDate from babies
        where family_id in (select value from json_each(?)) and deleted_at is null
          and archived_at is null order by created_at`,
     )

@@ -30,12 +30,16 @@ describe('voice agent', () => {
   let scope: AgentScope
   const fake = fakeText()
   const NOW = Date.UTC(2026, 9, 17, 2, 0)
+  /** After the other tests' conversations have gone idle, still the same day. */
+  const LATER = NOW + 2 * SESSION_IDLE_MS + 400_000
 
   const events = async () => {
     const res = await t.request('/api/sync/pull?cursor=', { headers })
     const page = (await res.json()) as PullResponse
     return page.events.filter((event: Event) => event.deletedAt === null)
   }
+  const bottles = async () =>
+    (await events()).filter((event) => event.type === 'feeding').map((event) => event.data)
 
   beforeAll(async () => {
     t = await createTestApp()
@@ -63,7 +67,7 @@ describe('voice agent', () => {
 
   it('records through the record tool and remembers the conversation', async () => {
     fake.setResponses([
-      { toolCalls: [{ name: 'record', input: { actions: [diaper] } }] },
+      { toolCalls: [{ name: 'record', input: { actions: [diaper], confirmed: false } }] },
       { text: '记好了，换了尿布。还有吗？' },
     ])
     const turn = await runAgent(fake, scope, '换尿布了', NOW)
@@ -110,7 +114,7 @@ describe('voice agent', () => {
 
   it('keeps the record when the user says no', async () => {
     fake.setResponses([
-      { toolCalls: [{ name: 'record', input: { actions: [diaper] } }] },
+      { toolCalls: [{ name: 'record', input: { actions: [diaper], confirmed: false } }] },
       { text: '记好了。' },
     ])
     await runAgent(fake, scope, '换尿布了', NOW + 200_000)
@@ -160,7 +164,7 @@ describe('voice agent', () => {
 
   it('undoes the last change', async () => {
     fake.setResponses([
-      { toolCalls: [{ name: 'record', input: { actions: [diaper] } }] },
+      { toolCalls: [{ name: 'record', input: { actions: [diaper], confirmed: false } }] },
       { text: '记好了。' },
     ])
     await runAgent(fake, scope, '又换了尿布', NOW + 300_000)
@@ -172,7 +176,7 @@ describe('voice agent', () => {
 
   it('deletes only the record it asked about when the model asks to delete two', async () => {
     fake.setResponses([
-      { toolCalls: [{ name: 'record', input: { actions: [diaper, diaper] } }] },
+      { toolCalls: [{ name: 'record', input: { actions: [diaper, diaper], confirmed: false } }] },
       { text: '记好了。' },
     ])
     await runAgent(fake, scope, '换了两次尿布', NOW + 312_000)
@@ -209,6 +213,7 @@ describe('voice agent', () => {
               amountMl: null,
               diaper: 'dirty',
               note: null,
+              confirmed: false,
             },
           },
         ],
@@ -236,5 +241,55 @@ describe('voice agent', () => {
     ])
     await runAgent(fake, scope, '你好', NOW + 320_000 + SESSION_IDLE_MS + 1)
     expect(seen).toBe(1)
+  })
+
+  it("tells the model each baby's age, what is usual for it, and its own habits", async () => {
+    let prompt = ''
+    fake.setResponses([
+      ({ request }) => {
+        prompt = JSON.stringify(request.systemPrompts)
+        return { text: '你好。' }
+      },
+    ])
+    await runAgent(fake, scope, '你好', LATER)
+    expect(prompt).toContain('小米粒：出生 17 天。')
+    expect(prompt).toContain('瓶喂每次 30–120 毫升')
+    expect(prompt).toContain('confirmed: true')
+  })
+
+  it('asks before recording an amount that looks misheard, and records it once confirmed', async () => {
+    const bottle = { ...diaper, type: 'bottle', amountMl: 500, milk: 'formula' }
+    let result = ''
+    fake.setResponses([
+      { toolCalls: [{ name: 'record', input: { actions: [bottle], confirmed: false } }] },
+      ({ request }) => {
+        result = JSON.stringify(request.messages.at(-1))
+        return { text: '是 50 毫升吗？' }
+      },
+    ])
+    const asked = await runAgent(fake, scope, '喝了五百毫升奶粉', LATER + 1000)
+    expect(asked.reply).toBe('是 50 毫升吗？')
+    expect(result).toContain('可能听错了')
+    expect(await bottles()).toEqual([])
+
+    fake.setResponses([
+      { toolCalls: [{ name: 'record', input: { actions: [bottle], confirmed: true } }] },
+      { text: '好的，记了 500 毫升。还有吗？' },
+    ])
+    await runAgent(fake, scope, '对，就是五百', LATER + 2000)
+    expect(await bottles()).toEqual([expect.objectContaining({ kind: 'bottle', amountMl: 500 })])
+  })
+
+  it('records a plausible amount without asking', async () => {
+    const bottle = { ...diaper, type: 'bottle', amountMl: 60, milk: 'formula' }
+    fake.setResponses([
+      { toolCalls: [{ name: 'record', input: { actions: [bottle], confirmed: false } }] },
+      { text: '记好了。还有吗？' },
+    ])
+    await runAgent(fake, scope, '喝了六十毫升奶粉', LATER + 3000)
+    const amounts = (await events()).flatMap((event) =>
+      event.type === 'feeding' && event.data.kind === 'bottle' ? [event.data.amountMl] : [],
+    )
+    expect(amounts).toContain(60)
   })
 })

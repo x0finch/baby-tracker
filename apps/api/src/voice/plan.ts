@@ -8,6 +8,8 @@ export interface VoiceBaby {
   id: string
   name: string
   familyId: string
+  /** "YYYY-MM-DD", for the age the assistant checks values against. */
+  birthDate: string
 }
 
 export interface PlanContext {
@@ -103,6 +105,12 @@ export function formatClock(at: number, timeZone: string): string {
 const pad = (n: number) => String(n).padStart(2, '0')
 
 /** "2026-10-17 21:05 星期五", for the model to resolve times against. */
+/** The zone's calendar day at `at`, "YYYY-MM-DD". */
+export function localDay(at: number, timeZone: string): string {
+  const p = zoneParts(at, timeZone)
+  return `${p.year}-${pad(p.month)}-${pad(p.day)}`
+}
+
 export function localNow(now: number, timeZone: string): string {
   const p = zoneParts(now, timeZone)
   const weekday = new Intl.DateTimeFormat('zh-CN', { timeZone, weekday: 'long' }).format(now)
