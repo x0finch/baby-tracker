@@ -160,8 +160,8 @@ export function agentTools(ctx: AgentContext) {
   const updateEvent = toolDefinition({
     name: 'update_event',
     description:
-      'Change one record (its id from find_events). Only the fields given change. Needs the ' +
-      "user's approval, which they give in their next message.",
+      'Change one record (its id from find_events). Only the fields given change. It changes ' +
+      'at once; tell the user what changed, as the result says.',
     inputSchema: z.object({
       id: z.string(),
       time: z.string().nullable().meta({ description: 'New start time, HH:MM' }),
@@ -171,7 +171,6 @@ export function agentTools(ctx: AgentContext) {
       note: z.string().nullable(),
     }),
     outputSchema: resultSchema,
-    needsApproval: true,
   }).server(async ({ id, time, endTime, amountMl, diaper, note }) => {
     const found = await ownEvent(id)
     if (!found) return { ok: false, message: '找不到这条记录。' }
@@ -197,7 +196,9 @@ export function agentTools(ctx: AgentContext) {
     const change: Change = { event: parsed.data, before: event }
     const refused = await writeChanges(db, access, userId, log, [change], now)
     if (refused) return { ok: false, message: REFUSED[refused] ?? refused }
-    return { ok: true, message: `已修改：${line(parsed.data, null, known, timeZone)}` }
+    const was = line(event, null, known, timeZone)
+    const is = line(parsed.data, null, known, timeZone)
+    return { ok: true, message: `已修改：${was} → ${is}。说「撤销」可以改回来。` }
   })
 
   const deleteEvent = toolDefinition({

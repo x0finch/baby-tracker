@@ -159,6 +159,38 @@ describe('voice agent', () => {
     expect(await events()).toHaveLength(1)
   })
 
+  it('changes a record at once and says what changed', async () => {
+    const [stored] = await events()
+    let seen = ''
+    fake.setResponses([
+      {
+        toolCalls: [
+          {
+            name: 'update_event',
+            input: {
+              id: stored?.id,
+              time: null,
+              endTime: null,
+              amountMl: null,
+              diaper: 'dirty',
+              note: null,
+            },
+          },
+        ],
+      },
+      ({ request }) => {
+        seen = JSON.stringify(request.messages)
+        return { text: '改好了，换成便便了。' }
+      },
+    ])
+    const turn = await runAgent(fake, scope, '刚才那条是便便', NOW + 320_000)
+    expect(turn).toEqual({ reply: '改好了，换成便便了。', done: false, confirming: false })
+    expect(seen).toMatch(/已修改：[^"]*尿尿[^"]*→[^"]*便便/)
+    expect((await events()).find((event) => event.id === stored?.id)).toMatchObject({
+      data: { contents: 'dirty' },
+    })
+  })
+
   it('starts a new conversation after a pause', async () => {
     let seen = 0
     fake.setResponses([
@@ -167,7 +199,7 @@ describe('voice agent', () => {
         return { text: '你好。' }
       },
     ])
-    await runAgent(fake, scope, '你好', NOW + 310_000 + SESSION_IDLE_MS + 1)
+    await runAgent(fake, scope, '你好', NOW + 320_000 + SESSION_IDLE_MS + 1)
     expect(seen).toBe(1)
   })
 })

@@ -23,7 +23,8 @@ them, or say "没有了" to finish.
   shared, and which family's): what was said with one key never goes to another key's provider.
 - Settings → Siri 语音记录 → 试一下 opens the same conversation as a chat box. What is said
   there is really recorded.
-- Updating or deleting a record needs approval (`needsApproval`). Siri asks
+- Updating a record happens at once: the agent says what changed (before → after), and
+  "撤销" changes it back. Deleting needs approval (`needsApproval`). Siri asks
   "要删除「…」吗？", and the same model reads the reply, in any words or language: yes
   approves it, no refuses it. Anything else, such as a correction, refuses it and is handled as
   a new message.
