@@ -40,9 +40,10 @@ const PROVIDERS: Record<AiProvider, ProviderInfo> = {
   openrouter: {
     baseURL: 'https://openrouter.ai/api/v1',
     api: 'chat-completions',
+    // The first is picked for a new key: DeepSeek passes every agent eval and costs least.
     recommended: [
-      ['openai/gpt-5.4-mini', 'steady'],
       ['deepseek/deepseek-v4.1-flash', 'cheapest'],
+      ['openai/gpt-5.4-mini', 'steady'],
       ['openai/gpt-5.4-nano', 'balanced'],
     ],
     usable: ({ supported_parameters: params = [] }) => params.includes('tools'),
