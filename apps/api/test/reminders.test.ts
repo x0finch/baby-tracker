@@ -1,7 +1,7 @@
 import { type Event, type PushMessage, base64UrlDecode, base64UrlEncode, newId } from '@bobo/shared'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { dispatchReminders } from '../src/reminders'
+import { MAX_SENDS, dispatchReminders } from '../src/reminders'
 import { encryptPayload, generateVapidKeys, vapidAuthorization } from '../src/web-push'
 import { createTestApp } from './app'
 import { baby as fixtureBaby } from './fixtures'
@@ -256,5 +256,36 @@ describe('reminders', () => {
       'select count(*) as count from push_subscriptions',
     ).first<{ count: number }>()) ?? { count: -1 }
     expect(count).toBe(0)
+  })
+
+  it('sends at most MAX_SENDS pushes a run and leaves the rest for the next', async () => {
+    const devices = MAX_SENDS / 2 + 1
+    const first = baby()
+    const second = baby()
+    await send('POST', '/api/sync/push', {
+      babies: [first, second],
+      events: [feeding(first.id, now), feeding(second.id, now)],
+    })
+    await t.env.DB.prepare('delete from push_subscriptions').run()
+    for (let i = 0; i < devices; i += 1) {
+      const browser = await fakeBrowser()
+      await send('PUT', '/api/push/subscription', {
+        endpoint: `https://push.example.com/${newId()}`,
+        keys: browser.keys,
+      })
+    }
+    for (const b of [first, second]) {
+      await send('PUT', '/api/reminders', {
+        babyId: b.id,
+        kind: 'feeding',
+        intervalMinutes: 30,
+        enabled: true,
+      })
+    }
+    const run = pushService()
+    expect(await dispatchReminders(t.env, now + HOUR, run.fetcher)).toBe(devices)
+    const next = pushService()
+    expect(await dispatchReminders(t.env, now + HOUR + 60_000, next.fetcher)).toBe(devices)
+    expect(await dispatchReminders(t.env, now + HOUR + 120_000, pushService().fetcher)).toBe(0)
   })
 })

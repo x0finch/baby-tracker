@@ -9,6 +9,12 @@ import { type PushResult, type PushTarget, sendPush } from './web-push'
 const LATE_LIMIT = 3 * 60 * MINUTE
 /** Bounded so one cron run stays well within the free plan's CPU limit. */
 const BATCH = 20
+/**
+ * Pushes per run (reminders × each user's devices): every push is a subrequest and costs an
+ * encryption and a signature, so a run stays inside the Workers limits. Reminders past it
+ * wait for the next minute.
+ */
+export const MAX_SENDS = 30
 
 export interface DueReminder {
   userId: string
@@ -85,19 +91,25 @@ export async function dispatchReminders(
   const keys = targets.length > 0 ? await getVapidKeys(db) : undefined
   const sends: Promise<PushResult>[] = []
   const sentTo: PushTarget[] = []
+  const handled: DueReminder[] = []
   for (const reminder of due) {
+    const devices = keys ? targets.filter((target) => target.userId === reminder.userId) : []
+    // The first always goes, so a user with many devices is never stuck.
+    if (handled.length > 0 && sends.length + devices.length > MAX_SENDS) break
+    handled.push(reminder)
     const message = reminderMessage(reminder, now)
-    for (const target of targets) {
-      if (target.userId !== reminder.userId || !keys) continue
+    for (const target of devices) {
+      if (!keys) continue
       sentTo.push(target)
       sends.push(sendPush(target, message, keys, env.BETTER_AUTH_URL, now, fetcher))
     }
   }
   const results = await Promise.all(sends)
 
-  // Marked even without a device to send to, so each gap is considered once.
+  // Marked even without a device to send to, so each gap is considered once; reminders left
+  // for the next run stay unmarked.
   await db.batch(
-    due.map((reminder) =>
+    handled.map((reminder) =>
       db
         .prepare(
           'update reminders set fired_for = ? where user_id = ? and baby_id = ? and kind = ?',

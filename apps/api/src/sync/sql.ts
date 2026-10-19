@@ -64,6 +64,11 @@ export function upsertEvents(db: D1Database, events: Event[]) {
     .bind(JSON.stringify(events))
 }
 
+/** An events row as an Event's fields (data still JSON text). */
+export const EVENT_COLUMNS = `id, baby_id as babyId, family_id as familyId, type, start_at as startAt,
+  end_at as endAt, data, note, created_at as createdAt, updated_at as updatedAt,
+  deleted_at as deletedAt, created_by as createdBy`
+
 /** Bindings for `(seq > ? or (seq = ? and id > ?))`, i.e. strictly after the cursor. */
 function after(cursor: TableCursor): [number, number, string] {
   return [cursor[0], cursor[0], cursor[1]]
@@ -96,9 +101,7 @@ export function selectEventsPage(
 ) {
   return db
     .prepare(
-      `select id, baby_id as babyId, family_id as familyId, type, start_at as startAt,
-         end_at as endAt, data, note, created_at as createdAt, updated_at as updatedAt,
-         deleted_at as deletedAt, created_by as createdBy, seq
+      `select ${EVENT_COLUMNS}, seq
        from events
        where (family_id in (select value from json_each(?)) or baby_id in (select value from json_each(?)))
          and (seq > ? or (seq = ? and id > ?))

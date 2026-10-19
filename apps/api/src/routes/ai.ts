@@ -97,14 +97,14 @@ export const userAiRoutes = new Hono<AppEnv>()
   .get('/', async (c) => c.json(await view(c.env.DB, c.get('user').id)))
   .get('/models', async (c) => {
     const secret = c.env.ENCRYPTION_SECRET
-    if (!secret) return c.json({ error: 'not_configured' }, 503)
+    if (!secret) fail('not_configured')
     const keys = await readKeys(c.env.DB, c.get('user').id)
     return c.json({ providers: await Promise.all(keys.map((key) => modelsFor(secret, key))) })
   })
   // Checks the key, saves it, and on the first key also picks the model to start with.
   .put('/keys/:provider', json(keySchema), async (c) => {
     const secret = c.env.ENCRYPTION_SECRET
-    if (!secret) return c.json({ error: 'not_configured' }, 503)
+    if (!secret) fail('not_configured')
     const provider = providerSchema.safeParse(c.req.param('provider'))
     if (!provider.success) fail('not_found')
     const db = c.env.DB
@@ -114,7 +114,7 @@ export const userAiRoutes = new Hono<AppEnv>()
     try {
       models = await listModels(provider.data, apiKey)
     } catch (error) {
-      if (error instanceof AiKeyError) return c.json({ error: 'invalid_key' }, 400)
+      if (error instanceof AiKeyError) fail('invalid_key')
       throw error
     }
     const before = await view(db, userId)
@@ -160,7 +160,7 @@ export const userAiRoutes = new Hono<AppEnv>()
     const userId = c.get('user').id
     const { provider, model } = c.req.valid('json')
     const keys = await readKeys(db, userId)
-    if (!keys.some((key) => key.provider === provider)) return c.json({ error: 'no_key' }, 400)
+    if (!keys.some((key) => key.provider === provider)) fail('no_key')
     await saveChoice(db, userId, provider, model).run()
     return c.json(await view(db, userId))
   })
@@ -179,14 +179,14 @@ export const userAiRoutes = new Hono<AppEnv>()
            and family_id not in (select value from json_each(?2))`,
         )
         .bind(userId, JSON.stringify(familyIds)),
-      ...familyIds.map((familyId) =>
-        db
-          .prepare(
-            `insert into ai_shares (family_id, user_id, created_at) values (?, ?, ?)
-             on conflict do nothing`,
-          )
-          .bind(familyId, userId, now),
-      ),
+      // One statement for any number of families.
+      db
+        .prepare(
+          `insert into ai_shares (family_id, user_id, created_at)
+           select value, ?2, ?3 from json_each(?1) where true
+           on conflict do nothing`,
+        )
+        .bind(JSON.stringify(familyIds), userId, now),
     ])
     return c.json(await view(db, userId))
   })

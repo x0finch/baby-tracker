@@ -161,10 +161,10 @@ export const inviteAcceptRoutes = new Hono<AppEnv>().post('/:code/accept', async
     )
     .bind(userId, code)
     .first<InviteRow & { isMember: number }>()
-  if (!row) return c.json({ error: 'not_found' }, 404)
-  if (row.isMember) return c.json({ error: 'already_member', familyId: row.familyId }, 409)
+  if (!row) fail('not_found')
+  if (row.isMember) fail('already_member', { familyId: row.familyId })
   const status = statusOf(row, now)
-  if (status !== 'active') return c.json({ error: status }, 410)
+  if (status !== 'active') fail(status)
 
   // Claim the invite and create the membership in one transaction. The conditional update
   // makes a concurrent second accept claim nothing, so its inserts select no rows.
@@ -194,6 +194,6 @@ export const inviteAcceptRoutes = new Hono<AppEnv>().post('/:code/accept', async
       )
       .bind(userId, now, code),
   ])
-  if (!claim?.meta.changes) return c.json({ error: 'used' }, 410)
+  if (!claim?.meta.changes) fail('used')
   return c.json({ familyId: row.familyId }, 200)
 })

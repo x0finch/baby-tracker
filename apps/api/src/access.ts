@@ -49,6 +49,18 @@ export const memberSeesBaby = (babyIdColumn: string) =>
   `(m.baby_scope = 'all' or exists (select 1 from membership_babies mb
     where mb.family_id = m.family_id and mb.user_id = m.user_id and mb.baby_id = ${babyIdColumn}))`
 
+/** Whether the user can see the baby: a member of its family, within their baby scope. */
+export async function canSeeBaby(db: D1Database, userId: string, babyId: string) {
+  const row = await db
+    .prepare(
+      `select 1 from babies b join memberships m on m.family_id = b.family_id and m.user_id = ?1
+       where b.id = ?2 and b.deleted_at is null and ${memberSeesBaby('b.id')}`,
+    )
+    .bind(userId, babyId)
+    .first()
+  return row !== null
+}
+
 /** Everything the user can access, in one query. */
 export async function loadAccess(db: D1Database, userId: string): Promise<Access> {
   const { results } = await db

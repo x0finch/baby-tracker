@@ -1,5 +1,6 @@
 import { createMiddleware } from 'hono/factory'
 
+import { fail } from './http'
 import type { AppEnv, AuthFor } from './types'
 
 /** Resolves the session from the cookie (or bearer token); most requests hit the cookie cache. */
@@ -9,7 +10,7 @@ export function requireUser(authFor: AuthFor) {
       headers: c.req.raw.headers,
       returnHeaders: true,
     })
-    if (!data) return c.json({ error: 'unauthorized' }, 401)
+    if (!data) fail('unauthorized')
     c.set('user', data.user)
     c.set('session', data.session)
     await next()

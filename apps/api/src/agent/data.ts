@@ -2,17 +2,13 @@ import { type Event, inBabyScope, newId } from '@bobo/shared'
 
 import { type Access, type FamilyAccess, checkEventWrite } from '../access'
 import { parseEvent } from '../sync/protocol'
-import { bumpSeq, upsertEvents } from '../sync/sql'
+import { EVENT_COLUMNS, bumpSeq, upsertEvents } from '../sync/sql'
 import type { VoiceBaby } from '../voice/plan'
 
 // Reads and writes the agent's tools share. Writes go through the same checks and SQL as a
 // sync push, so devices get them on their next pull.
 
 type EventRow = Omit<Event, 'data'> & { data: string }
-
-const EVENT_COLUMNS = `id, baby_id as babyId, family_id as familyId, type, start_at as startAt,
-  end_at as endAt, data, note, created_at as createdAt, updated_at as updatedAt,
-  deleted_at as deletedAt, created_by as createdBy`
 
 function toEvents(rows: EventRow[]): Event[] {
   return rows.flatMap((row) => {

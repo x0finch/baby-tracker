@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 
-import { threadPrefix } from '../agent/run'
+import { threadRange } from '../agent/run'
 import type { AppEnv } from '../types'
 
 const SESSION_COOKIES = ['better-auth.session_token', 'better-auth.session_data']
@@ -13,6 +13,7 @@ const SESSION_COOKIES = ['better-auth.session_token', 'better-auth.session_data'
 export const accountRoutes = new Hono<AppEnv>().delete('/', async (c) => {
   const db = c.env.DB
   const userId = c.get('user').id
+  const threads = threadRange(userId)
 
   // Families where the user is the only member: everything in them goes.
   const soleFamilies = `select m.family_id from memberships m where m.user_id = ?1
@@ -56,8 +57,8 @@ export const accountRoutes = new Hono<AppEnv>().delete('/', async (c) => {
     // Their conversations with the voice agent, current and earlier ones.
     ...['voice_ops', 'chat_interrupts', 'chat_runs', 'chat_threads'].map((table) =>
       db
-        .prepare(`delete from ${table} where substr(thread_id, 1, length(?1)) = ?1`)
-        .bind(threadPrefix(userId)),
+        .prepare(`delete from ${table} where thread_id >= ? and thread_id < ?`)
+        .bind(threads.from, threads.to),
     ),
     db.prepare('delete from voice_settings where user_id = ?').bind(userId),
     db.prepare('delete from ai_shares where user_id = ?').bind(userId),

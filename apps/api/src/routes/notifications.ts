@@ -6,22 +6,10 @@ import {
 } from '@bobo/shared'
 import { Hono } from 'hono'
 
-import { memberSeesBaby } from '../access'
+import { canSeeBaby } from '../access'
 import { fail, json } from '../http'
 import { getVapidKeys, notifyUser } from '../push'
 import type { AppEnv } from '../types'
-
-/** Whether the user can see the baby: a member of its family, within their baby scope. */
-async function canSeeBaby(db: D1Database, userId: string, babyId: string): Promise<boolean> {
-  const row = await db
-    .prepare(
-      `select 1 from babies b join memberships m on m.family_id = b.family_id and m.user_id = ?1
-       where b.id = ?2 and b.deleted_at is null and ${memberSeesBaby('b.id')}`,
-    )
-    .bind(userId, babyId)
-    .first()
-  return row !== null
-}
 
 /** Push subscriptions of the signed-in user's devices. */
 export const pushRoutes = new Hono<AppEnv>()
