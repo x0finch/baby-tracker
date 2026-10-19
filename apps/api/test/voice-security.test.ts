@@ -92,6 +92,9 @@ describe('voice logging, adversarially', () => {
     fake.setResponses([{ toolCalls: [{ name: 'delete_event', input: { id: secret.id } }] }])
     const ask = await chat(me.headers, '删掉那条')
     expect(ask.reply).toBe('要删除「这条记录」吗？')
+    fake.setResponses([{ text: '{"answer":"yes"}' }, { text: '好的。' }])
+    await chat(me.headers, '对')
+    // An update goes through without asking, and still never to another family's record.
     callTool('update_event', {
       id: secret.id,
       time: '01:00',
@@ -100,8 +103,8 @@ describe('voice logging, adversarially', () => {
       diaper: null,
       note: '改了',
     })
-    fake.setResponses([{ text: '好的。' }])
-    await chat(me.headers, '对')
+    await chat(me.headers, '改到一点')
+    expect(sent).not.toContain('私密备注')
     expect(await events(stranger.headers)).toEqual([
       expect.objectContaining({ id: secret.id, note: '私密备注' }),
     ])
