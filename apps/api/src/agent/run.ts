@@ -109,12 +109,15 @@ function instructions(scope: AgentScope, now: number, babyLines: string[]) {
 - 能直接记就直接记，不要反复确认（疑似听错的除外，见下面）。一句话里的几件事用一次 record 调用。
 - 修改或删除前先用 find_events 找到那条记录。修改直接调用 update_event，不用问家长，改完用一句话说清改了什么（改之前和改之后）。删除调用 delete_event，系统会自动请家长确认，你不用自己问。
 - 回答问题时先用 find_events 查，再根据结果回答，不要编造。
-- 记录或修改前，对照下面每个宝宝的月龄参考和最近习惯。数值、时间或类型明显不合理时，比如远超参考范围、和最近习惯差好几倍、时间在将来、还不吃辅食的月龄记了辅食，很可能是语音识别听错了（十五和五十、一百和一千、十四和四十、上午和下午、喂奶和尿布）。这时先不要记，用一句话问家长，说出你猜的正确值，例如"是 50 毫升吗？"。家长确认后，带上 confirmed: true 再调用 record 或 update_event。数值合理就直接记，不要多问。
+- 记录或修改前，对照下面每个宝宝的月龄参考和最近习惯。数值、时间或类型明显不合理时，比如远超参考范围、和最近习惯差好几倍、时间在将来、还不吃辅食的月龄记了辅食，很可能是语音识别听错了（十五和五十、一百和一千、十四和四十、上午和下午、喂奶和尿布）。这时这一轮不要调用 record 或 update_event（也不要先记上再说可以改），只用一句话问家长，说出你猜的正确值，例如"是 50 毫升吗？"。家长确认后，带上 confirmed: true 再调用 record 或 update_event。数值合理就直接记，不要多问。
 - 记完或答完后，问一句"还有吗？"。家长说没有了、好了、谢谢，就调用 end_conversation 并简短道别。
 - 能记录的宝宝如下，括号里是家庭名，用于区分重名的宝宝，记录时要带上。没说名字且只有一个宝宝时就是这个宝宝。
 ${babyLines.map((line) => `  ${line}`).join('\n') || '  （还没有宝宝）'}${limit}
 - 现在是 ${localNow(now, scope.timeZone)}。`
 }
+
+/** What the user hears when the model call failed or went wrong. */
+export const FAILED_REPLY = '没处理好，请再说一遍。'
 
 /** Every thread of a user starts with this, so deleting the account can find them all. */
 export const threadPrefix = (userId: string) => `voice_${userId}_`
@@ -294,7 +297,7 @@ export async function runAgent(
     if (outcome.error || RAW_TOOL_CALL.test(outcome.text)) {
       if (!outcome.error)
         console.error('Model wrote a tool call as text', outcome.text.slice(0, 200))
-      return { reply: '没处理好，请再说一遍。', done: false, confirming: false }
+      return { reply: FAILED_REPLY, done: false, confirming: false }
     }
     const first = outcome.approvals[0]
     if (first) return { reply: await confirmQuestion(scope, first), done: false, confirming: true }

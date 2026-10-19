@@ -2,7 +2,7 @@ import { type Event, newId } from '@bobo/shared'
 import type { AnyTextAdapter } from '@tanstack/ai'
 
 import { loadAccess } from '../src/access'
-import { type AgentScope, runAgent } from '../src/agent/run'
+import { type AgentScope, FAILED_REPLY, runAgent } from '../src/agent/run'
 import { localDay } from '../src/voice/plan'
 import type { createTestApp } from '../test/app'
 import { baby } from '../test/fixtures'
@@ -26,6 +26,9 @@ export interface TurnResult {
   /** Why the turn failed. */
   why?: string
 }
+
+/** Why a turn failed when the model call itself failed (see the run's log for the error). */
+export const ERRORED = '模型调用出错'
 
 export interface RunResult {
   scenario: Scenario
@@ -123,6 +126,8 @@ async function playTurn(
   const { reply } = await runAgent(adapter, scope, turn.say, Date.now())
   const after = await storedEvents(t, familyId)
   const added = [...after].filter(([id]) => !before.has(id)).map(([, stored]) => stored)
+  // A failed model call says nothing about the model's judgement: counted apart.
+  if (reply === FAILED_REPLY) return { say: turn.say, reply, added, pass: false, why: ERRORED }
   return { say: turn.say, reply, added, ...judge(turn.expect, reply, added) }
 }
 
@@ -197,36 +202,54 @@ const percent = (passed: number, total: number) =>
   total === 0 ? '–' : `${Math.round((passed / total) * 100)}%（${passed}/${total}）`
 
 /** The results as Markdown: pass rates by model and category, then every failure. */
+const errored = (result: RunResult) =>
+  result.error !== undefined || result.turns.some((turn) => turn.why === ERRORED)
+
+/**
+ * The results as Markdown: pass rates by model and category, then every failure. Runs whose
+ * model call failed are counted apart, not as wrong answers.
+ */
 export function report(results: RunResult[], runs: number): string {
   const models = [...new Set(results.map((result) => result.model))]
   const categories: Category[] = ['misheard', 'plausible', 'follow-up']
   const lines = [
     `# Agent evals`,
     '',
-    `每个场景跑 ${runs} 次。`,
+    `每个场景跑 ${runs} 次。通过率不算调用出错的那几次。`,
     '',
-    `| 模型 | ${categories.map((category) => CATEGORY_LABEL[category]).join(' | ')} | 总计 |`,
-    `| --- | ${categories.map(() => '---').join(' | ')} | --- |`,
+    `| 模型 | ${categories.map((category) => CATEGORY_LABEL[category]).join(' | ')} | 总计 | 调用出错 |`,
+    `| --- | ${categories.map(() => '---').join(' | ')} | --- | --- |`,
   ]
   for (const model of models) {
     const mine = results.filter((result) => result.model === model)
-    const cells = categories.map((category) => {
-      const runsOf = mine.filter((result) => result.scenario.category === category)
-      return percent(runsOf.filter((result) => result.pass).length, runsOf.length)
-    })
+    const judged = mine.filter((result) => !errored(result))
+    const rate = (some: RunResult[]) =>
+      percent(some.filter((result) => result.pass).length, some.length)
+    const cells = categories.map((category) =>
+      rate(judged.filter((result) => result.scenario.category === category)),
+    )
     lines.push(
-      `| ${model} | ${cells.join(' | ')} | ${percent(mine.filter((result) => result.pass).length, mine.length)} |`,
+      `| ${model} | ${cells.join(' | ')} | ${rate(judged)} | ${mine.length - judged.length} |`,
     )
   }
-  const failures = results.filter((result) => !result.pass)
+  const failures = results.filter((result) => !result.pass && !errored(result))
   if (failures.length > 0) {
     lines.push('', '## 没通过的', '')
     for (const failure of failures) {
       const last = failure.turns.at(-1)
-      const why = failure.error ?? last?.why ?? ''
       const said = last ? `「${last.say}」→「${last.reply}」` : ''
       const added = last && last.added.length > 0 ? `，记了 ${JSON.stringify(last.added)}` : ''
-      lines.push(`- **${failure.model}** · ${failure.scenario.name}：${why}。${said}${added}`)
+      lines.push(
+        `- **${failure.model}** · ${failure.scenario.name}：${last?.why ?? ''}。${said}${added}`,
+      )
+    }
+  }
+  const errors = results.filter(errored)
+  if (errors.length > 0) {
+    lines.push('', '## 调用出错', '')
+    for (const model of models) {
+      const count = errors.filter((result) => result.model === model).length
+      if (count > 0) lines.push(`- **${model}**：${count} 次，错误信息在运行日志里。`)
     }
   }
   return `${lines.join('\n')}\n`

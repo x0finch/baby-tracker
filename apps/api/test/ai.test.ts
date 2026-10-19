@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
-import { decryptKey } from '../src/voice/ai'
+import { MAX_OUTPUT_TOKENS, decryptKey, modelOptionsFor } from '../src/voice/ai'
 import { createTestApp } from './app'
 
 const SECRET = 'test-ai-key-secret-test-ai-key-secret'
@@ -224,5 +224,16 @@ describe('AI settings', () => {
     await t.send('DELETE', '/api/ai/keys/openrouter', owner)
     expect(await mine()).toEqual({ keys: [], choice: null, sharedFamilyIds: [] })
     expect(await family()).toEqual({ inUse: null, shares: [] })
+  })
+})
+
+describe('model request options', () => {
+  // Without a cap, OpenRouter reserves the model's maximum output and refuses small balances.
+  it('caps output tokens under the name each API uses', () => {
+    expect(modelOptionsFor('openrouter')).toEqual({
+      max_tokens: MAX_OUTPUT_TOKENS,
+      provider: { require_parameters: true },
+    })
+    expect(modelOptionsFor('openai')).toEqual({ max_output_tokens: MAX_OUTPUT_TOKENS })
   })
 })

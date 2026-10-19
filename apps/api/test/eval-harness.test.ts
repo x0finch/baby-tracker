@@ -81,7 +81,18 @@ describe('eval harness', () => {
     expect(failed.turns).toHaveLength(1)
 
     const markdown = report([passed, failed], 1)
-    expect(markdown).toContain('| fake | 50%（1/2） | – | – | 50%（1/2） |')
+    expect(markdown).toContain('| fake | 50%（1/2） | – | – | 50%（1/2） | 0 |')
     expect(markdown).toContain('没有先问就记了')
+  })
+
+  it('counts a failed model call apart from a wrong answer', async () => {
+    const fake = fakeText()
+    fake.setResponses([() => Promise.reject(new Error('402 needs more credits'))])
+    const result = await runScenario(t, fake, 'broke', misheard)
+    expect(result.error ?? result.turns[0]?.why).toBeTruthy()
+    const markdown = report([result], 1)
+    expect(markdown).toContain('| broke | – | – | – | – | 1 |')
+    expect(markdown).toContain('## 调用出错')
+    expect(markdown).not.toContain('## 没通过的')
   })
 })

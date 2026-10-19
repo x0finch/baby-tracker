@@ -129,12 +129,25 @@ export async function listModels(provider: AiProvider, apiKey: string): Promise<
 }
 
 /**
- * Request options for the provider. OpenRouter routes only to hosts that support every
- * parameter sent, tools included: a host without tool calling has models write their calls
- * as text (DeepSeek's DSML), which the user would then hear.
+ * Most tokens one model call may write. Replies are a sentence or two, but reasoning models
+ * also count their thinking. Without a cap, OpenRouter reserves the model's maximum (64k
+ * tokens) against the key's credit and refuses keys with a small balance (402).
  */
-export const modelOptionsFor = (provider: AiProvider): Record<string, unknown> | undefined =>
-  provider === 'openrouter' ? { provider: { require_parameters: true } } : undefined
+export const MAX_OUTPUT_TOKENS = 4096
+
+/**
+ * Request options for the provider: the output cap under the name its API uses. OpenRouter
+ * routes only to hosts that support every parameter sent, tools included: a host without
+ * tool calling has models write their calls as text (DeepSeek's DSML), which the user would
+ * then hear.
+ */
+export const modelOptionsFor = (provider: AiProvider): Record<string, unknown> =>
+  PROVIDERS[provider].api === 'responses'
+    ? { max_output_tokens: MAX_OUTPUT_TOKENS }
+    : {
+        max_tokens: MAX_OUTPUT_TOKENS,
+        ...(provider === 'openrouter' ? { provider: { require_parameters: true } } : {}),
+      }
 
 /** The model to start with: the first recommended one this key can use. */
 export const firstChoice = (models: AiModel[]) =>
