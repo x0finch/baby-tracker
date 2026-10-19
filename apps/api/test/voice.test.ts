@@ -58,7 +58,7 @@ describe('siri voice logging', () => {
     fake.setResponses([
       ({ request }) => {
         system = JSON.stringify(request.systemPrompts ?? [])
-        return { toolCalls: [{ name: 'record', input: { actions } }] }
+        return { toolCalls: [{ name: 'record', input: { actions, confirmed: false } }] }
       },
       { text: reply },
     ])
