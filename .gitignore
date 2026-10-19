@@ -19,3 +19,4 @@ apps/api/worker-configuration.d.ts
 e2e/.wrangler-state/
 e2e/test-results/
 e2e/playwright-report/
+apps/api/eval-report.md

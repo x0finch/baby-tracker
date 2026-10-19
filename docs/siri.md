@@ -32,6 +32,31 @@ them, or say "没有了" to finish.
 - Conversations are kept 30 days after they were last used: once an hour the cron deletes
   older ones with their runs, pending questions and undo log (`agent/retention.ts`).
 
+### Misheard values
+
+- Each turn's instructions give every baby its age, the usual values for that age
+  (`agent/guide.ts`, with sources), and its own last 7 days of feeds.
+- When a value looks misheard ("十五" for "五十", solids at two months), the agent asks one
+  short question with the likely value, and records with `confirmed: true` once the parent
+  agrees. Plausible values are recorded directly.
+- The server backs this up: without `confirmed`, `record` and `update_event` refuse values past
+  hard limits for the age (`implausible` in `agent/guide.ts`) and tell the agent to ask.
+
+### Evals
+
+Unit tests use a scripted model, so they show the tools and checks work, not that a real model
+decides well. `apps/api/evals` plays scenarios (misheard, plausible, ask-then-answer) against
+real models, several runs each, and reports pass rates by model and category with every
+failure.
+
+- In GitHub: Actions → Agent evals → Run workflow (models, runs and a name filter are inputs).
+  It also runs every Monday. It needs the `EVAL_OPENROUTER_API_KEY` secret (or
+  `EVAL_OPENAI_API_KEY`), and skips without one. The report is in the run summary.
+- Locally: `EVAL_OPENROUTER_API_KEY=… pnpm --filter @bobo/api eval`, with `EVAL_MODELS`,
+  `EVAL_RUNS` and `EVAL_ONLY` to narrow it. The report is written to `eval-report.md`.
+- Re-run it after changing the instructions, the tools or `agent/guide.ts`, and compare.
+- `test/eval-harness.test.ts` keeps the harness itself working in CI.
+
 ### Families
 
 One shortcut and one code cover all the user's families. The agent is given the babies the user
