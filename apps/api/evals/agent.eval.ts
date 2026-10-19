@@ -17,10 +17,7 @@ const KEYS: Record<AiProvider, string | undefined> = {
   openrouter: process.env.EVAL_OPENROUTER_API_KEY,
   openai: process.env.EVAL_OPENAI_API_KEY,
 }
-const MODELS = (
-  process.env.EVAL_MODELS ||
-  'openrouter:deepseek/deepseek-v4.1-flash,openrouter:openai/gpt-5.4-mini'
-)
+const MODELS = (process.env.EVAL_MODELS || 'openrouter:deepseek/deepseek-v4.1-flash')
   .split(',')
   .map((entry) => entry.trim())
   .filter(Boolean)

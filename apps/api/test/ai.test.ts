@@ -87,7 +87,7 @@ describe('AI settings', () => {
     vi.stubGlobal('fetch', fakeProviders())
     expect(await (await addKey('openrouter', KEY)).json()).toEqual({
       keys: [{ provider: 'openrouter', keyHint: 'sk-or-…1234' }],
-      choice: { provider: 'openrouter', model: 'openai/gpt-5.4-mini' },
+      choice: { provider: 'openrouter', model: 'deepseek/deepseek-v4.1-flash' },
       sharedFamilyIds: [],
     })
     expect(await cipher('openrouter')).not.toContain(KEY)
@@ -101,7 +101,7 @@ describe('AI settings', () => {
         { provider: 'openai', keyHint: 'sk-…wxyz' },
         { provider: 'openrouter', keyHint: 'sk-or-…1234' },
       ],
-      choice: { provider: 'openrouter', model: 'openai/gpt-5.4-mini' },
+      choice: { provider: 'openrouter', model: 'deepseek/deepseek-v4.1-flash' },
     })
     expect(await decryptKey(SECRET, await cipher('openrouter'))).toBe(KEY)
   })
@@ -124,15 +124,15 @@ describe('AI settings', () => {
           status: 'ok',
           models: [
             {
-              id: 'openai/gpt-5.4-mini',
-              tag: 'steady',
-              price: { input: 0.75, output: 4.5 },
-              everyday: true,
-            },
-            {
               id: 'deepseek/deepseek-v4.1-flash',
               tag: 'cheapest',
               price: { input: 0.04, output: 0.144 },
+              everyday: true,
+            },
+            {
+              id: 'openai/gpt-5.4-mini',
+              tag: 'steady',
+              price: { input: 0.75, output: 4.5 },
               everyday: true,
             },
             { id: '~deepseek/deepseek-flash-latest', everyday: false },
