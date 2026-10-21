@@ -16,6 +16,20 @@ describe('api', () => {
     expect(await res.json()).toEqual({ ok: true })
   })
 
+  it('offers only the sign-in options this deployment is set up for', async () => {
+    // The test app has a Google client but no way to send email.
+    expect(await (await t.request('/api/sign-in-options')).json()).toEqual({
+      google: true,
+      passwordReset: false,
+    })
+    const bare = await createTestApp({ GOOGLE_CLIENT_ID: undefined, RESEND_API_KEY: 're_test' })
+    expect(await (await bare.request('/api/sign-in-options')).json()).toEqual({
+      google: false,
+      passwordReset: true,
+    })
+    await bare.dispose()
+  })
+
   it('applies the migrations', async () => {
     const tables = await t.env.DB.prepare(
       "select name from sqlite_master where type = 'table' and name in ('babies', 'events', 'user', 'session') order by name",
@@ -33,7 +47,13 @@ describe('api', () => {
   })
 
   it('answers 401 without a session on every route but the public ones', async () => {
-    const open = new Set(['/api/health', '/api/auth/*', '/api/invites/:code', '/api/voice/siri'])
+    const open = new Set([
+      '/api/health',
+      '/api/sign-in-options',
+      '/api/auth/*',
+      '/api/invites/:code',
+      '/api/voice/siri',
+    ])
     const routes = t.app.routes.filter((route) => route.method !== 'ALL' && !open.has(route.path))
     expect(routes.length).toBeGreaterThan(30)
     for (const route of routes) {

@@ -74,11 +74,11 @@ In [Google Cloud Console](https://console.cloud.google.com/apis/credentials), cr
 - Authorized JavaScript origin: the app URL
 - Authorized redirect URI: `<app URL>/api/auth/callback/google`
 
-Then set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` and re-run the deploy.
+Then set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` and re-run the deploy. The Google button shows only once both are set.
 
 ## Optional: password-reset emails
 
-Sign-up and sign-in work without email. "Forgot password" needs it:
+Sign-up and sign-in work without email. "Forgot password" needs it, and shows only once one of these is set up:
 
 - **Free plan:** create a Resend account, verify your domain, and set `RESEND_API_KEY` and
   `EMAIL_FROM`.

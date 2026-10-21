@@ -1,8 +1,10 @@
+import { useQuery } from '@tanstack/react-query'
 import { type FormEvent, useEffect, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
 import { FormError } from '../../components/ui/FormError'
 import { Input } from '../../components/ui/Input'
+import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { HttpError } from '../../lib/api'
 import { m } from '../../paraglide/messages.js'
 import {
@@ -14,6 +16,7 @@ import {
 } from './account'
 import { isPasskeyCancel, passkeysSupported, signInWithPasskey } from './passkey'
 import { MIN_PASSWORD_LENGTH } from './password'
+import { accountQueries } from './queries'
 
 type Mode = 'sign-in' | 'sign-up' | 'reset-request' | 'reset'
 
@@ -24,8 +27,9 @@ const isStatus = (error: unknown, status: number) =>
   error instanceof HttpError && error.status === status
 
 /**
- * Google sign-in, or email and password with sign-up and a code-based password reset.
- * `onSignedIn` runs after an email sign-in; Google leaves the page and returns to `returnTo`.
+ * Google sign-in, or email and password with sign-up and a code-based password reset. Google
+ * and the reset show only when the deployment is set up for them. `onSignedIn` runs after an
+ * email or passkey sign-in; Google leaves the page and returns to `returnTo`.
  */
 export function SignInOptions({
   returnTo,
@@ -45,6 +49,10 @@ export function SignInOptions({
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [resendIn, setResendIn] = useState(0)
+  // Until the server answers (or offline), only what needs no setup: email and passkeys.
+  const { data: options } = useQuery(accountQueries.signInOptions())
+  const google = options?.google === true
+  const passkeyButton = mode === 'sign-in' && passkeysSupported()
 
   useEffect(() => {
     if (resendIn <= 0) return undefined
@@ -58,7 +66,7 @@ export function SignInOptions({
     setPassword('')
   }
 
-  async function google() {
+  async function signInGoogle() {
     setError(undefined)
     onGoogle?.()
     try {
@@ -168,19 +176,34 @@ export function SignInOptions({
 
   return (
     <div className="flex flex-col gap-3">
-      <Button size="lg" block onClick={() => void google()}>
-        {m.signInGoogle()}
-      </Button>
-      {mode === 'sign-in' && passkeysSupported() && (
+      {(mode === 'sign-in' || mode === 'sign-up') && (
+        <SegmentedControl
+          label={m.signInOrUp()}
+          options={[
+            { value: 'sign-in', label: m.signInSubmit() },
+            { value: 'sign-up', label: m.signUpSubmit() },
+          ]}
+          value={mode}
+          onChange={switchMode}
+        />
+      )}
+      {google && (
+        <Button size="lg" block onClick={() => void signInGoogle()}>
+          {m.signInGoogle()}
+        </Button>
+      )}
+      {passkeyButton && (
         <Button variant="outline" block disabled={busy} onClick={() => void passkey()}>
           {m.passkeySignIn()}
         </Button>
       )}
-      <div aria-hidden className="flex items-center gap-3 text-caption text-fg-muted">
-        <span className="h-0.5 flex-1 bg-border" />
-        {m.signInOr()}
-        <span className="h-0.5 flex-1 bg-border" />
-      </div>
+      {(google || passkeyButton) && (
+        <div aria-hidden className="flex items-center gap-3 text-caption text-fg-muted">
+          <span className="h-0.5 flex-1 bg-border" />
+          {m.signInOr()}
+          <span className="h-0.5 flex-1 bg-border" />
+        </div>
+      )}
       <form noValidate onSubmit={submit} className="flex flex-col gap-3">
         {mode === 'reset-request' && <p className="m-0 text-fg-muted">{m.resetIntro()}</p>}
         {mode === 'reset' ? (
@@ -229,25 +252,15 @@ export function SignInOptions({
             onChange={(e) => setPassword(e.target.value)}
           />
         )}
-        <Button type="submit" variant="outline" block disabled={busy}>
+        <Button type="submit" variant={google ? 'outline' : 'solid'} block disabled={busy}>
           {submitLabel}
         </Button>
       </form>
       {error && <FormError>{error}</FormError>}
       <div className="flex flex-wrap justify-between gap-2">
-        {mode === 'sign-in' && (
-          <>
-            <Button variant="ghost" onClick={() => switchMode('sign-up')}>
-              {m.signUpSwitch()}
-            </Button>
-            <Button variant="ghost" onClick={() => switchMode('reset-request')}>
-              {m.passwordForgot()}
-            </Button>
-          </>
-        )}
-        {mode === 'sign-up' && (
-          <Button variant="ghost" onClick={() => switchMode('sign-in')}>
-            {m.signInSwitch()}
+        {mode === 'sign-in' && options?.passwordReset && (
+          <Button variant="ghost" onClick={() => switchMode('reset-request')}>
+            {m.passwordForgot()}
           </Button>
         )}
         {(mode === 'reset-request' || mode === 'reset') && (

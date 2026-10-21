@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Card, NoticeCard } from '../../components/ui/Card'
 import { m } from '../../paraglide/messages.js'
 import { useAccess } from '../../sync/use-access'
+import { SignInNotice } from '../account/SignInNotice'
 import { KeysCard } from './KeysCard'
 import { ModelCard } from './ModelCard'
 import { aiQueries } from './queries'
@@ -20,7 +21,7 @@ export function useAiSummary() {
 export function MyAi() {
   const { userId } = useAccess()
   if (!userId) {
-    return <NoticeCard>{m.aiSignedOut()}</NoticeCard>
+    return <SignInNotice>{m.aiSignedOut()}</SignInNotice>
   }
   return <MyAiCards />
 }

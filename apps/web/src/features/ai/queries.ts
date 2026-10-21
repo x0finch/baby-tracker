@@ -3,7 +3,7 @@ import { queryOptions } from '@tanstack/react-query'
 import { aiApi } from './api'
 
 // Account-side caches don't carry the user id: signing out clears the whole query cache
-// (features/account/AccountCard.tsx). `all` keys are roots for invalidating a whole group.
+// (features/account/AccountSettings.tsx). `all` keys are roots for invalidating a whole group.
 
 /** Kept on the device across reloads and offline (lib/persist-queries.ts). */
 const persist = { persist: true }

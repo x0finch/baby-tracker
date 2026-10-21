@@ -14,12 +14,19 @@ import {
 } from './passkey'
 import { accountKeys, accountQueries } from './queries'
 
-/** The signed-in account's passkeys: add one for this device, or remove old ones. */
-export function PasskeySection() {
+/**
+ * The signed-in account's passkeys: remove old ones, and add one for this device when
+ * `canAdd` (accounts with a password; Google already signs in without typing one).
+ */
+export function PasskeySection({ canAdd }: { canAdd: boolean }) {
   const queryClient = useQueryClient()
   const list = useQuery(accountQueries.passkeys())
   const [message, setMessage] = useState<string>()
-  const refresh = () => queryClient.invalidateQueries({ queryKey: accountKeys.passkeys })
+  const refresh = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: accountKeys.passkeys }),
+      queryClient.invalidateQueries({ queryKey: accountKeys.methods }),
+    ])
 
   const add = useMutation({
     mutationFn: () => addPasskey(m.passkeyDefaultName({ date: formatDate(Date.now()) })),
@@ -42,12 +49,12 @@ export function PasskeySection() {
 
   // A failed list (e.g. offline) still offers adding one.
   const passkeys: PasskeyInfo[] | undefined = list.isError ? [] : list.data
-  if (!passkeysSupported() || !passkeys) return null
+  if (!passkeysSupported() || !passkeys || (!canAdd && passkeys.length === 0)) return null
 
   return (
-    <section className="flex flex-col gap-2 border-t-2 border-border pt-3">
+    <section className="flex flex-col gap-2">
       <h3 className="m-0 font-extrabold">{m.passkeyTitle()}</h3>
-      <p className="m-0 text-caption text-fg-muted">{m.passkeyIntro()}</p>
+      {canAdd && <p className="m-0 text-caption text-fg-muted">{m.passkeyIntro()}</p>}
       {passkeys.length > 0 && (
         <ul className="m-0 flex list-none flex-col gap-1 p-0">
           {passkeys.map((item) => (
@@ -68,9 +75,11 @@ export function PasskeySection() {
           ))}
         </ul>
       )}
-      <Button variant="soft" tone="primary" disabled={add.isPending} onClick={() => add.mutate()}>
-        {m.passkeyAdd()}
-      </Button>
+      {canAdd && (
+        <Button variant="soft" tone="primary" disabled={add.isPending} onClick={() => add.mutate()}>
+          {m.passkeyAdd()}
+        </Button>
+      )}
       {message && <output className="m-0 font-bold">{message}</output>}
     </section>
   )

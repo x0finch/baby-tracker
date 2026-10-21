@@ -32,3 +32,8 @@ export function formatTime(date: Date | number, locale: string = getLocale()): s
 export function localeDisplayName(locale: string): string {
   return new Intl.DisplayNames([locale], { type: 'language' }).of(locale) ?? locale
 }
+
+/** "A、B 和 C" in the active locale. */
+export function formatList(items: string[], locale: string = getLocale()): string {
+  return new Intl.ListFormat(locale, { type: 'conjunction' }).format(items)
+}

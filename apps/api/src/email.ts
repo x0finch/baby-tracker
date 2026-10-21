@@ -14,6 +14,9 @@ export interface EmailBinding {
   ): Promise<unknown>
 }
 
+/** Whether email can really be sent; without a way, messages are only logged. */
+export const canSendEmail = (env: Env) => Boolean(env.EMAIL || env.RESEND_API_KEY)
+
 const RESEND_URL = 'https://api.resend.com/emails'
 
 /**

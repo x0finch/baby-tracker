@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button'
 import { Card, NoticeCard } from '../../components/ui/Card'
 import { m } from '../../paraglide/messages.js'
 import { useAccess } from '../../sync/use-access'
+import { SignInNotice } from '../account/SignInNotice'
 import { type VoiceSettings } from './api'
 import { ChatSheet } from './ChatSheet'
 import { Connect } from './Connect'
@@ -24,7 +25,7 @@ export function useVoiceSummary() {
 export function VoiceCard() {
   const { userId } = useAccess()
   if (!userId) {
-    return <NoticeCard>{m.voiceSignedOut()}</NoticeCard>
+    return <SignInNotice>{m.voiceSignedOut()}</SignInNotice>
   }
   return <Voice />
 }

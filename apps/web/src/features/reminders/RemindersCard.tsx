@@ -3,11 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
-import { Card, NoticeCard } from '../../components/ui/Card'
+import { Card } from '../../components/ui/Card'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { formatNumber } from '../../lib/i18n'
 import { m } from '../../paraglide/messages.js'
 import { useAccess } from '../../sync/use-access'
+import { SignInNotice } from '../account/SignInNotice'
 import { useBabies } from '../babies/use-babies'
 import { reminderKey, useReminders } from './collection'
 import {
@@ -44,7 +45,7 @@ export const usePushState = () => useQuery(reminderQueries.pushState()).data
 export function RemindersCard() {
   const { userId } = useAccess()
   if (!userId) {
-    return <NoticeCard>{m.reminderSignedOut()}</NoticeCard>
+    return <SignInNotice>{m.reminderSignedOut()}</SignInNotice>
   }
   return <Reminders key={userId} userId={userId} />
 }

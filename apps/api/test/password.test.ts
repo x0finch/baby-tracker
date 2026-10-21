@@ -87,6 +87,36 @@ describe('email and password', () => {
     expect(await (await me(sessionCookie(res))).json()).toMatchObject({ name: '爸爸' })
   })
 
+  it('lists how the account signs in, renames it and changes its password', async () => {
+    const password = key()
+    // Its own address, apart from the rate limits other tests use up.
+    const ip = { 'cf-connecting-ip': '192.0.2.7' }
+    const created = await post(
+      '/api/auth/sign-up/email',
+      { email: 'methods@example.com', password, name: '' },
+      ip,
+    )
+    const cookie = sessionCookie(created)
+    const methods = await t.request('/api/account', { headers: { cookie } })
+    expect(await methods.json()).toEqual({ google: false, password: true, passkeys: 0 })
+
+    expect((await post('/api/auth/update-user', { name: '妈妈' }, { cookie, ...ip })).status).toBe(
+      200,
+    )
+    const renamed: { name: string } = await (await me(cookie)).json()
+    expect(renamed.name).toBe('妈妈')
+
+    const next = key()
+    const changed = await post(
+      '/api/auth/change-password',
+      { currentPassword: password, newPassword: next },
+      { cookie, ...ip },
+    )
+    expect(changed.status).toBe(200)
+    expect((await signIn('methods@example.com', password, ip)).status).toBe(401)
+    expect((await signIn('methods@example.com', next, ip)).status).toBe(200)
+  })
+
   it('refuses raw passwords that were not stretched by the app', async () => {
     expect((await signUp('raw@example.com', 'hunter22')).status).toBe(400)
   })
