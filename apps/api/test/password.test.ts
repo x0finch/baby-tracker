@@ -106,15 +106,19 @@ describe('email and password', () => {
     const renamed: { name: string } = await (await me(cookie)).json()
     expect(renamed.name).toBe('妈妈')
 
+    const elsewhere = sessionCookie(await signIn('methods@example.com', password, ip))
     const next = key()
     const changed = await post(
       '/api/auth/change-password',
-      { currentPassword: password, newPassword: next },
+      { currentPassword: password, newPassword: next, revokeOtherSessions: true },
       { cookie, ...ip },
     )
     expect(changed.status).toBe(200)
     expect((await signIn('methods@example.com', password, ip)).status).toBe(401)
     expect((await signIn('methods@example.com', next, ip)).status).toBe(200)
+    // Other devices are signed out; this one keeps its (renewed) session.
+    expect((await me(elsewhere)).status).toBe(401)
+    expect((await me(sessionCookie(changed))).status).toBe(200)
   })
 
   it('refuses raw passwords that were not stretched by the app', async () => {

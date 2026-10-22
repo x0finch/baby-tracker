@@ -63,7 +63,8 @@ export async function changePassword(email: string, current: string, next: strin
   ])
   await apiFetch('/api/auth/change-password', {
     method: 'POST',
-    body: JSON.stringify({ currentPassword, newPassword }),
+    // Signs out every other device, in case someone else knew the old password.
+    body: JSON.stringify({ currentPassword, newPassword, revokeOtherSessions: true }),
   })
 }
 
