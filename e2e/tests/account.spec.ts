@@ -43,7 +43,10 @@ test('signs up with email, renames the account and changes the password', async 
 
   const nickname = page.getByLabel('昵称')
   await nickname.fill('小米粒妈妈')
+  // Saved when the field loses focus; let it reach the server before reloading the page.
+  const saved = page.waitForResponse((res) => res.url().endsWith('/api/auth/update-user'))
   await nickname.blur()
+  await saved
   await page.goto('/settings')
   await expect(page.getByText('小米粒妈妈', { exact: true })).toBeVisible()
 
