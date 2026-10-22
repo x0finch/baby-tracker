@@ -53,15 +53,39 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   block?: boolean
 }
 
+type ButtonLook = Pick<ButtonProps, 'tone' | 'variant' | 'size' | 'block' | 'className'>
+
+/** The classes of a button, for a link that looks like one. */
+export function buttonClass({
+  tone = 'primary',
+  variant = 'solid',
+  size = 'md',
+  block = false,
+  className,
+}: ButtonLook) {
+  return clsx(
+    'inline-flex shrink-0 select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg font-extrabold',
+    'disabled:pointer-events-none disabled:opacity-50',
+    size === 'md' && 'min-h-touch px-4 text-body',
+    size === 'lg' && 'min-h-14 px-6 text-label',
+    block && 'w-full',
+    variant === 'solid' && clsx('press border-b-4 text-on-accent', solidTones[tone]),
+    variant === 'soft' && clsx('press border-2 border-b-4', softTones[tone]),
+    variant === 'outline' && clsx('press border-2 border-b-4 border-border bg-bg', textTones[tone]),
+    variant === 'ghost' && clsx('active:bg-surface', textTones[tone]),
+    className,
+  )
+}
+
 /**
  * Flat button with a solid bottom edge that collapses when pressed (no gradients or
  * shadows). Pressed state is visible on touch devices; nothing depends on hover.
  */
 export function Button({
-  tone = 'primary',
-  variant = 'solid',
-  size = 'md',
-  block = false,
+  tone,
+  variant,
+  size,
+  block,
   className,
   type = 'button',
   ...props
@@ -69,19 +93,7 @@ export function Button({
   return (
     <button
       type={type}
-      className={clsx(
-        'inline-flex shrink-0 select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg font-extrabold',
-        'disabled:pointer-events-none disabled:opacity-50',
-        size === 'md' && 'min-h-touch px-4 text-body',
-        size === 'lg' && 'min-h-14 px-6 text-label',
-        block && 'w-full',
-        variant === 'solid' && clsx('press border-b-4 text-on-accent', solidTones[tone]),
-        variant === 'soft' && clsx('press border-2 border-b-4', softTones[tone]),
-        variant === 'outline' &&
-          clsx('press border-2 border-b-4 border-border bg-bg', textTones[tone]),
-        variant === 'ghost' && clsx('active:bg-surface', textTones[tone]),
-        className,
-      )}
+      className={buttonClass({ tone, variant, size, block, className })}
       {...props}
     />
   )

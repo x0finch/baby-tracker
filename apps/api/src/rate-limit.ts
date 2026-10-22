@@ -15,7 +15,12 @@ const GUESSES = new Set([
   '/api/auth/sign-in/email-otp',
 ])
 /** Limited per IP only: no address in the request. */
-const PER_IP = new Set(['/api/auth/sign-up/email', '/api/auth/passkey/verify-authentication'])
+const PER_IP = new Set([
+  '/api/auth/sign-up/email',
+  '/api/auth/passkey/verify-authentication',
+  // Checks the current password, though only for someone already signed in.
+  '/api/auth/change-password',
+])
 
 async function emailOf(request: Request): Promise<string | undefined> {
   try {

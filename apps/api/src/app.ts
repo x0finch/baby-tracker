@@ -4,6 +4,7 @@ import { except } from 'hono/combine'
 import { cors } from 'hono/cors'
 
 import { getAuth, trustedOrigins } from './auth'
+import { canSendEmail } from './email'
 import { errorResponse, fail } from './http'
 import { requireUser } from './middleware'
 import { authRateLimit } from './rate-limit'
@@ -57,6 +58,15 @@ export function createApp(options: AppOptions = {}) {
     return c.json({ ok: true })
   })
 
+  // Only the options this deployment is set up for: Google needs its client, a password
+  // reset needs a way to send the code.
+  app.get('/sign-in-options', (c) =>
+    c.json({
+      google: Boolean(c.env.GOOGLE_CLIENT_ID && c.env.GOOGLE_CLIENT_SECRET),
+      passwordReset: canSendEmail(c.env),
+    }),
+  )
+
   app.use('/auth/*', authRateLimit)
   app.on(['GET', 'POST'], '/auth/*', (c) => authFor(c.env).handler(c.req.raw))
 
@@ -67,6 +77,8 @@ export function createApp(options: AppOptions = {}) {
       [
         '/api/health',
         '/api/auth/*',
+        // Which sign-in options to show, before signing in.
+        '/api/sign-in-options',
         // Who invited you, shown before signing in; accepting needs a session.
         '/api/invites/:code',
         // The shortcut authenticates with its own code.

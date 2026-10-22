@@ -82,15 +82,21 @@ test('key screens look as before', async ({ page, context }) => {
   await sheetShot(page, 'export-picker')
   await closeSheet(page)
 
+  // The local server has no Google client or email: only email and passkeys.
+  await page.goto('/settings/account')
+  await expect(page.getByRole('radio', { name: '登录' })).toBeChecked()
+  await page.waitForLoadState('networkidle')
+  await screen(page, 'account-signed-out')
+
   await signIn(context, 'visual')
   await syncNow(page)
+  // The sync time would change on every run.
+  const syncTime = page.getByText(/^已同步 · /)
+  await expect(page.getByText('visual@example.com')).toBeVisible()
+  await expect(page).toHaveScreenshot('account.png', { fullPage: true, mask: [syncTime] })
   await page.goto('/settings')
   await expect(page.getByRole('heading', { name: '家庭' })).toBeVisible()
-  // The sync time in the account row would change on every run.
-  await expect(page).toHaveScreenshot('settings.png', {
-    fullPage: true,
-    mask: [page.getByRole('link', { name: /账号与同步/ })],
-  })
+  await expect(page).toHaveScreenshot('settings.png', { fullPage: true, mask: [syncTime] })
   await page.getByRole('link', { name: /的家/ }).click()
   await expect(page.getByRole('button', { name: '邀请家人' })).toBeVisible()
   await screen(page, 'family')

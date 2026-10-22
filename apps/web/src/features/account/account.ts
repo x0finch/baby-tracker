@@ -32,6 +32,42 @@ export const httpAccountApi: AccountApi = {
     apiFetch<FamilySummary>('/api/families', { method: 'POST', body: JSON.stringify({ name }) }),
 }
 
+/** The sign-in options this deployment is set up for. */
+export interface SignInOptionsInfo {
+  google: boolean
+  passwordReset: boolean
+}
+
+export const fetchSignInOptions = () => apiFetch<SignInOptionsInfo>('/api/sign-in-options')
+
+/** How the signed-in account can sign in. */
+export interface SignInMethods {
+  google: boolean
+  password: boolean
+  passkeys: number
+}
+
+export const fetchSignInMethods = () => apiFetch<SignInMethods>('/api/account')
+
+export async function updateName(name: string) {
+  await apiFetch('/api/auth/update-user', {
+    method: 'POST',
+    body: JSON.stringify({ name: name.trim() }),
+  })
+}
+
+export async function changePassword(email: string, current: string, next: string) {
+  const [currentPassword, newPassword] = await Promise.all([
+    derivePasswordKey(email, current),
+    derivePasswordKey(email, next),
+  ])
+  await apiFetch('/api/auth/change-password', {
+    method: 'POST',
+    // Signs out every other device, in case someone else knew the old password.
+    body: JSON.stringify({ currentPassword, newPassword, revokeOtherSessions: true }),
+  })
+}
+
 /** Starts Google sign-in; the browser leaves the app and returns to `returnTo`. */
 export async function signInWithGoogle(returnTo = '/settings/account') {
   const { url } = await apiFetch<{ url: string }>('/api/auth/sign-in/social', {
