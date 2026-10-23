@@ -1,7 +1,7 @@
 import type { Event } from '@bobo/shared'
 import { describe, expect, it } from 'vitest'
 
-import { ageLabel, implausible, referenceFor } from '../src/agent/guide'
+import { ageLabel, implausible, nextUpLines } from '../src/agent/guide'
 
 const NOW = Date.UTC(2026, 9, 17, 2, 0)
 const ZONE = 'Asia/Shanghai'
@@ -28,14 +28,7 @@ function bottle(amountMl: number, startAt = base.startAt): Event {
   }
 }
 
-describe('age references', () => {
-  it('picks the band for the age in months', () => {
-    expect(referenceFor(0).bottleMlPerFeed).toEqual([30, 120])
-    expect(referenceFor(3).bottleMlPerFeed).toEqual([120, 180])
-    expect(referenceFor(7).solids).toBe('yes')
-    expect(referenceFor(30).milkMlPerDay).toEqual([400, 600])
-  })
-
+describe('ages', () => {
   it('labels ages the way parents say them', () => {
     expect(ageLabel({ totalDays: 17, months: 0, days: 17 })).toBe('出生 17 天')
     expect(ageLabel({ totalDays: 100, months: 3, days: 8 })).toBe('3 个月 8 天')
@@ -69,5 +62,18 @@ describe('implausible', () => {
     }
     expect(implausible(sleep, null, newborn, NOW, ZONE)).toContain('12 小时')
     expect(implausible(sleep, { ...sleep, endAt: null }, newborn, NOW, ZONE)).toBeNull()
+  })
+})
+
+describe('what comes next', () => {
+  // Four months old; 10:00 in Shanghai.
+  const birthDate = '2026-06-10'
+
+  it('tells the assistant when the next feed is, on the family’s clock', () => {
+    const fed = { ...bottle(120, NOW - 60 * 60_000), endAt: NOW - 50 * 60_000 }
+    expect(nextUpLines([fed], birthDate, NOW, ZONE)[0]).toBe(
+      '下次喂奶大约 12:15–12:45（按月龄估算）',
+    )
+    expect(nextUpLines([bottle(120)], birthDate, NOW, ZONE)[0]).toBe('正在喂')
   })
 })

@@ -1,101 +1,26 @@
-import { type BabyAge, DAY, type Event, MINUTE, babyAge } from '@bobo/shared'
+import {
+  type BabyAge,
+  DAY,
+  type Event,
+  MINUTE,
+  type Window,
+  ageNorms,
+  babyAge,
+  nextUp,
+} from '@bobo/shared'
 
-import { type VoiceBaby, localDay } from '../voice/plan'
+import { type VoiceBaby, formatClock, localDay, minuteOfDayIn } from '../voice/plan'
 import { recentEvents } from './data'
 
-// What is usual at each age, for the assistant to tell a misheard value ("十五毫升" for
-// "五十毫升") from a real one. Ranges are deliberately wide: they describe healthy babies in
-// general, not targets. Sources:
-// - AAP, HealthyChildren.org, "Amount and Schedule of Baby Formula Feedings" (bottle amounts,
-//   feeds per day, about 960 ml a day at most).
-// - 中国营养学会《中国居民膳食指南（2022）》婴幼儿喂养指南 (milk per day from 7 months,
-//   solids from 6 months).
-// - WHO infant and young child feeding (solids from about 6 months, 8–12 breastfeeds a day
-//   for newborns).
-// - AASM 2016 consensus and National Sleep Foundation (sleep per day by age).
-
-/** Usual values for babies of one age band, `[low, high]`. */
-export interface AgeReference {
-  /** Up to this many whole months (exclusive). */
-  untilMonths: number
-  bottleMlPerFeed: [number, number]
-  feedsPerDay: [number, number]
-  /** Milk a day, bottle and breast together, when it is known. */
-  milkMlPerDay: [number, number]
-  sleepHoursPerDay: [number, number]
-  /** Whether solids are usual yet. */
-  solids: 'no' | 'starting' | 'yes'
-}
-
-export const AGE_REFERENCES: readonly AgeReference[] = [
-  {
-    untilMonths: 1,
-    bottleMlPerFeed: [30, 120],
-    feedsPerDay: [8, 12],
-    milkMlPerDay: [300, 750],
-    sleepHoursPerDay: [14, 17],
-    solids: 'no',
-  },
-  {
-    untilMonths: 2,
-    bottleMlPerFeed: [90, 150],
-    feedsPerDay: [6, 10],
-    milkMlPerDay: [500, 900],
-    sleepHoursPerDay: [14, 17],
-    solids: 'no',
-  },
-  {
-    untilMonths: 4,
-    bottleMlPerFeed: [120, 180],
-    feedsPerDay: [6, 8],
-    milkMlPerDay: [600, 960],
-    sleepHoursPerDay: [14, 17],
-    solids: 'no',
-  },
-  {
-    untilMonths: 6,
-    bottleMlPerFeed: [120, 210],
-    feedsPerDay: [5, 7],
-    milkMlPerDay: [700, 960],
-    sleepHoursPerDay: [12, 16],
-    solids: 'starting',
-  },
-  {
-    untilMonths: 9,
-    bottleMlPerFeed: [150, 240],
-    feedsPerDay: [4, 6],
-    milkMlPerDay: [600, 900],
-    sleepHoursPerDay: [12, 16],
-    solids: 'yes',
-  },
-  {
-    untilMonths: 12,
-    bottleMlPerFeed: [150, 240],
-    feedsPerDay: [3, 5],
-    milkMlPerDay: [600, 800],
-    sleepHoursPerDay: [12, 16],
-    solids: 'yes',
-  },
-  {
-    untilMonths: Number.POSITIVE_INFINITY,
-    bottleMlPerFeed: [120, 240],
-    feedsPerDay: [2, 4],
-    milkMlPerDay: [400, 600],
-    sleepHoursPerDay: [11, 14],
-    solids: 'yes',
-  },
-]
-
-export function referenceFor(months: number): AgeReference {
-  return AGE_REFERENCES.find((band) => months < band.untilMonths) ?? AGE_REFERENCES.at(-1)!
-}
+// What is usual at each age (ageNorms) lets the assistant tell a misheard value ("十五毫升"
+// for "五十毫升") from a real one.
 
 /**
  * Past these, a value is taken as misheard until the parent confirms it: well beyond what
  * any baby of the age does, so a real one is rare and worth one question.
  */
 export function hardLimits(months: number) {
-  const reference = referenceFor(months)
+  const reference = ageNorms(months)
   return {
     bottleMl: Math.round(reference.bottleMlPerFeed[1] * 1.5),
     pumpingMl: 400,
@@ -119,7 +44,7 @@ const range = ([low, high]: [number, number], unit: string) => `${low}–${high}
 
 /** The age's usual values, as one line of the instructions. */
 export function referenceLine(months: number): string {
-  const reference = referenceFor(months)
+  const reference = ageNorms(months)
   const solids = { no: '还不吃辅食', starting: '可以开始添加辅食', yes: '吃辅食' }[reference.solids]
   return [
     `瓶喂每次 ${range(reference.bottleMlPerFeed, '毫升')}`,
@@ -170,7 +95,7 @@ export function implausible(
 ): string | null {
   const age = ageOn(birthDate, now, timeZone)
   const limits = hardLimits(age.months)
-  const reference = referenceFor(age.months)
+  const reference = ageNorms(age.months)
   const at = ageLabel(age)
   if (event.startAt > now + 10 * MINUTE || (event.endAt ?? 0) > now + 10 * MINUTE) {
     return '时间在将来'
@@ -246,4 +171,42 @@ export async function describeBabies(
       habits ? `最近 ${HABIT_DAYS} 天：${habits}。` : '',
     ].join('')
   })
+}
+
+const PLAN_LABEL = { feed: '喂奶', nap: '小睡', bedtime: '晚上入睡' } as const
+
+/**
+ * What likely comes next for a baby, in a few short lines: from their age and last week's
+ * feeds, sleeps and diapers (nextUp), for questions like "下次什么时候喂？".
+ */
+export function nextUpLines(
+  events: readonly Event[],
+  birthDate: string,
+  now: number,
+  timeZone: string,
+): string[] {
+  const age = ageOn(birthDate, now, timeZone)
+  const next = nextUp(events, {
+    months: age.totalDays / (365.25 / 12),
+    now,
+    minuteOfDay: minuteOfDayIn(timeZone),
+  })
+  const span = (window: Window) =>
+    `大约 ${formatClock(window.from, timeZone)}–${formatClock(window.to, timeZone)}` +
+    (window.personalized ? '' : '（按月龄估算）')
+  const lines: string[] = []
+  if (next.feed.status === 'feeding') lines.push('正在喂')
+  else if (next.feed.status === 'predicted') lines.push(`下次喂奶${span(next.feed)}`)
+  if (next.sleep.status === 'sleeping') lines.push(next.sleep.night ? '晚上正在睡' : '正在睡')
+  else if (next.sleep.status === 'predicted') {
+    lines.push(`${next.sleep.bedtime ? '晚上入睡' : '下次小睡'}${span(next.sleep)}`)
+  }
+  if (next.diaper.status === 'predicted') lines.push(`下次换尿布${span(next.diaper)}`)
+  if (next.plan.length > 1) {
+    const plan = next.plan.map(
+      (item) => `${formatClock(item.at, timeZone)} ${PLAN_LABEL[item.kind]}`,
+    )
+    lines.push(`${next.night ? '今晚' : '今天'}接下来：${plan.join('，')}`)
+  }
+  return lines
 }

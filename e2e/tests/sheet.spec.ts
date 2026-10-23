@@ -55,11 +55,15 @@ test.describe('bottom sheet', () => {
     expect(before).toBeGreaterThan(0)
     await page.locator('main').getByRole('button', { name: '更多记录' }).click()
     await expect(sheet(page)).toBeVisible()
-    const body = await page.evaluate(() => ({
-      position: document.body.style.position,
-      top: document.body.getBoundingClientRect().top,
-    }))
-    expect(body).toEqual({ position: 'fixed', top: -before })
+    // The lock lands just after the sheet shows.
+    await expect
+      .poll(() =>
+        page.evaluate(() => ({
+          position: document.body.style.position,
+          top: document.body.getBoundingClientRect().top,
+        })),
+      )
+      .toEqual({ position: 'fixed', top: -before })
     await page.keyboard.press('Escape')
     await sheetClosed(page)
     expect(await page.evaluate(() => [document.body.style.position, window.scrollY])).toEqual([
