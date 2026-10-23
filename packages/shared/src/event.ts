@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { checkTimestamps, syncFields, timestampSchema } from './common'
 import { idSchema } from './id'
+import { recordKindOf } from './record-kinds'
 
 export const breastSideSchema = z.enum(['left', 'right'])
 
@@ -59,7 +60,8 @@ export const diaperDataSchema = z.object({
 
 export const pumpingDataSchema = z.object({
   side: z.enum(['left', 'right', 'both']),
-  amountMl: z.number().positive().max(1000),
+  /** Known once pumping is done; absent only while it is still running. */
+  amountMl: z.number().positive().max(1000).optional(),
 })
 
 export const temperatureDataSchema = z.object({
@@ -93,8 +95,8 @@ const eventBase = {
   familyId: idSchema.nullable(),
   startAt: timestampSchema,
   /**
-   * Null while a timed event is running. Bottles and solids may record when they finished;
-   * other instant events never have one.
+   * Duration records (see RECORD_KINDS): null while running, otherwise when they ended; the
+   * same as `startAt` when how long they took was not recorded. Instant records never have one.
    */
   endAt: timestampSchema.nullable(),
   note: z.string().trim().max(500).nullable(),
@@ -118,8 +120,11 @@ export const eventSchema = z
     if (event.endAt !== null && event.endAt < event.startAt) {
       ctx.addIssue({ code: 'custom', message: 'endAt must not be before startAt', path: ['endAt'] })
     }
-    if (!isTimed(event) && !hasOptionalDuration(event) && event.endAt !== null) {
+    if (!hasDuration(event) && event.endAt !== null) {
       ctx.addIssue({ code: 'custom', message: 'Instant events have no endAt', path: ['endAt'] })
+    }
+    if (event.type === 'pumping' && event.endAt !== null && event.data.amountMl === undefined) {
+      ctx.addIssue({ code: 'custom', message: 'Finished pumping needs an amount', path: ['data'] })
     }
     if (event.type === 'feeding' && event.data.kind === 'bottle') {
       checkMilkSplit(event.data, ctx)
@@ -199,19 +204,18 @@ function checkBreastSegments(
   if (lastEnd !== endAt) issue('Last segment must end with the event')
 }
 
-/** Whether the event spans time (has a timer) rather than happening at an instant. */
-export function isTimed(event: Pick<Event, 'type' | 'data'>): boolean {
-  if (event.type === 'sleep') return true
-  return event.type === 'feeding' && 'kind' in event.data && event.data.kind === 'breast'
-}
-
-/** Bottles and solids happen at their start time and may also record how long they took. */
-export function hasOptionalDuration(event: Pick<Event, 'type' | 'data'>): boolean {
-  return event.type === 'feeding' && 'kind' in event.data && event.data.kind !== 'breast'
+/** Whether the record spans time: it can run as a timer, or have a start and an end. */
+export function hasDuration(event: Pick<Event, 'type' | 'data'>): boolean {
+  return recordKindOf(event).timing === 'duration'
 }
 
 export function isRunning(event: Pick<Event, 'type' | 'data' | 'endAt'>): boolean {
-  return isTimed(event) && event.endAt === null
+  return hasDuration(event) && event.endAt === null
+}
+
+/** A finished duration record whose length was recorded (not just its start). */
+export function hasKnownDuration(event: Pick<Event, 'type' | 'data' | 'startAt' | 'endAt'>) {
+  return hasDuration(event) && event.endAt !== null && event.endAt > event.startAt
 }
 
 /**
@@ -221,7 +225,7 @@ export function eventDurationMs(
   event: Pick<Event, 'type' | 'data' | 'startAt' | 'endAt'>,
   now: number,
 ): number {
-  const end = event.endAt ?? (isTimed(event) ? now : event.startAt)
+  const end = event.endAt ?? (hasDuration(event) ? now : event.startAt)
   return Math.max(0, end - event.startAt)
 }
 

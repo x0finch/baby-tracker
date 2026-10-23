@@ -1,3 +1,4 @@
+import { RECORDS_VERSION_HEADER } from '@bobo/shared'
 import { Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { except } from 'hono/combine'
@@ -44,7 +45,7 @@ export function createApp(options: AppOptions = {}) {
     cors({
       origin: (origin, c) => (trustedOrigins(c.env).includes(origin) ? origin : null),
       credentials: true,
-      allowHeaders: ['Content-Type', 'Authorization'],
+      allowHeaders: ['Content-Type', 'Authorization', RECORDS_VERSION_HEADER],
       exposeHeaders: ['set-auth-token'],
     }),
   )

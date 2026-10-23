@@ -1,4 +1,4 @@
-import { type Baby, type Event, eventDurationMs } from '@bobo/shared'
+import { type Baby, type Event, eventDurationMs, hasKnownDuration } from '@bobo/shared'
 
 import { formatDate } from '../../lib/i18n'
 import { m } from '../../paraglide/messages.js'
@@ -36,7 +36,7 @@ function amounts(event: Event): {
     case 'feeding':
       return { ...none, ml: event.data.kind === 'bottle' ? event.data.amountMl : null }
     case 'pumping':
-      return { ...none, ml: event.data.amountMl }
+      return { ...none, ml: event.data.amountMl ?? null }
     case 'temperature':
       return { ...none, celsius: event.data.celsius }
     case 'growth':
@@ -90,7 +90,7 @@ export function eventsToCsv(
         names.get(event.babyId) ?? '',
         localDate(event.startAt),
         localTime(event.startAt),
-        event.endAt === null ? null : localTime(event.endAt),
+        hasKnownDuration(event) && event.endAt !== null ? localTime(event.endAt) : null,
         title,
         detail,
         duration > 0 ? Math.round(duration / 60_000) : null,

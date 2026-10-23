@@ -1,4 +1,9 @@
-import type { PullResponse, PushResponse } from '@bobo/shared'
+import {
+  type PullResponse,
+  type PushResponse,
+  RECORDS_VERSION,
+  RECORDS_VERSION_HEADER,
+} from '@bobo/shared'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { createTestApp } from './app'
@@ -103,6 +108,25 @@ describe('families and sync', () => {
       .bind(b.id)
       .first<{ c: string }>()
     expect(row?.c).toBe(userId)
+  })
+
+  it('gives bottles from apps that predate timers an end, and lets newer apps run them', async () => {
+    const b = baby(familyId)
+    const bottle = () => ({
+      ...diaper(b.id, familyId),
+      type: 'feeding',
+      data: { kind: 'bottle', amountMl: 90, milk: 'formula' },
+    })
+    const legacy = bottle()
+    const running = bottle()
+    await push({ babies: [b], events: [legacy] })
+    const current = new Headers(headers)
+    current.set(RECORDS_VERSION_HEADER, RECORDS_VERSION)
+    await push({ events: [running] }, current)
+
+    const { events } = await pull()
+    expect(events.find((e) => e.id === legacy.id)?.endAt).toBe(legacy.startAt)
+    expect(events.find((e) => e.id === running.id)?.endAt).toBeNull()
   })
 
   it('rejects invalid items without blocking valid ones', async () => {

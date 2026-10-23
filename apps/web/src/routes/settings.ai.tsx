@@ -1,10 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 import { SettingsPage } from '../components/SettingsLayout'
+import { isSignedIn } from '../db'
 import { MyAi } from '../features/ai/MyAi'
 import { aiQueries } from '../features/ai/queries'
 import { m } from '../paraglide/messages.js'
-import { isSignedIn } from '../sync/local'
 
 export const Route = createFileRoute('/settings/ai')({
   loader: async ({ context: { queryClient } }) => {

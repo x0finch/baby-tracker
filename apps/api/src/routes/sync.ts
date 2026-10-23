@@ -3,6 +3,8 @@ import {
   type Event,
   type PullResponse,
   type PushResponse,
+  RECORDS_VERSION,
+  RECORDS_VERSION_HEADER,
   SYNC_PULL_LIMIT,
   SYNC_PUSH_LIMIT,
   pushRequestSchema,
@@ -19,6 +21,7 @@ import {
   encodeCursor,
   parseBaby,
   parseEvent,
+  parseLegacyEvent,
   planWrites,
   idsOf,
 } from '../sync/protocol'
@@ -74,9 +77,10 @@ export const syncRoutes = new Hono<AppEnv>()
       (baby, current) => checkBabyWrite(access, baby, current),
       userId,
     )
+    const upToDate = c.req.header(RECORDS_VERSION_HEADER) === RECORDS_VERSION
     const eventPlan = planWrites<Event>(
       events,
-      parseEvent,
+      upToDate ? parseEvent : parseLegacyEvent,
       toMap(existingEvents?.results ?? []),
       (event, current) =>
         checkEventWrite(

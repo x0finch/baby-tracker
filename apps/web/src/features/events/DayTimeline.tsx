@@ -1,4 +1,4 @@
-import { type Event, HOUR, isTimed } from '@bobo/shared'
+import { type Event, HOUR, hasDuration } from '@bobo/shared'
 import { clsx } from 'clsx'
 
 import { formatTime } from '../../lib/i18n'
@@ -32,7 +32,8 @@ export function DayTimeline({
 }) {
   const visible = events.filter(
     (event) =>
-      event.startAt < dayEnd && (event.endAt ?? (isTimed(event) ? now : event.startAt)) >= dayStart,
+      event.startAt < dayEnd &&
+      (event.endAt ?? (hasDuration(event) ? now : event.startAt)) >= dayStart,
   )
   const hours = Math.round((dayEnd - dayStart) / HOUR)
   const toPx = (at: number) =>
@@ -74,7 +75,7 @@ export function DayTimeline({
                 .filter((event) => laneOf(event.type) === lane)
                 .map((event) => {
                   const top = toPx(event.startAt)
-                  const end = event.endAt ?? (isTimed(event) ? now : event.startAt)
+                  const end = event.endAt ?? (hasDuration(event) ? now : event.startAt)
                   const height = Math.max(toPx(end) - top, MIN_BLOCK_PX)
                   const { title, detail } = describeEvent(event, now)
                   return (
@@ -86,7 +87,7 @@ export function DayTimeline({
                       className={clsx(
                         'absolute inset-x-1 rounded-sm border-2 border-bg',
                         categoryDot[event.type],
-                        event.endAt === null && isTimed(event) && 'animate-pulse',
+                        event.endAt === null && hasDuration(event) && 'animate-pulse',
                       )}
                       style={{ top, height }}
                     />

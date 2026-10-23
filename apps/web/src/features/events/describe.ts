@@ -1,4 +1,10 @@
-import { type Event, breastSideDurations, eventDurationMs, isRunning } from '@bobo/shared'
+import {
+  type Event,
+  breastSideDurations,
+  eventDurationMs,
+  hasKnownDuration,
+  isRunning,
+} from '@bobo/shared'
 
 import { formatQuantity, unitLabel } from '../../lib/units'
 import { m } from '../../paraglide/messages.js'
@@ -70,7 +76,7 @@ export function describeEvent(event: Event, now: number): { title: string; detai
         }
       }
       // A bottle or solids feed may record how long it took.
-      const took = event.endAt === null ? [] : [durationLabel(event.endAt - event.startAt)]
+      const took = hasKnownDuration(event) ? [durationLabel(eventDurationMs(event, now))] : []
       if (data.kind === 'bottle') {
         return {
           title: m.feedBottle(),
@@ -115,11 +121,14 @@ export function describeEvent(event: Event, now: number): { title: string; detai
     case 'pumping':
       return {
         title: m.categoryPumping(),
-        detail: m.pumpingDetail({
-          side: sideLabel[event.data.side](),
-          amount: formatQuantity('volume', event.data.amountMl),
-          unit: unitLabel('volume'),
-        }),
+        detail:
+          event.data.amountMl === undefined
+            ? sideLabel[event.data.side]()
+            : m.pumpingDetail({
+                side: sideLabel[event.data.side](),
+                amount: formatQuantity('volume', event.data.amountMl),
+                unit: unitLabel('volume'),
+              }),
       }
     case 'temperature': {
       const value = temperatureText(event.data.celsius)

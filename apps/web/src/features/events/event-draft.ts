@@ -59,10 +59,12 @@ export const emptyPumping: PumpingDraft = { side: 'both', amount: '' }
 
 export const draftFromPumping = (data: PumpingEvent['data']): PumpingDraft => ({
   side: data.side,
-  amount: inputValue('volume', data.amountMl),
+  amount: data.amountMl === undefined ? '' : inputValue('volume', data.amountMl),
 })
 
-export function parsePumping(draft: PumpingDraft): Parsed<PumpingEvent['data'], 'amount'> {
+export function parsePumping(
+  draft: PumpingDraft,
+): Parsed<PumpingEvent['data'] & { amountMl: number }, 'amount'> {
   const volume = parseVolume(draft.amount)
   return 'error' in volume
     ? { errors: { amount: volume.error } }

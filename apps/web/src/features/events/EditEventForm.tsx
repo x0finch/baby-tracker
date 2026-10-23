@@ -1,4 +1,4 @@
-import { type Event, MINUTE, hasOptionalDuration, isRunning, isTimed } from '@bobo/shared'
+import { type Event, MINUTE, hasDuration, isRunning } from '@bobo/shared'
 import { type FormEvent, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
@@ -95,8 +95,10 @@ export function EditEventForm({
   const [diaper, setDiaper] = useState<DiaperData>(() =>
     event.type === 'diaper' ? event.data : { contents: 'wet' },
   )
+  // Bottles and solids show how long they took (until #170 brings this to every duration record).
+  const feedDuration = event.type === 'feeding' && event.data.kind !== 'breast'
   const [duration, setDuration] = useState<number | null>(() =>
-    hasOptionalDuration(event) && event.endAt !== null
+    feedDuration && event.endAt !== null && event.endAt > event.startAt
       ? Math.round((event.endAt - event.startAt) / MINUTE)
       : null,
   )
@@ -160,9 +162,9 @@ export function EditEventForm({
     const parsed = parseData(next)
     if ('errors' in parsed) Object.assign(nextErrors, parsed.errors)
     else next = parsed.event
-    if (hasOptionalDuration(next)) {
-      const endAt = duration === null ? null : next.startAt + duration * MINUTE
-      if (endAt !== null && endAt > current + MINUTE) nextErrors.start = m.feedEndFuture()
+    if (feedDuration) {
+      const endAt = next.startAt + (duration ?? 0) * MINUTE
+      if (endAt > current + MINUTE) nextErrors.start = m.feedEndFuture()
       else next = { ...next, endAt }
     }
     if (next.type === 'note' && !note.trim()) nextErrors.note = m.noteRequired()
@@ -214,11 +216,9 @@ export function EditEventForm({
             onChange={setSleepKind}
           />
         )}
-        {hasOptionalDuration(event) && (
-          <FeedDurationField value={duration} onChange={setDuration} />
-        )}
+        {feedDuration && <FeedDurationField value={duration} onChange={setDuration} />}
         <TimeField
-          label={isTimed(event) || hasOptionalDuration(event) ? m.eventStart() : m.eventTime()}
+          label={hasDuration(event) ? m.eventStart() : m.eventTime()}
           value={start}
           onChange={setStart}
           error={errors.start}

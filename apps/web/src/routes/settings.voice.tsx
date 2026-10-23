@@ -1,10 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 import { SettingsPage } from '../components/SettingsLayout'
+import { isSignedIn } from '../db'
 import { voiceQueries } from '../features/voice/queries'
 import { VoiceCard } from '../features/voice/VoiceCard'
 import { m } from '../paraglide/messages.js'
-import { isSignedIn } from '../sync/local'
 
 export const Route = createFileRoute('/settings/voice')({
   loader: async ({ context: { queryClient } }) => {

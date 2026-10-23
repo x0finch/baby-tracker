@@ -54,7 +54,8 @@ export function logBottle(
     ...base(babyId, now),
     type: 'feeding',
     startAt: at,
-    endAt: durationMs === null ? null : at + durationMs,
+    // Without a duration the end is the start (how long it took wasn't recorded).
+    endAt: at + (durationMs ?? 0),
     data: { kind: 'bottle', amountMl, milk, ...(milk === 'mixed' && split) },
   }
 }
@@ -70,7 +71,8 @@ export function logSolids(
     ...base(babyId, now),
     type: 'feeding',
     startAt: at,
-    endAt: durationMs === null ? null : at + durationMs,
+    // Without a duration the end is the start (how long it took wasn't recorded).
+    endAt: at + (durationMs ?? 0),
     data: { kind: 'solids', food: food.trim() },
   }
 }
@@ -122,7 +124,8 @@ export function logPumping(
     ...base(babyId, now),
     type: 'pumping',
     startAt: at,
-    endAt: null,
+    // How long it took isn't asked yet: the end is the start.
+    endAt: at,
     data: { side, amountMl },
   }
 }
@@ -259,7 +262,9 @@ export function moveEventStart<T extends Event>(event: T, startAt: number, now: 
       },
     }
   }
-  return { ...event, startAt, updatedAt: touched(event, now) }
+  // A finished duration record keeps how long it took; a running one keeps running.
+  const endAt = event.endAt === null ? null : event.endAt + startAt - event.startAt
+  return { ...event, startAt, endAt, updatedAt: touched(event, now) }
 }
 
 export function setEventNote<T extends Event>(event: T, note: string, now: number): T {
