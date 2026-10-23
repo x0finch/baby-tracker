@@ -51,7 +51,7 @@ test('logs a breastfeed afterwards with minutes on each side', async ({ page }) 
   // Left is suggested first; it starts with the usual 10 minutes. Add 5 on the right.
   const right = sheet(page).getByRole('group', { name: '右侧喂了多久' })
   await right.getByText('5 分钟', { exact: true }).click()
-  await expect(sheet(page).getByText(/^结束于 /)).toBeVisible()
+  await expect(sheet(page).getByLabel('结束时间')).not.toHaveValue('')
   await sheet(page).getByRole('button', { name: '保存' }).click()
   await sheetClosed(page)
   await expect(page.getByText('左 10 分钟 · 右 5 分钟')).toBeVisible()

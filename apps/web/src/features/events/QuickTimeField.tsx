@@ -3,8 +3,8 @@ import { useState } from 'react'
 
 import { ChipGroup } from '../../components/ui/ToggleChip'
 import { m } from '../../paraglide/messages.js'
-import { toDateTimeLocal } from './time'
-import { TimeField } from './TimeField'
+import { fromDateTimeLocal, toDateTimeLocal } from './time'
+import { TimeRow } from './TimeRow'
 
 /** One-tap "how long ago" choices, in minutes; 0 is "just now". */
 const AGO = [0, 5, 15, 30, 60, 120] as const
@@ -60,12 +60,12 @@ export function QuickTimeField({
   const [selected, setSelected] = useState<number | null>(0)
   return (
     <div className="flex flex-col gap-2">
-      <TimeField
+      <TimeRow
         label={label}
-        value={value}
-        onChange={(next) => {
+        at={Number.isNaN(fromDateTimeLocal(value)) ? null : fromDateTimeLocal(value)}
+        onChange={(at) => {
           setSelected(null)
-          onChange(next)
+          onChange(toDateTimeLocal(at))
         }}
         error={error}
         now={now}
