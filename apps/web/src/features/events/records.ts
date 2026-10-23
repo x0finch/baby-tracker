@@ -30,6 +30,87 @@ function base(babyId: string, now: number): NewEventBase {
   }
 }
 
+type BottleData = Extract<FeedingEvent['data'], { kind: 'bottle' }>
+
+/** What a duration record holds, as chosen when logging it (see RECORD_KINDS). */
+export type DurationDetails =
+  | {
+      kind: 'breast'
+      /** Side fed first. */
+      side: BreastSide
+      /** Logged afterwards: how long each side took, in ms (the first side first). */
+      sides?: Record<BreastSide, number>
+    }
+  | ({ kind: 'bottle' } & Omit<BottleData, 'kind'>)
+  | { kind: 'solids'; food: string }
+  | { kind: 'sleep' }
+  | { kind: 'pumping'; side: PumpingEvent['data']['side']; amountMl?: number }
+
+function breastSegments(
+  details: Extract<DurationDetails, { kind: 'breast' }>,
+  startAt: number,
+  endAt: number | null,
+): Extract<FeedingEvent['data'], { kind: 'breast' }>['segments'] {
+  if (endAt === null) return [{ side: details.side, startAt, endAt: null }]
+  const other: BreastSide = details.side === 'left' ? 'right' : 'left'
+  const first = details.sides?.[details.side] ?? endAt - startAt
+  return [
+    { side: details.side, startAt, endAt: startAt + first },
+    { side: other, startAt: startAt + first, endAt },
+  ].filter((segment) => segment.endAt > segment.startAt || endAt === startAt)
+}
+
+/** The record for `details`, running (endAt null) or finished. */
+function durationRecord(
+  babyId: string,
+  details: DurationDetails,
+  startAt: number,
+  endAt: number | null,
+  now: number,
+): Event {
+  const timing = { ...base(babyId, now), startAt, endAt }
+  switch (details.kind) {
+    case 'breast':
+      return {
+        ...timing,
+        type: 'feeding',
+        data: { kind: 'breast', segments: breastSegments(details, startAt, endAt) },
+      }
+    case 'bottle': {
+      const { kind, ...bottle } = details
+      return { ...timing, type: 'feeding', data: { kind, ...bottle } }
+    }
+    case 'solids':
+      return { ...timing, type: 'feeding', data: { kind: 'solids', food: details.food.trim() } }
+    case 'sleep':
+      return { ...timing, type: 'sleep', data: { kind: sleepKindFor(startAt) } }
+    case 'pumping':
+      return {
+        ...timing,
+        type: 'pumping',
+        data: {
+          side: details.side,
+          ...(details.amountMl === undefined ? {} : { amountMl: details.amountMl }),
+        },
+      }
+    default:
+      return details satisfies never
+  }
+}
+
+/** Starts a timer now. */
+export const startRecord = (babyId: string, details: DurationDetails, now: number): Event =>
+  durationRecord(babyId, details, now, null, now)
+
+/** A duration record logged afterwards, with when it started and ended. */
+export const logRecord = (
+  babyId: string,
+  details: DurationDetails,
+  startAt: number,
+  endAt: number,
+  now: number,
+): Event => durationRecord(babyId, details, startAt, endAt, now)
+
 export function startBreastFeed(babyId: string, side: BreastSide, now: number): FeedingEvent {
   return {
     ...base(babyId, now),

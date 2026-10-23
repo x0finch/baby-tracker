@@ -9,37 +9,30 @@ import { useNow } from '../../lib/use-now'
 import { m } from '../../paraglide/messages.js'
 import { type GrowthErrors, emptyGrowth, parseGrowth } from '../growth/growth-input'
 import { addEvent } from './actions'
-import { type OtherCategory, categoryTone } from './category'
-import {
-  emptyMedication,
-  emptyPumping,
-  parseCelsius,
-  parseMedication,
-  parsePumping,
-} from './event-draft'
-import { GrowthFields, MedicationFields, PumpingFields, TemperatureField } from './EventFields'
+import { type InstantCategory, categoryTone } from './category'
+import { emptyMedication, parseCelsius, parseMedication } from './event-draft'
+import { GrowthFields, MedicationFields, TemperatureField } from './EventFields'
 import { QuickTimeField } from './QuickTimeField'
-import { logGrowth, logMedication, logNote, logPumping, logTemperature } from './records'
+import { logGrowth, logMedication, logNote, logTemperature } from './records'
 import { toDateTimeLocal } from './time'
 import { validateTime } from './validation'
 
 type Errors = Partial<Record<'time' | 'amount' | 'celsius' | 'name' | 'text', string>> &
   GrowthErrors
 
-/** Form for the less frequent event types (pumping, temperature, medication, notes, growth). */
+/** Form for the less frequent instant records (temperature, medication, notes, growth). */
 export function OtherEventForm({
   category,
   babyIds,
   onDone,
 }: {
-  category: OtherCategory
+  category: InstantCategory
   babyIds: readonly string[]
   onDone: () => void
 }) {
   const store = useLocalStore()
   const now = useNow(60_000)
   const [time, setTime] = useState(() => toDateTimeLocal(now))
-  const [pumping, setPumping] = useState(emptyPumping)
   const [celsius, setCelsius] = useState('')
   const [medication, setMedication] = useState(emptyMedication)
   const [text, setText] = useState('')
@@ -49,12 +42,6 @@ export function OtherEventForm({
   /** The record for one baby, or the field errors that block saving. */
   function build(at: number, current: number): ((babyId: string) => Event) | Errors {
     switch (category) {
-      case 'pumping': {
-        const parsed = parsePumping(pumping)
-        return 'errors' in parsed
-          ? parsed.errors
-          : (id) => logPumping(id, at, parsed.data.side, parsed.data.amountMl, current)
-      }
       case 'temperature': {
         const parsed = parseCelsius(celsius)
         return 'errors' in parsed
@@ -93,9 +80,6 @@ export function OtherEventForm({
 
   return (
     <form noValidate onSubmit={submit} className="flex flex-col gap-4">
-      {category === 'pumping' && (
-        <PumpingFields value={pumping} onChange={setPumping} error={errors.amount} />
-      )}
       {category === 'growth' && (
         <>
           <GrowthFields value={growth} onChange={setGrowth} errors={errors} />

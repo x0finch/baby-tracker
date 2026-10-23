@@ -20,11 +20,14 @@ const agoLabel = (minutes: number) =>
 export function AgoChips({
   legend,
   showLegend = false,
+  options = AGO,
   selected,
   onSelect,
 }: {
   legend: string
   showLegend?: boolean
+  /** Minutes ago to offer; 0 is "just now". */
+  options?: readonly number[]
   selected: number | null
   onSelect: (minutes: number) => void
 }) {
@@ -32,7 +35,7 @@ export function AgoChips({
     <ChipGroup<number>
       legend={legend}
       showLegend={showLegend}
-      options={AGO}
+      options={options}
       value={selected}
       onChange={onSelect}
       optionLabel={agoLabel}

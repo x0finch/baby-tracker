@@ -6,12 +6,14 @@ import {
   logBottle,
   logDiaper,
   logSleep,
+  logRecord,
   logSolids,
   moveEventStart,
   restoreEvent,
   setEventNote,
   sleepKindFor,
   startBreastFeed,
+  startRecord,
   startSleep,
   stopEvent,
   suggestedBreastSide,
@@ -21,6 +23,66 @@ import {
 const BABY = newId()
 const MINUTE = 60_000
 const T0 = new Date(2026, 9, 13, 10, 0).getTime()
+
+describe('duration records', () => {
+  it('start any duration kind as a running timer', () => {
+    const records = [
+      startRecord(BABY, { kind: 'breast', side: 'right' }, T0),
+      startRecord(BABY, { kind: 'bottle', amountMl: 90, milk: 'formula' }, T0),
+      startRecord(BABY, { kind: 'solids', food: '米粉' }, T0),
+      startRecord(BABY, { kind: 'sleep' }, T0),
+      startRecord(BABY, { kind: 'pumping', side: 'both' }, T0),
+    ]
+    for (const record of records) {
+      expect(eventSchema.safeParse(record).success).toBe(true)
+      expect(isRunning(record)).toBe(true)
+    }
+  })
+
+  it('log a breastfeed afterwards with minutes per side, the first side first', () => {
+    const sides = { left: 6 * MINUTE, right: 10 * MINUTE }
+    const record = logRecord(
+      BABY,
+      { kind: 'breast', side: 'right', sides },
+      T0,
+      T0 + 16 * MINUTE,
+      T0,
+    )
+    expect(eventSchema.safeParse(record).success).toBe(true)
+    expect(record.type === 'feeding' && record.data).toEqual({
+      kind: 'breast',
+      segments: [
+        { side: 'right', startAt: T0, endAt: T0 + 10 * MINUTE },
+        { side: 'left', startAt: T0 + 10 * MINUTE, endAt: T0 + 16 * MINUTE },
+      ],
+    })
+    const oneSide = logRecord(
+      BABY,
+      { kind: 'breast', side: 'left', sides: { left: 0, right: 8 * MINUTE } },
+      T0,
+      T0 + 8 * MINUTE,
+      T0,
+    )
+    expect(oneSide.type === 'feeding' && oneSide.data).toEqual({
+      kind: 'breast',
+      segments: [{ side: 'right', startAt: T0, endAt: T0 + 8 * MINUTE }],
+    })
+  })
+
+  it('log pumping afterwards with its amount, and a sleep as nap or night by its start', () => {
+    const pumping = logRecord(
+      BABY,
+      { kind: 'pumping', side: 'left', amountMl: 80 },
+      T0,
+      T0 + 15 * MINUTE,
+      T0,
+    )
+    expect(eventSchema.safeParse(pumping).success).toBe(true)
+    const night = new Date(2026, 9, 13, 21, 0).getTime()
+    const sleep = logRecord(BABY, { kind: 'sleep' }, night, night + 60 * MINUTE, night)
+    expect(sleep.type === 'sleep' && sleep.data.kind).toBe('night')
+  })
+})
 
 describe('event builders', () => {
   it('produce schema-valid events', () => {

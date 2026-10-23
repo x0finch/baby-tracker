@@ -44,6 +44,10 @@ export const categoryDot: Record<Category, string> = {
 /** Event types logged from the "more" sheet rather than the three big buttons. */
 export const OTHER_CATEGORIES = ['growth', 'pumping', 'temperature', 'medication', 'note'] as const
 export type OtherCategory = (typeof OTHER_CATEGORIES)[number]
+/** The "more" types that happen at one time; pumping takes time like a feed. */
+export type InstantCategory = Exclude<OtherCategory, 'pumping'>
+export const isInstantCategory = (category: unknown): category is InstantCategory =>
+  OTHER_CATEGORIES.some((other) => other === category && other !== 'pumping')
 
 /** Timeline lane for each type; the less frequent types share one lane. */
 export type Lane = 'feeding' | 'sleep' | 'diaper' | 'other'
