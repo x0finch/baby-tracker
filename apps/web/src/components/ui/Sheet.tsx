@@ -2,6 +2,7 @@ import { clsx } from 'clsx'
 import { type PointerEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 
 import { prefersReducedMotion } from '../../lib/motion'
+import { lockScroll } from '../../lib/scroll-lock'
 
 export interface SheetProps {
   open: boolean
@@ -116,6 +117,9 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
     }
   }, [open])
 
+  // The page behind stays put while the sheet is up, even on a sheet too short to scroll.
+  useEffect(() => (shownInDialog ? lockScroll() : undefined), [shownInDialog])
+
   // Dragging the header pulls the sheet down; far or fast enough, it closes.
   const startDrag = (event: PointerEvent<HTMLDivElement>) => {
     // The finger moves the sheet now; a running slide would hold it in place.
@@ -162,7 +166,7 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
         if (event.target === event.currentTarget) onClose()
       }}
       className={clsx(
-        'fixed inset-x-0 top-auto bottom-0 m-0 mx-auto w-full max-w-app max-h-[85dvh] overflow-x-hidden',
+        'fixed inset-x-0 top-auto bottom-0 m-0 mx-auto w-full max-w-app max-h-[85dvh] overflow-x-hidden overscroll-contain',
         'sheet rounded-t-xl border-2 border-b-0 border-border bg-bg p-0 text-fg focus:outline-none',
       )}
     >
