@@ -1,4 +1,4 @@
-import { type Event, HOUR, hasDuration } from '@bobo/shared'
+import { type Event, HOUR, hasDuration, hasKnownDuration, isRunning } from '@bobo/shared'
 import { clsx } from 'clsx'
 
 import { formatTime } from '../../lib/i18n'
@@ -78,6 +78,8 @@ export function DayTimeline({
                   const end = event.endAt ?? (hasDuration(event) ? now : event.startAt)
                   const height = Math.max(toPx(end) - top, MIN_BLOCK_PX)
                   const { title, detail } = describeEvent(event, now)
+                  // Instant records (and durations not recorded) are dots; the rest are bars.
+                  const dot = !isRunning(event) && !hasKnownDuration(event)
                   return (
                     <button
                       key={event.id}
@@ -85,11 +87,16 @@ export function DayTimeline({
                       aria-label={`${formatTime(event.startAt)} ${title} ${detail}`}
                       onClick={() => onSelect(event)}
                       className={clsx(
-                        'absolute inset-x-1 rounded-sm border-2 border-bg',
+                        'absolute border-2 border-bg',
+                        dot ? 'left-1/2 -translate-x-1/2 rounded-full' : 'inset-x-1 rounded-sm',
                         categoryDot[event.type],
-                        event.endAt === null && hasDuration(event) && 'animate-pulse',
+                        isRunning(event) && 'animate-pulse',
                       )}
-                      style={{ top, height }}
+                      style={{
+                        top,
+                        height: dot ? MIN_BLOCK_PX + 4 : height,
+                        width: dot ? MIN_BLOCK_PX + 4 : undefined,
+                      }}
                     />
                   )
                 })}

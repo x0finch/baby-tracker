@@ -76,7 +76,11 @@ export function describeEvent(event: Event, now: number): { title: string; detai
         }
       }
       // A bottle or solids feed may record how long it took.
-      const took = hasKnownDuration(event) ? [durationLabel(eventDurationMs(event, now))] : []
+      const took = running
+        ? [m.eventInProgress()]
+        : hasKnownDuration(event)
+          ? [durationLabel(eventDurationMs(event, now))]
+          : []
       if (data.kind === 'bottle') {
         return {
           title: m.feedBottle(),
@@ -118,18 +122,21 @@ export function describeEvent(event: Event, now: number): { title: string; detai
       }
       return { title: m.categoryDiaper(), detail: parts.join(' · ') }
     }
-    case 'pumping':
+    case 'pumping': {
+      const what =
+        event.data.amountMl === undefined
+          ? sideLabel[event.data.side]()
+          : m.pumpingDetail({
+              side: sideLabel[event.data.side](),
+              amount: formatQuantity('volume', event.data.amountMl),
+              unit: unitLabel('volume'),
+            })
+      const took = hasKnownDuration(event) ? [durationLabel(eventDurationMs(event, now))] : []
       return {
         title: m.categoryPumping(),
-        detail:
-          event.data.amountMl === undefined
-            ? sideLabel[event.data.side]()
-            : m.pumpingDetail({
-                side: sideLabel[event.data.side](),
-                amount: formatQuantity('volume', event.data.amountMl),
-                unit: unitLabel('volume'),
-              }),
+        detail: running ? m.eventInProgress() : [what, ...took].join(' · '),
       }
+    }
     case 'temperature': {
       const value = temperatureText(event.data.celsius)
       return {

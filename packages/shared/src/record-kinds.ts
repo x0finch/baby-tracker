@@ -26,21 +26,39 @@ export interface RecordKindDefinition {
   timing: 'instant' | 'duration'
   /** Quick choices for how long it took, in minutes, when logging afterwards. */
   durations: readonly number[]
+  /** The choice picked to begin with: a typical length. */
+  usualMinutes: number
   /** Sides it can be on; the first is the default. */
   sides: readonly Side[]
 }
 
-const instant: RecordKindDefinition = { timing: 'instant', durations: [], sides: [] }
+const instant: RecordKindDefinition = {
+  timing: 'instant',
+  durations: [],
+  usualMinutes: 0,
+  sides: [],
+}
 
 /** Every kind of record and how it is timed: the one place to look this up. */
 export const RECORD_KINDS: Record<RecordKind, RecordKindDefinition> = {
-  breast: { timing: 'duration', durations: [5, 10, 15, 20, 30], sides: ['left', 'right'] },
-  bottle: { timing: 'duration', durations: [5, 10, 15, 20, 30], sides: [] },
-  solids: { timing: 'duration', durations: [10, 15, 20, 30], sides: [] },
-  sleep: { timing: 'duration', durations: [30, 60, 90, 120, 180], sides: [] },
+  breast: {
+    timing: 'duration',
+    durations: [5, 10, 15, 20, 30],
+    usualMinutes: 10,
+    sides: ['left', 'right'],
+  },
+  bottle: { timing: 'duration', durations: [5, 10, 15, 20, 30], usualMinutes: 15, sides: [] },
+  solids: { timing: 'duration', durations: [10, 15, 20, 30, 45], usualMinutes: 20, sides: [] },
+  sleep: {
+    timing: 'duration',
+    durations: [30, 60, 90, 120, 180],
+    usualMinutes: 60,
+    sides: [],
+  },
   pumping: {
     timing: 'duration',
-    durations: [10, 15, 20, 30],
+    durations: [10, 15, 20, 30, 45],
+    usualMinutes: 15,
     sides: ['both', 'left', 'right'],
   },
   diaper: instant,

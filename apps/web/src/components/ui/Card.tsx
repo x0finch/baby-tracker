@@ -1,7 +1,7 @@
 import { clsx } from 'clsx'
 import type { HTMLAttributes, ReactNode } from 'react'
 
-export type CardTone = 'plain' | 'primary' | 'feeding' | 'sleep' | 'diaper'
+export type CardTone = 'plain' | 'primary' | 'feeding' | 'sleep' | 'diaper' | 'pumping'
 
 const tones: Record<CardTone, string> = {
   plain: 'border-border bg-bg',
@@ -9,6 +9,7 @@ const tones: Record<CardTone, string> = {
   feeding: 'border-feeding/40 bg-feeding-soft',
   sleep: 'border-sleep/40 bg-sleep-soft',
   diaper: 'border-diaper/40 bg-diaper-soft',
+  pumping: 'border-pumping/40 bg-pumping-soft',
 }
 
 export interface CardProps extends HTMLAttributes<HTMLElement> {

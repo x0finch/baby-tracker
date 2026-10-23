@@ -1,114 +1,25 @@
-import type { BreastSide, Event, FeedingEvent } from '@bobo/shared'
-import { MINUTE, isRunning } from '@bobo/shared'
-import { type FormEvent, type ReactNode, useState } from 'react'
+import type { Event } from '@bobo/shared'
+import { type ReactNode, useState } from 'react'
 
-import { Button } from '../../components/ui/Button'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
-import { useLocalStore } from '../../db'
-import { useNow } from '../../lib/use-now'
 import { m } from '../../paraglide/messages.js'
-import { addEvent } from './actions'
-import { emptyBottle, parseBottleDraft, parseSolids } from './event-draft'
-import { BottleFields, SolidsField } from './EventFields'
-import { FeedDurationField } from './FeedDurationField'
-import { sideLabel } from './labels'
-import { AgoChips } from './QuickTimeField'
-import { logBottle, logSolids, startBreastFeed, suggestedBreastSide } from './records'
-import { toDateTimeLocal } from './time'
-import { TimeField } from './TimeField'
-import { validateTime } from './validation'
+import { DurationForm } from './DurationForm'
 
 type Kind = 'breast' | 'bottle' | 'solids'
 
-const splitOf = (data: { breastMl?: number; formulaMl?: number }) =>
-  data.breastMl === undefined || data.formulaMl === undefined
-    ? undefined
-    : { breastMl: data.breastMl, formulaMl: data.formulaMl }
-
+/** Feeds: breastfeeding, bottle or solids, each logged like any duration record. */
 export function FeedingForm({
   babyIds,
   events,
   targets,
   onDone,
 }: {
-  /** The selected baby first; breastfeeding is only timed for it. */
   babyIds: readonly string[]
   events: readonly Event[]
   targets?: ReactNode
   onDone: () => void
 }) {
-  const babyId = babyIds[0] ?? ''
-  const store = useLocalStore()
   const [kind, setKind] = useState<Kind>('breast')
-  // Time the sheet opened; the form defaults and the max selectable time derive from it.
-  const now = useNow(60_000)
-  const [time, setTime] = useState(() => toDateTimeLocal(now))
-  const [bottle, setBottle] = useState(emptyBottle)
-  const [food, setFood] = useState('')
-  // The start is worked out from when the feed ended and how long it took, until it is edited
-  // by hand (endedAgo null).
-  const [endedAgo, setEndedAgo] = useState<number | null>(0)
-  const [duration, setDuration] = useState<number | null>(null)
-  const [errors, setErrors] = useState<{ time?: string; amount?: string; food?: string }>({})
-
-  const feeds = events.filter((event): event is FeedingEvent => event.type === 'feeding')
-  const runningBreast = feeds.find((event) => event.data.kind === 'breast' && isRunning(event))
-  const lastBreast = feeds.find((event) => event.data.kind === 'breast')
-  const suggested = suggestedBreastSide(lastBreast)
-
-  function startBreast(side: BreastSide) {
-    // Click handler, not render; the rule cannot see that it only runs from onClick.
-    // oxlint-disable-next-line react/purity
-    addEvent(store, startBreastFeed(babyId, side, Date.now()))
-    onDone()
-  }
-
-  function deriveStart(ended: number, took: number | null) {
-    setTime(toDateTimeLocal(Date.now() - (ended + (took ?? 0)) * MINUTE))
-  }
-
-  function chooseEnded(minutes: number) {
-    setEndedAgo(minutes)
-    deriveStart(minutes, duration)
-  }
-
-  function chooseDuration(minutes: number | null) {
-    setDuration(minutes)
-    // A start set by hand stays; otherwise it follows from the end time.
-    if (endedAgo !== null) deriveStart(endedAgo, minutes)
-  }
-
-  function submit(event: FormEvent) {
-    event.preventDefault()
-    const current = Date.now()
-    const timeResult = validateTime(time, current)
-    const parsed = kind === 'bottle' ? parseBottleDraft(bottle) : parseSolids(food)
-    const nextErrors: typeof errors = 'errors' in parsed ? { ...parsed.errors } : {}
-    if ('error' in timeResult) nextErrors.time = timeResult.error
-    const durationMs = duration === null ? null : duration * MINUTE
-    if (
-      'at' in timeResult &&
-      durationMs !== null &&
-      timeResult.at + durationMs > current + MINUTE
-    ) {
-      nextErrors.time = m.feedEndFuture()
-    }
-    setErrors(nextErrors)
-    if (Object.keys(nextErrors).length > 0 || !('at' in timeResult) || 'errors' in parsed) return
-
-    const at = timeResult.at
-    const { data } = parsed
-    for (const id of babyIds) {
-      addEvent(
-        store,
-        data.kind === 'bottle'
-          ? logBottle(id, at, data.amountMl, data.milk, current, splitOf(data), durationMs)
-          : logSolids(id, at, data.food, current, durationMs),
-      )
-    }
-    onDone()
-  }
-
   return (
     <div className="flex flex-col gap-4">
       <SegmentedControl<Kind>
@@ -121,68 +32,14 @@ export function FeedingForm({
         value={kind}
         onChange={setKind}
       />
-      {kind !== 'breast' && targets}
-
-      {kind === 'breast' &&
-        (runningBreast ? (
-          <p className="text-fg-muted">{m.breastAlreadyRunning()}</p>
-        ) : (
-          <>
-            <p className="text-fg-muted">{m.breastStartHint()}</p>
-            <div className="grid grid-cols-2 gap-3">
-              {(['left', 'right'] as const).map((side) => (
-                <Button
-                  key={side}
-                  tone="feeding"
-                  size="lg"
-                  className="relative min-h-24"
-                  onClick={() => startBreast(side)}
-                >
-                  {sideLabel[side]()}
-                  {side === suggested && (
-                    <span className="absolute top-2 right-2 rounded-full bg-on-accent px-2 text-caption text-feeding-text">
-                      {m.sideSuggested()}
-                    </span>
-                  )}
-                </Button>
-              ))}
-            </div>
-          </>
-        ))}
-
-      {kind !== 'breast' && (
-        <form noValidate onSubmit={submit} className="flex flex-col gap-4">
-          {kind === 'bottle' && (
-            <BottleFields value={bottle} onChange={setBottle} error={errors.amount} />
-          )}
-          {kind === 'solids' && <SolidsField value={food} onChange={setFood} error={errors.food} />}
-          <AgoChips
-            legend={m.feedEndedWhen()}
-            showLegend
-            selected={endedAgo}
-            onSelect={chooseEnded}
-          />
-          <FeedDurationField value={duration} onChange={chooseDuration} />
-          <div className="flex flex-col gap-1.5">
-            <TimeField
-              label={m.eventStart()}
-              value={time}
-              onChange={(value) => {
-                setTime(value)
-                setEndedAgo(null)
-              }}
-              error={errors.time}
-              now={now}
-            />
-            {endedAgo !== null && (
-              <p className="m-0 text-caption text-fg-muted">{m.feedStartDerived()}</p>
-            )}
-          </div>
-          <Button type="submit" tone="feeding" size="lg" block>
-            {m.actionSave()}
-          </Button>
-        </form>
-      )}
+      <DurationForm
+        key={kind}
+        kind={kind}
+        babyIds={babyIds}
+        events={events}
+        targets={targets}
+        onDone={onDone}
+      />
     </div>
   )
 }

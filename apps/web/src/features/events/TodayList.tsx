@@ -1,4 +1,4 @@
-import { type Event, startOfLocalDay } from '@bobo/shared'
+import { type Event, hasKnownDuration, startOfLocalDay } from '@bobo/shared'
 import { AnimatePresence, m as motion } from 'motion/react'
 import { useState } from 'react'
 
@@ -98,6 +98,9 @@ export function TodayList({ events }: { events: readonly Event[] }) {
               {today.map((event) => {
                 const { title, detail } = describeEvent(event, now)
                 const time = formatTime(event.startAt)
+                // Duration records show when they ended under when they started.
+                const ended =
+                  hasKnownDuration(event) && event.endAt !== null ? formatTime(event.endAt) : null
                 return (
                   <motion.li
                     key={event.id}
@@ -117,7 +120,12 @@ export function TodayList({ events }: { events: readonly Event[] }) {
                       className="press-row flex min-h-touch w-full items-center gap-3 py-3 text-left"
                     >
                       <EventIcon {...eventIconProps(event)} className="size-7" />
-                      <span className="w-12 shrink-0 text-fg-muted tabular-nums">{time}</span>
+                      <span className="flex w-12 shrink-0 flex-col text-fg-muted tabular-nums">
+                        <span>{time}</span>
+                        {ended && (
+                          <span className="text-caption">{m.eventUntil({ time: ended })}</span>
+                        )}
+                      </span>
                       <span className="shrink-0 font-extrabold">{title}</span>
                       <span className="truncate text-fg-muted">{detail}</span>
                     </button>

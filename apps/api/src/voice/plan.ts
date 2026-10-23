@@ -1,4 +1,4 @@
-import { type Event, eventSchema, newId } from '@bobo/shared'
+import { type Event, eventSchema, isRunning, newId } from '@bobo/shared'
 
 import type { VoiceAction } from './action'
 
@@ -131,6 +131,12 @@ const SIDE = { left: '左侧', right: '右侧', both: '双侧' } as const
 
 /** What a record is, in a few words: "换尿布（尿尿）". */
 export function describe(event: Event, before: Event | null): string {
+  // Bottles, solids and pumping can run as timers too (#170).
+  const prefix = isRunning(event) && event.type !== 'sleep' ? '正在' : ''
+  return prefix + describeRecord(event, before)
+}
+
+function describeRecord(event: Event, before: Event | null): string {
   switch (event.type) {
     case 'diaper':
       return `换尿布（${DIAPER[event.data.contents]}）`
@@ -140,7 +146,7 @@ export function describe(event: Event, before: Event | null): string {
       if (data.kind === 'solids') return `辅食：${data.food}`
       const side = SIDE[data.segments[0]?.side ?? 'left']
       return event.endAt === null
-        ? `开始亲喂（${side}）`
+        ? `亲喂（${side}）`
         : `亲喂 ${durationLabel(event.endAt - event.startAt)}`
     }
     case 'sleep':
@@ -149,7 +155,9 @@ export function describe(event: Event, before: Event | null): string {
         ? `醒了（睡了 ${durationLabel(event.endAt - event.startAt)}）`
         : `睡了 ${durationLabel(event.endAt - event.startAt)}`
     case 'pumping':
-      return `吸奶 ${event.data.amountMl} 毫升（${SIDE[event.data.side]}）`
+      return event.data.amountMl === undefined
+        ? `吸奶（${SIDE[event.data.side]}）`
+        : `吸奶 ${event.data.amountMl} 毫升（${SIDE[event.data.side]}）`
     case 'temperature':
       return `体温 ${event.data.celsius}°C`
     case 'medication':

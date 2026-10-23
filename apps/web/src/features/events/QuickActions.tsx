@@ -6,14 +6,20 @@ import { Sheet } from '../../components/ui/Sheet'
 import { m } from '../../paraglide/messages.js'
 import { useAccess } from '../../sync/use-access'
 import { useBabies } from '../babies/use-babies'
-import { type Category, OTHER_CATEGORIES, categoryTitle, categoryTone } from './category'
+import {
+  type Category,
+  OTHER_CATEGORIES,
+  categoryTitle,
+  categoryTone,
+  isInstantCategory,
+} from './category'
 import { DiaperForm } from './DiaperForm'
+import { DurationForm } from './DurationForm'
 import { EventIcon, categoryIconKind } from './EventIcon'
 import { FeedingForm } from './FeedingForm'
 import { useLogTogether } from './log-targets'
 import { LogTargets } from './LogTargets'
 import { OtherEventForm } from './OtherEventForm'
-import { SleepForm } from './SleepForm'
 
 const MAIN_CATEGORIES = ['feeding', 'sleep', 'diaper'] as const
 
@@ -46,7 +52,7 @@ export function QuickActions({ baby, events }: { baby: Baby; events: readonly Ev
   const [open, setOpen] = useState<Category | 'more' | null>(null)
   const close = () => setOpen(null)
   const logging = open === 'more' ? undefined : (open ?? undefined)
-  const other = OTHER_CATEGORIES.find((category) => category === open)
+  const other = isInstantCategory(open) ? open : undefined
 
   return (
     <>
@@ -73,8 +79,15 @@ export function QuickActions({ baby, events }: { baby: Baby; events: readonly Ev
         {logging === 'feeding' && (
           <FeedingForm babyIds={babyIds} events={events} targets={targets} onDone={close} />
         )}
-        {logging === 'sleep' && (
-          <SleepForm babyIds={babyIds} events={events} targets={targets} onDone={close} />
+        {(logging === 'sleep' || logging === 'pumping') && (
+          <DurationForm
+            key={logging}
+            kind={logging}
+            babyIds={babyIds}
+            events={events}
+            targets={targets}
+            onDone={close}
+          />
         )}
         {logging === 'diaper' && <DiaperForm babyIds={babyIds} targets={targets} onDone={close} />}
         {other && (
