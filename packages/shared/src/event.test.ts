@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { breastSideDurations, eventDurationMs, eventSchema, isRunning, isTimed } from './event'
+import {
+  breastSideDurations,
+  eventDurationMs,
+  eventSchema,
+  hasDuration,
+  hasKnownDuration,
+  isRunning,
+} from './event'
 import { MINUTE, T0, baseEvent } from './fixtures.test-utils'
 
 const sleep = (endAt: number | null) => ({
@@ -108,7 +115,7 @@ describe('eventSchema', () => {
     expect(eventSchema.safeParse(sleep(T0 - MINUTE)).success).toBe(false)
   })
 
-  it('allows an end time only on bottles and solids among instant events', () => {
+  it('lets bottles, solids and pumping run or end, and only those with a duration', () => {
     const bottle = finished('feeding', { kind: 'bottle', amountMl: 90, milk: 'breast' })
     expect(eventSchema.safeParse(bottle).success).toBe(true)
     expect(
@@ -116,6 +123,16 @@ describe('eventSchema', () => {
     ).toBe(true)
     expect(eventSchema.safeParse(finished('diaper', { contents: 'wet' })).success).toBe(false)
     expect(eventDurationMs(eventSchema.parse(bottle), T0)).toBe(15 * MINUTE)
+    const running = { ...bottle, endAt: null }
+    expect(isRunning(eventSchema.parse(running))).toBe(true)
+  })
+
+  it('lets pumping run without an amount, but not end without one', () => {
+    expect(instant('pumping', { side: 'both' })).toBe(true)
+    expect(eventSchema.safeParse(finished('pumping', { side: 'both' })).success).toBe(false)
+    expect(eventSchema.safeParse(finished('pumping', { side: 'left', amountMl: 60 })).success).toBe(
+      true,
+    )
   })
 
   describe('breast segments', () => {
@@ -170,8 +187,10 @@ describe('event helpers', () => {
   })
 
   it('knows which events are timed and running', () => {
-    expect(isTimed(runningSleep)).toBe(true)
-    expect(isTimed(diaper)).toBe(false)
+    expect(hasDuration(runningSleep)).toBe(true)
+    expect(hasDuration(diaper)).toBe(false)
+    expect(hasKnownDuration(finishedSleep)).toBe(true)
+    expect(hasKnownDuration(runningSleep)).toBe(false)
     expect(isRunning(runningSleep)).toBe(true)
     expect(isRunning(finishedSleep)).toBe(false)
     expect(isRunning(diaper)).toBe(false)

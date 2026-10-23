@@ -71,7 +71,7 @@ export function summarizeDay(
         summary.diapers[event.data.contents] += 1
         continue
       case 'pumping':
-        summary.pumpingMl += event.data.amountMl
+        summary.pumpingMl += event.data.amountMl ?? 0
         continue
       case 'temperature':
         if (event.startAt > latestTemperatureAt) {

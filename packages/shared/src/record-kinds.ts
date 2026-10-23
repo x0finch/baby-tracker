@@ -1,0 +1,61 @@
+import type { Event } from './event'
+
+/**
+ * What a record is, one level finer than its type: feeds differ by kind (breast, bottle,
+ * solids) in how they are timed and logged.
+ */
+export type RecordKind =
+  | 'breast'
+  | 'bottle'
+  | 'solids'
+  | 'sleep'
+  | 'pumping'
+  | 'diaper'
+  | 'temperature'
+  | 'medication'
+  | 'growth'
+  | 'note'
+
+export type Side = 'left' | 'right' | 'both'
+
+export interface RecordKindDefinition {
+  /**
+   * Instant records happen at one time. Duration records can run as a timer (no end yet) or
+   * be logged afterwards with a start and how long they took.
+   */
+  timing: 'instant' | 'duration'
+  /** Quick choices for how long it took, in minutes, when logging afterwards. */
+  durations: readonly number[]
+  /** Sides it can be on; the first is the default. */
+  sides: readonly Side[]
+}
+
+const instant: RecordKindDefinition = { timing: 'instant', durations: [], sides: [] }
+
+/** Every kind of record and how it is timed: the one place to look this up. */
+export const RECORD_KINDS: Record<RecordKind, RecordKindDefinition> = {
+  breast: { timing: 'duration', durations: [5, 10, 15, 20, 30], sides: ['left', 'right'] },
+  bottle: { timing: 'duration', durations: [5, 10, 15, 20, 30], sides: [] },
+  solids: { timing: 'duration', durations: [10, 15, 20, 30], sides: [] },
+  sleep: { timing: 'duration', durations: [30, 60, 90, 120, 180], sides: [] },
+  pumping: {
+    timing: 'duration',
+    durations: [10, 15, 20, 30],
+    sides: ['both', 'left', 'right'],
+  },
+  diaper: instant,
+  temperature: instant,
+  medication: instant,
+  growth: instant,
+  note: instant,
+}
+
+export function recordKind(event: Pick<Event, 'type' | 'data'>): RecordKind {
+  if (event.type !== 'feeding') return event.type
+  // A Pick of the union doesn't tie `data` to `type`; tell the feeds apart by their fields.
+  const { data } = event
+  return 'segments' in data ? 'breast' : 'food' in data ? 'solids' : 'bottle'
+}
+
+export const recordKindOf = (event: Pick<Event, 'type' | 'data'>): RecordKindDefinition =>
+  RECORD_KINDS[recordKind(event)]

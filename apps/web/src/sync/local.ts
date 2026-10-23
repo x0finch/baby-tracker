@@ -1,7 +1,7 @@
 import type { Baby, Event, FamilySummary } from '@bobo/shared'
 import { createTransaction } from '@tanstack/db'
 
-import { type LocalStore, getLocalStore } from '../db'
+import type { LocalStore } from '../db/local-store'
 
 export type SyncTable = 'babies' | 'events'
 
@@ -23,7 +23,7 @@ export const ACCESS_KEY = 'access'
 
 const outboxKey = (table: SyncTable, id: string) => `${table}:${id}`
 
-function setMeta(store: LocalStore, key: string, value: unknown) {
+export function setMeta(store: LocalStore, key: string, value: unknown) {
   if (store.meta.has(key)) {
     store.meta.update(key, (draft) => {
       draft.value = value
@@ -47,15 +47,6 @@ function isAccount(value: unknown): value is SyncAccount {
 export function getAccount(store: LocalStore): SyncAccount | undefined {
   const value = store.meta.get(ACCOUNT_KEY)?.value
   return isAccount(value) ? value : undefined
-}
-
-/**
- * Whether this device is signed in, for route loaders (outside React): they prefetch
- * account-side data only then.
- */
-export async function isSignedIn(): Promise<boolean> {
-  if (typeof window === 'undefined') return false
-  return getAccount(await getLocalStore()) !== undefined
 }
 
 export function setAccount(store: LocalStore, account: SyncAccount | undefined) {

@@ -9,6 +9,13 @@ export const SYNC_PUSH_LIMIT = 500
 export const SYNC_PULL_LIMIT = 500
 
 /** Items are validated one by one on the server so one bad record cannot block the rest. */
+/**
+ * Sent with pushes by apps that know duration records can run (#170). Older apps send
+ * bottles, solids and pumping without an end to mean the record has no duration.
+ */
+export const RECORDS_VERSION_HEADER = 'X-Bobo-Records'
+export const RECORDS_VERSION = '2'
+
 export const pushRequestSchema = z.object({
   babies: z.array(z.unknown()).default([]),
   events: z.array(z.unknown()).default([]),

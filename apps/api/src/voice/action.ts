@@ -30,7 +30,7 @@ export const voiceActionSchema = z.object({
   durationMinutes: z
     .number()
     .nullable()
-    .meta({ description: 'How long it lasted, if said (sleep, breastfeeding), else null' }),
+    .meta({ description: 'How long it lasted, if said (sleep, feeding, pumping), else null' }),
   diaper: z.enum(['wet', 'dirty', 'mixed']).nullable(),
   amountMl: z.number().nullable().meta({ description: 'Bottle or pumped amount in ml' }),
   milk: z.enum(['breast', 'formula', 'mixed']).nullable(),

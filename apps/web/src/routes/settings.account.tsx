@@ -2,10 +2,10 @@ import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 
 import { SettingsPage } from '../components/SettingsLayout'
+import { isSignedIn } from '../db'
 import { AccountSettings } from '../features/account/AccountSettings'
 import { accountQueries } from '../features/account/queries'
 import { m } from '../paraglide/messages.js'
-import { isSignedIn } from '../sync/local'
 
 const searchSchema = z.object({
   /** A settings page that needs an account, to go back to once signed in. */

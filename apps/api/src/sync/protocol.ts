@@ -3,10 +3,12 @@ import {
   type Event,
   type PushItemResult,
   type PushRejectReason,
+  type RecordKind,
   babySchema,
   base64UrlDecode,
   base64UrlEncode,
   eventSchema,
+  recordKind,
 } from '@bobo/shared'
 
 /** Position in one table's change stream: rows are ordered by (seq, id). */
@@ -100,6 +102,18 @@ export function planWrites<T extends Baby | Event>(
 
 export const parseBaby = (item: unknown): Baby | undefined => babySchema.safeParse(item).data
 export const parseEvent = (item: unknown): Event | undefined => eventSchema.safeParse(item).data
+
+const LEGACY_INSTANTS: ReadonlySet<RecordKind> = new Set(['bottle', 'solids', 'pumping'])
+
+/**
+ * An event from an app older than RECORDS_VERSION, where bottles, solids and pumping had no
+ * timer and no end meant "duration not recorded": now the end is the start.
+ */
+export function parseLegacyEvent(item: unknown): Event | undefined {
+  const event = parseEvent(item)
+  if (!event || event.endAt !== null || !LEGACY_INSTANTS.has(recordKind(event))) return event
+  return { ...event, endAt: event.startAt }
+}
 
 /** Ids of raw pushed items, read before validation to look up what they would replace. */
 export function idsOf(items: unknown[]): string[] {

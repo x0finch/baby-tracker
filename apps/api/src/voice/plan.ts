@@ -209,6 +209,12 @@ function changeFor(action: VoiceAction, context: PlanContext): PlannedChange {
   const at = whenOf(action, context)
   const minutes = action.durationMinutes !== null && action.durationMinutes > 0
   const duration = minutes ? (action.durationMinutes ?? 0) * MINUTE : 0
+  // A finished record: with a duration said, one that ended by now; without, the end is the
+  // start (how long it took wasn't said).
+  const done = () => {
+    const startAt = minutes ? Math.min(at, context.now - duration) : at
+    return draft(baby, context, startAt, startAt + duration)
+  }
 
   switch (action.type) {
     case 'diaper': {
@@ -227,7 +233,7 @@ function changeFor(action: VoiceAction, context: PlanContext): PlannedChange {
         amountMl: Math.round(action.amountMl ?? 0),
         milk: action.milk ?? 'formula',
       }
-      return added({ ...draft(baby, context, at, null), type: 'feeding', data })
+      return added({ ...done(), type: 'feeding', data })
     }
     case 'breast': {
       const side = action.side === 'right' ? 'right' : 'left'
@@ -257,7 +263,7 @@ function changeFor(action: VoiceAction, context: PlanContext): PlannedChange {
     }
     case 'solids':
       return added({
-        ...draft(baby, context, at, null),
+        ...done(),
         type: 'feeding',
         data: { kind: 'solids', food: action.food?.trim() || '辅食' },
       })
@@ -283,7 +289,7 @@ function changeFor(action: VoiceAction, context: PlanContext): PlannedChange {
     case 'pumping': {
       if (!action.amountMl || action.amountMl <= 0) refuse(REPLY.needAmount)
       const data = { side: action.side ?? 'both', amountMl: Math.round(action.amountMl ?? 0) }
-      return added({ ...draft(baby, context, at, null), type: 'pumping', data })
+      return added({ ...done(), type: 'pumping', data })
     }
     case 'temperature': {
       if (action.celsius === null) refuse(REPLY.needTemperature)

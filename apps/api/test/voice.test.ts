@@ -173,6 +173,9 @@ describe('siri voice logging', () => {
     const stored = (await events()).filter((event) => !earlier.has(event.id))
     expect(stored.map((event) => event.type).toSorted()).toEqual(['diaper', 'feeding'])
     expect(stored.every((event) => event.createdBy !== null)).toBe(true)
+    // A bottle said without a duration is finished, not a running timer.
+    const bottle = stored.find((event) => event.type === 'feeding')
+    expect(bottle?.endAt).toBe(bottle?.startAt)
   })
 
   it("replies in the app's language, as the app last set it", async () => {

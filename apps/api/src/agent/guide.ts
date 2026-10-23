@@ -187,7 +187,7 @@ export function implausible(
   ) {
     return `${at}的宝宝通常还不吃辅食`
   }
-  if (event.type === 'pumping' && event.data.amountMl > limits.pumpingMl) {
+  if (event.type === 'pumping' && (event.data.amountMl ?? 0) > limits.pumpingMl) {
     return `一次吸奶 ${event.data.amountMl} 毫升，远超常见的量`
   }
   if (event.type === 'temperature') {
