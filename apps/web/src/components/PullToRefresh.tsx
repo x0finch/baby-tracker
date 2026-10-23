@@ -154,7 +154,7 @@ export function PullToRefresh({ children }: { children: ReactNode }) {
             : m.pullHint()
 
   return (
-    <div className="relative">
+    <div data-pull-to-refresh className="relative">
       <motion.output
         aria-hidden={phase === 'idle'}
         className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col items-center gap-1"
