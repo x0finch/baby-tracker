@@ -187,6 +187,18 @@ describe('planning what was said', () => {
     )
   })
 
+  it('labels a sleep night or nap by when it started, in the family’s zone', () => {
+    // 10:00 in Shanghai now; 23:00 was last night.
+    expect(
+      planned([action({ type: 'sleep', time: '23:00', durationMinutes: 360 })]).event.data,
+    ).toEqual({
+      kind: 'night',
+    })
+    expect(planned([action({ type: 'sleep', durationMinutes: 40 })]).event.data).toEqual({
+      kind: 'nap',
+    })
+  })
+
   it('records growth, and needs a measurement', () => {
     const { event, line } = planned([action({ type: 'growth', weightKg: 6.234, headCm: 40 })])
     expect(event.data).toEqual({ weightKg: 6.23, lengthCm: null, headCm: 40 })

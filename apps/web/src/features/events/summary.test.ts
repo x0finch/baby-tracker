@@ -15,7 +15,7 @@ import {
   stopEvent,
   switchBreastSide,
 } from './records'
-import { lastActivityAt, summarizeDay } from './summary'
+import { lastActivityAt, onDayList, summarizeDay } from './summary'
 
 const BABY = newId()
 const MIN = 60_000
@@ -116,5 +116,17 @@ describe('lastActivityAt', () => {
     // Feeds are spaced start to start, however long they took.
     const feed = logBottle(BABY, at(9), 120, 'formula', at(9, 30), undefined, 20 * MIN)
     expect(lastActivityAt([feed], 'feeding', at(12))).toBe(at(9))
+  })
+})
+
+describe('onDayList', () => {
+  it('lists a sleep on the day it started and the day it ran into', () => {
+    const night = logSleep(BABY, at(23) - 24 * H, at(5), at(5))
+    expect(onDayList(night, DAY_START, DAY_END, at(9))).toBe(true)
+    expect(onDayList(night, DAY_START - 24 * H, DAY_START, at(9))).toBe(true)
+    // An instant record stays on its own day.
+    expect(onDayList(logDiaper(BABY, at(23) - 24 * H, 'wet'), DAY_START, DAY_END, at(9))).toBe(
+      false,
+    )
   })
 })

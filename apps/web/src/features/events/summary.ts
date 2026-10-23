@@ -1,4 +1,4 @@
-import { type Event, breastSideDurations, eventDurationMs } from '@bobo/shared'
+import { type Event, breastSideDurations, eventDurationMs, hasDuration } from '@bobo/shared'
 
 export interface DaySummary {
   feedings: number
@@ -26,6 +26,17 @@ function overlapMs(event: Event, dayStart: number, dayEnd: number, now: number):
 
 function inDay(at: number, dayStart: number, dayEnd: number) {
   return at >= dayStart && at < dayEnd
+}
+
+/**
+ * Whether a record belongs on a day's list: it started that day, or it ran into the day from
+ * the one before (a sleep from 23:00 to 05:00 shows on both).
+ */
+export function onDayList(event: Event, dayStart: number, dayEnd: number, now: number) {
+  return (
+    inDay(event.startAt, dayStart, dayEnd) ||
+    (hasDuration(event) && event.startAt < dayStart && (event.endAt ?? now) > dayStart)
+  )
 }
 
 /**

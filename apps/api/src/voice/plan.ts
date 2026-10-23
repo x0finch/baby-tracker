@@ -5,6 +5,7 @@ import {
   isRunning,
   newId,
   recordKind,
+  sleepKindFor,
 } from '@bobo/shared'
 
 import { TIMED_TYPES, type TimedType, type VoiceAction } from './action'
@@ -151,7 +152,7 @@ const SIDE = { left: '左侧', right: '右侧', both: '双侧' } as const
 
 const minutesOf = (ms: number) => Math.max(1, Math.round(ms / MINUTE))
 
-function durationLabel(ms: number): string {
+export function durationLabel(ms: number): string {
   const minutes = minutesOf(ms)
   const hours = Math.floor(minutes / 60)
   const rest = minutes % 60
@@ -466,8 +467,11 @@ function changeFor(action: VoiceAction, context: PlanContext): PlannedChange {
         type: 'feeding',
         data: { kind: 'solids', food: action.food?.trim() || '辅食' },
       })
-    case 'sleep':
-      return added({ ...record('sleep'), type: 'sleep', data: { kind: 'nap' } })
+    case 'sleep': {
+      const sleep = record('sleep')
+      const kind = sleepKindFor(sleep.startAt, minuteOfDayIn(context.timeZone))
+      return added({ ...sleep, type: 'sleep', data: { kind } })
+    }
     case 'pumping': {
       const running = timed('pumping')
       // The amount is known once pumping is done.

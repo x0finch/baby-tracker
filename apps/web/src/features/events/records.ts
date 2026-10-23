@@ -10,6 +10,7 @@ import {
   type SleepEvent,
   type TemperatureEvent,
   newId,
+  sleepKindFor,
 } from '@bobo/shared'
 
 type NewEventBase = Pick<
@@ -179,12 +180,6 @@ export function logSolids(
     endAt: at + (durationMs ?? 0),
     data: { kind: 'solids', food: food.trim() },
   }
-}
-
-/** Night sleep starts between 19:00 and 06:59 local time; anything else is a nap. */
-export function sleepKindFor(startAt: number): 'nap' | 'night' {
-  const hour = new Date(startAt).getHours()
-  return hour >= 19 || hour < 7 ? 'night' : 'nap'
 }
 
 export function startSleep(babyId: string, now: number): SleepEvent {

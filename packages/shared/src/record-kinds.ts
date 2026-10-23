@@ -77,3 +77,20 @@ export function recordKind(event: Pick<Event, 'type' | 'data'>): RecordKind {
 
 export const recordKindOf = (event: Pick<Event, 'type' | 'data'>): RecordKindDefinition =>
   RECORD_KINDS[recordKind(event)]
+
+const deviceMinute = (at: number) => {
+  const date = new Date(at)
+  return date.getHours() * 60 + date.getMinutes()
+}
+
+/**
+ * Night sleep starts between 19:00 and 06:59 local time; anything else is a nap. Only a
+ * label for people: predictions read sleep as sleep.
+ */
+export function sleepKindFor(
+  startAt: number,
+  minuteOfDay: (at: number) => number = deviceMinute,
+): 'nap' | 'night' {
+  const hour = Math.floor(minuteOfDay(startAt) / 60)
+  return hour >= 19 || hour < 7 ? 'night' : 'nap'
+}
