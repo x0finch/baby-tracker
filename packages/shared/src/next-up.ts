@@ -35,7 +35,7 @@ export interface PlanItem {
 }
 
 export interface NextUp {
-  /** Asleep for the night: only feeds are suggested. */
+  /** Within the baby's usual night hours: only feeds, and bedtime while it is late. */
   night: boolean
   feed: NextFeed
   sleep: NextSleep
@@ -69,6 +69,8 @@ const BEDTIME = 20 * 60
 const WAKE_TIME = 7 * 60
 const MINUTES_A_DAY = 24 * 60
 const PLAN_LIMIT = 12
+/** Up this long past bedtime with no night's sleep logged, bedtime is still suggested. */
+const LATE_BEDTIME = 3 * 60 * MINUTE
 
 const deviceMinute = (at: number) => {
   const date = new Date(at)
@@ -226,11 +228,15 @@ export function nextUp(events: readonly Event[], options: NextUpOptions): NextUp
     at + ((minute - minuteOfDay(at) + MINUTES_A_DAY) % MINUTES_A_DAY) * MINUTE
 
   const lastSleep = sleeps.at(-1)
-  const night =
-    isNight(now) &&
-    lastSleep !== undefined &&
-    lastSleep.night &&
-    lastSleep.startAt > now - DAY / 1.5
+  // Night by the clock, whether or not the night's sleep was logged; a nap running late
+  // keeps it day.
+  const napping = lastSleep?.endAt === null && !lastSleep.night
+  const night = isNight(now) && !napping
+  /** When tonight's bedtime was, during the night. */
+  const tonight = now - ((minuteOfDay(now) - bedtime + MINUTES_A_DAY) % MINUTES_A_DAY) * MINUTE
+  const asleepTonight = sleeps.some(
+    (sleep) => sleep.night && (sleep.endAt === null || sleep.endAt >= tonight),
+  )
 
   // Feeds: close ones joined, day and night intervals apart.
   const feedRange = minutes(norms.feedIntervalMinutes)
@@ -294,18 +300,31 @@ export function nextUp(events: readonly Event[], options: NextUpOptions): NextUp
       : { at: nap, bedtime: false }
   }
 
+  const bedtimeWindow = (at: number) => ({
+    from: round(at - 15 * MINUTE),
+    to: round(at + 15 * MINUTE),
+    personalized: bedtimePersonalized,
+  })
   let sleep: NextSleep = { status: 'unknown' }
   if (lastSleep?.endAt === null) sleep = { status: 'sleeping', night: lastSleep.night }
-  else if (lastSleep?.endAt && now <= lastSleep.endAt + awake.giveUp) {
+  else if (night) {
+    // Still up past bedtime, the night's sleep not logged yet: bedtime, a little late.
+    if (!asleepTonight && now < tonight + LATE_BEDTIME) {
+      sleep = {
+        status: 'predicted',
+        since: lastSleep?.endAt ?? tonight,
+        bedtime: true,
+        ...bedtimeWindow(tonight),
+      }
+    }
+  } else if (lastSleep?.endAt && now <= lastSleep.endAt + awake.giveUp) {
     const next = sleepAfter(lastSleep.endAt)
     sleep = next.bedtime
       ? {
           status: 'predicted',
           since: lastSleep.endAt,
           bedtime: true,
-          from: round(next.at - 15 * MINUTE),
-          to: round(next.at + 15 * MINUTE),
-          personalized: bedtimePersonalized,
+          ...bedtimeWindow(next.at),
         }
       : {
           status: 'predicted',
@@ -370,7 +389,7 @@ export function nextUp(events: readonly Event[], options: NextUpOptions): NextUp
   return {
     night,
     feed,
-    sleep: night && sleep.status === 'predicted' ? { status: 'unknown' } : sleep,
+    sleep,
     diaper,
     plan,
     feedEvery: dayFeeds.center,

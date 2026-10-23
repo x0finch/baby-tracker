@@ -46,7 +46,15 @@ export function NextUp({ baby, events }: { baby: Baby; events: readonly Event[] 
   if (next.diaper.status === 'predicted') {
     rows.push({ icon: 'diaper', label: m.nextDiaper(), window: next.diaper })
   }
-  if (rows.length === 0 && next.plan.length === 0) return null
+  // Nothing to go on yet: say what to log. Anything running has its own card already.
+  const running = next.feed.status === 'feeding' || next.sleep.status === 'sleeping'
+  if (rows.length === 0 && next.plan.length === 0 && running) return null
+  const hint =
+    rows.length === 0 && next.plan.length === 0
+      ? m.nextUnknown()
+      : next.sleep.status === 'unknown' && !next.night
+        ? m.nextSleepUnknown()
+        : null
 
   return (
     <Card as="section" aria-labelledby="next-title" className="flex flex-col gap-3 py-3">
@@ -102,9 +110,12 @@ export function NextUp({ baby, events }: { baby: Baby; events: readonly Event[] 
           )}
         </div>
       )}
-      <p className="m-0 text-caption text-fg-muted">
-        {rows.some((row) => row.window.personalized) ? m.nextBasisHistory() : m.nextBasisAge()}
-      </p>
+      {hint && <p className="m-0 text-fg-muted">{hint}</p>}
+      {rows.length > 0 && (
+        <p className="m-0 text-caption text-fg-muted">
+          {rows.some((row) => row.window.personalized) ? m.nextBasisHistory() : m.nextBasisAge()}
+        </p>
+      )}
     </Card>
   )
 }

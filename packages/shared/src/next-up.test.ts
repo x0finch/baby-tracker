@@ -164,6 +164,34 @@ describe('nextUp', () => {
     })
   })
 
+  describe('when sleep goes unlogged', () => {
+    it('still keeps to the night by the clock: feeds only, until morning', () => {
+      const events = [bottle(at(1, 23)), diaper(at(1, 23))]
+      const next = nextUp(events, options(at(2, 2)))
+      expect(next.night).toBe(true)
+      expect(next.diaper).toEqual({ status: 'unknown' })
+      expect(next.plan.every((item) => item.kind === 'feed')).toBe(true)
+      expect(next.plan.at(-1)?.at).toBeLessThan(at(2, 7))
+    })
+
+    it('suggests bedtime, late, while the baby is still up', () => {
+      const next = nextUp([sleep(at(1, 16), at(1, 17))], options(at(1, 21)))
+      expect(next.sleep).toMatchObject({
+        status: 'predicted',
+        bedtime: true,
+        from: at(1, 19, 45),
+        to: at(1, 20, 15),
+      })
+      // Once the night's sleep is logged, nothing more until morning.
+      const asleep = nextUp([sleep(at(1, 20, 30), at(1, 23), 'night')], options(at(1, 23, 30)))
+      expect(asleep.sleep).toEqual({ status: 'unknown' })
+    })
+
+    it('is day while a nap runs late', () => {
+      expect(nextUp([sleep(at(1, 19, 30), null)], options(at(1, 20, 30))).night).toBe(false)
+    })
+  })
+
   it('lays out the rest of the day: feeds and naps in turn, then bedtime', () => {
     const events = [sleep(at(1, 7), at(1, 8)), bottle(at(1, 8))]
     const { plan } = nextUp(events, options(at(1, 8, 30)))
