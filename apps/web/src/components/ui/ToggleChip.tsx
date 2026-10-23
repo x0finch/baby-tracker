@@ -1,6 +1,7 @@
 import { clsx } from 'clsx'
 import { type ButtonHTMLAttributes, useEffect, useId, useRef } from 'react'
 
+import { useBounce } from '../../lib/bounce'
 import { popElement } from '../../lib/motion'
 
 export type ChipTone = 'primary' | 'feeding' | 'diaper'
@@ -75,6 +76,7 @@ export function ChipGroup<T extends string | number | null>({
 }: ChipGroupProps<T>) {
   const name = useId()
   const row = useRef<HTMLDivElement>(null)
+  useBounce(row, { axes: ['x'] })
   // A choice made earlier (editing a record) may sit past the visible chips: show it.
   useEffect(() => {
     const list = row.current

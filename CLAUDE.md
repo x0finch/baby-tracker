@@ -11,6 +11,8 @@ See README.md for the stack, commands and architecture. Conventions the code doe
   gradients or shadows. Put new icons in `apps/web/src/components/ui/` next to `Chevron.tsx`
   (or `features/events/EventIcon.tsx` for record types) and draw them as inline SVG using
   `currentColor` or the theme tokens; don't add an icon library.
+- Scroll areas bounce at their ends like iOS, horizontally or vertically: give a new one
+  `useBounce` (`apps/web/src/lib/bounce.ts`). Sheets lock the page behind them.
 
 ## Records
 

@@ -7,11 +7,12 @@ import {
   createRootRouteWithContext,
   useHydrated,
 } from '@tanstack/react-router'
-import { type ReactNode, Suspense, useEffect } from 'react'
+import { type ReactNode, Suspense, useEffect, useRef } from 'react'
 
 import { TabBar } from '../components/TabBar'
 import { Toaster } from '../components/ui/Toast'
 import { UpdatePrompt } from '../components/UpdatePrompt'
+import { useBounce } from '../lib/bounce'
 import { getLocale } from '../lib/i18n'
 import { MotionProvider } from '../lib/motion'
 import { splashLinks } from '../lib/splash'
@@ -66,6 +67,10 @@ function RootDocument({ children }: { children: ReactNode }) {
   )
 }
 
+const pageOwnsNot = (target: Element, _axis: unknown, edge: 'start' | 'end') =>
+  target.closest('dialog') !== null ||
+  (edge === 'start' && target.closest('[data-pull-to-refresh]') !== null)
+
 function RootLayout() {
   // The prerendered shell never contains page content. Rendering pages only after
   // hydration keeps the first client render identical to the shell; otherwise a page
@@ -91,10 +96,18 @@ function RootLayout() {
     return () => document.removeEventListener('gesturestart', cancel)
   }, [])
 
+  // The page bounces at its ends. Sheets bounce on their own (Sheet), and on Today the
+  // pull-to-refresh owns the top.
+  const main = useRef<HTMLElement>(null)
+  useBounce(null, { axes: ['y'], content: main, ignore: pageOwnsNot })
+
   return (
     <MotionProvider>
       <div className="mx-auto flex min-h-dvh max-w-app flex-col">
-        <main className="flex-1 [view-transition-name:page] pt-safe-4 pr-safe-4 pb-above-tab-bar pl-safe-4">
+        <main
+          ref={main}
+          className="flex-1 [view-transition-name:page] pt-safe-4 pr-safe-4 pb-above-tab-bar pl-safe-4"
+        >
           {/* Pages suspend while the local store opens (a few ms on startup). */}
           {hydrated && (
             <Suspense>

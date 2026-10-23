@@ -1,6 +1,7 @@
 import { clsx } from 'clsx'
 import { type PointerEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 
+import { useBounce } from '../../lib/bounce'
 import { prefersReducedMotion } from '../../lib/motion'
 import { lockScroll } from '../../lib/scroll-lock'
 
@@ -53,8 +54,13 @@ function useLastOpen<T>(open: boolean, value: T): T {
  * Bottom sheet built on the native <dialog> element, which provides focus trapping,
  * Escape to close and an inert background. Used instead of centered modals for forms.
  */
+const onHandle = (target: Element) => target.closest('[data-sheet-handle]') !== null
+
 export function Sheet({ open, onClose, title, children }: SheetProps) {
   const ref = useRef<HTMLDialogElement>(null)
+  const body = useRef<HTMLDivElement>(null)
+  // The content bounces at its ends; the header's own drag (closing the sheet) is left alone.
+  useBounce(ref, { axes: ['y'], content: body, ignore: onHandle })
   const titleId = useId()
   // Mirrors `open` so the native close event can tell a user dismissal (Escape) from the
   // parent closing the sheet, which must not call onClose again (e.g. when one sheet
@@ -170,8 +176,9 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
         'sheet rounded-t-xl border-2 border-b-0 border-border bg-bg p-0 text-fg focus:outline-none',
       )}
     >
-      <div className="flex flex-col gap-4 px-4 pt-3 pb-safe-4">
+      <div ref={body} className="flex flex-col gap-4 px-4 pt-3 pb-safe-4">
         <div
+          data-sheet-handle
           className="-mx-4 -mt-3 flex touch-none flex-col gap-4 px-4 pt-3"
           onPointerDown={startDrag}
           onPointerMove={moveDrag}
