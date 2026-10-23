@@ -1,5 +1,5 @@
 import { clsx } from 'clsx'
-import { type ButtonHTMLAttributes, useId } from 'react'
+import { type ButtonHTMLAttributes, useEffect, useId, useRef } from 'react'
 
 import { popElement } from '../../lib/motion'
 
@@ -59,7 +59,8 @@ export interface ChipGroupProps<T> {
 }
 
 /**
- * Single-choice chips in a three-column grid, for quick picks like "5 分钟前". Native radio
+ * Single-choice chips in one row that scrolls sideways, for quick picks like "5 分钟前". About
+ * three and a half fit, so the cut-off chip on the right shows there are more. Native radio
  * buttons underneath give the group its name, arrow keys and one tab stop.
  */
 export function ChipGroup<T extends string | number | null>({
@@ -72,17 +73,26 @@ export function ChipGroup<T extends string | number | null>({
   tone = 'primary',
 }: ChipGroupProps<T>) {
   const name = useId()
+  const row = useRef<HTMLDivElement>(null)
+  // A choice made earlier (editing a record) may sit past the visible chips: show it.
+  useEffect(() => {
+    const list = row.current
+    const chosen = list?.querySelector<HTMLElement>('label:has(input:checked)')
+    if (!list || !chosen) return
+    const overflow = chosen.offsetLeft + chosen.offsetWidth - list.clientWidth
+    if (overflow > 0) list.scrollLeft = overflow + chosen.offsetWidth / 2
+  }, [])
   return (
     <fieldset className="m-0 min-w-0 border-0 p-0">
       <legend className={showLegend ? 'mb-1.5 p-0 font-bold' : 'sr-only'}>{legend}</legend>
-      <div className="grid grid-cols-3 gap-2">
+      <div ref={row} className="relative flex snap-x gap-2 overflow-x-auto pb-1">
         {options.map((option) => {
           const checked = value === option
           return (
             <label
               key={String(option)}
               className={clsx(
-                'press flex min-h-11 items-center justify-center rounded-lg border-2 border-b-4 px-2 text-center font-extrabold',
+                'press flex min-h-11 w-[28%] shrink-0 snap-start items-center justify-center rounded-lg border-2 border-b-4 px-1 text-center font-extrabold whitespace-nowrap',
                 'has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-diaper',
                 checked
                   ? [pressedTones[tone].box, pressedTones[tone].text]

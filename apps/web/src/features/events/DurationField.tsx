@@ -9,6 +9,14 @@ import { durationLabel } from './duration-label'
 
 type Choice = number | 'custom'
 
+/** Short enough for a chip: "20 分钟", "1.5 小时". */
+function chipLabel(minutes: number): string {
+  if (minutes < 60) return m.durationMinutes({ minutes })
+  return minutes % 30 === 0
+    ? m.durationHours({ hours: minutes / 60 })
+    : durationLabel(minutes * MINUTE)
+}
+
 /**
  * How long something took: quick choices in minutes, or any number of minutes. With
  * `noneLabel`, a first choice of 0 for "not at all" (a breast side not fed).
@@ -49,7 +57,7 @@ export function DurationField({
             ? m.durationCustom()
             : choice === 0 && noneLabel !== undefined
               ? noneLabel
-              : durationLabel(choice * MINUTE)
+              : chipLabel(choice)
         }
         tone={tone}
       />
