@@ -16,6 +16,7 @@ import {
 } from './account'
 import { isPasskeyCancel, passkeysSupported, signInWithPasskey } from './passkey'
 import { MIN_PASSWORD_LENGTH } from './password'
+import { PasswordRefused, checkNewPassword } from './password-check'
 import { accountQueries } from './queries'
 
 type Mode = 'sign-in' | 'sign-up' | 'reset-request' | 'reset'
@@ -131,10 +132,16 @@ export function SignInOptions({
       if (!check({ needsPassword: true })) return
       void run(
         async () => {
+          await checkNewPassword(email, password)
           await signUpWithEmail(email, password, name)
           await onSignedIn()
         },
-        (e) => (isStatus(e, 422) ? m.signUpExists() : m.emailSendFailed()),
+        (e) =>
+          e instanceof PasswordRefused
+            ? e.message
+            : isStatus(e, 422)
+              ? m.signUpExists()
+              : m.emailSendFailed(),
       )
     } else if (mode === 'reset-request') {
       if (!check({ needsPassword: false })) return
@@ -155,11 +162,17 @@ export function SignInOptions({
       if (!check({ needsPassword: true })) return
       void run(
         async () => {
+          await checkNewPassword(email, password)
           await resetPassword(email, code, password)
           await signInWithEmail(email, password)
           await onSignedIn()
         },
-        (e) => (e instanceof HttpError ? m.emailCodeInvalid() : m.emailSendFailed()),
+        (e) =>
+          e instanceof PasswordRefused
+            ? e.message
+            : e instanceof HttpError
+              ? m.emailCodeInvalid()
+              : m.emailSendFailed(),
       )
     }
   }

@@ -92,6 +92,7 @@ Internal packages export TypeScript source directly; consuming apps compile them
 - the minimal build
 - a signed cookie cache, so most requests validate the session without D1
 - no password hashing on the server (the client stretches the password)
+- new passwords are checked on the device: obvious ones are refused, and so are ones found in [Have I Been Pwned](https://haveibeenpwned.com/API/v3#PwnedPasswords), queried by the first 5 characters of the SHA-1; if the check can't be reached, the password is allowed
 - Workers rate limiters instead of DB-backed rate limiting
 
 ## Internationalization
