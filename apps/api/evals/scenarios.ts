@@ -269,6 +269,34 @@ export const SCENARIOS: Scenario[] = [
       { say: '吸奶一百二十毫升', expect: records({ type: 'pumping', data: { amountMl: 120 } }) },
     ],
   },
+  {
+    name: '混合喂养分别说了母乳和奶粉',
+    category: 'plausible',
+    ageDays: 2 * MONTH,
+    turns: [
+      {
+        say: '喝了母乳六十毫升，奶粉四十毫升',
+        expect: records({
+          type: 'feeding',
+          data: { kind: 'bottle', amountMl: 100, milk: 'mixed', breastMl: 60, formulaMl: 40 },
+        }),
+      },
+    ],
+  },
+  {
+    name: '开始吸奶计时',
+    category: 'plausible',
+    ageDays: NEWBORN,
+    turns: [{ say: '开始吸奶', expect: records({ type: 'pumping' }) }],
+  },
+  {
+    name: '体重 6.2 公斤',
+    category: 'plausible',
+    ageDays: 3 * MONTH,
+    turns: [
+      { say: '称了体重六点二公斤', expect: records({ type: 'growth', data: { weightKg: 6.2 } }) },
+    ],
+  },
 
   // Follow-up: the assistant asks, then records what the parent's answer says.
   {
