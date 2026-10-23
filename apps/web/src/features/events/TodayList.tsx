@@ -14,6 +14,7 @@ import { describeEvent } from './describe'
 import { EditEventSheet } from './EditEventSheet'
 import { EventIcon, eventIconProps } from './EventIcon'
 import { restoreEvent } from './records'
+import { onDayList } from './summary'
 
 const UNDO_MS = 6000
 
@@ -34,7 +35,7 @@ export function TodayList({ events }: { events: readonly Event[] }) {
   }
   const dayStart = startOfLocalDay(now, -daysBack)
   const dayEnd = startOfLocalDay(now, 1 - daysBack)
-  const today = events.filter((event) => event.startAt >= dayStart && event.startAt < dayEnd)
+  const today = events.filter((event) => onDayList(event, dayStart, dayEnd, now))
   const heading =
     daysBack === 0
       ? m.todaySummaryTitle()
@@ -121,6 +122,9 @@ export function TodayList({ events }: { events: readonly Event[] }) {
                     >
                       <EventIcon {...eventIconProps(event)} className="size-7" />
                       <span className="flex w-12 shrink-0 flex-col text-fg-muted tabular-nums">
+                        {event.startAt < dayStart && (
+                          <span className="text-caption">{m.eventDayBefore()}</span>
+                        )}
                         <span>{time}</span>
                         {ended && (
                           <span className="text-caption">{m.eventUntil({ time: ended })}</span>

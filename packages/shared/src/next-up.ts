@@ -1,6 +1,6 @@
-import { ageNorms } from './age-norms'
+import { type AgeNorms, ageNorms } from './age-norms'
 import { DAY, MINUTE } from './date'
-import type { Event } from './event'
+import type { Event, FeedingEvent } from './event'
 import { RECORD_KINDS } from './record-kinds'
 
 /** A suggested time, give or take: never a target, babies vary. */
@@ -17,32 +17,32 @@ export type NextFeed =
   | ({ status: 'predicted'; since: number } & Window)
 
 export type NextSleep =
-  | { status: 'sleeping'; night: boolean }
+  | {
+      status: 'sleeping'
+      since: number
+      /** Roughly when the baby wakes, or null once the sleep runs far past it. */
+      wake: Window | null
+    }
   | { status: 'unknown' }
   | ({
       status: 'predicted'
       /** When the baby last woke up. */
       since: number
-      /** Whether this sleep is the night's, not a nap. */
-      bedtime: boolean
+      /** How long this sleep likely lasts. */
+      length: number
     } & Window)
 
 export type NextDiaper = { status: 'unknown' } | ({ status: 'predicted'; since: number } & Window)
 
-export interface PlanItem {
-  kind: 'feed' | 'nap' | 'bedtime'
-  at: number
-}
+export type PlanItem = { kind: 'feed'; at: number } | { kind: 'sleep'; at: number; length: number }
 
 export interface NextUp {
-  /** Within the baby's usual night hours: only feeds, and bedtime while it is late. */
-  night: boolean
   feed: NextFeed
   sleep: NextSleep
   diaper: NextDiaper
-  /** Roughly how the rest of the day (or night) goes from here. */
+  /** Roughly how the next 12 hours go: sleeps (with how long) and feeds in time order. */
   plan: PlanItem[]
-  /** The usual daytime time from one feed, and one diaper change, to the next. */
+  /** The baby's usual time from one meal, and one diaper change, to the next. */
   feedEvery: number
   diaperEvery: number
 }
@@ -59,18 +59,24 @@ export interface NextUpOptions {
 const HISTORY = 7 * DAY
 /** Each day further back counts half as much. */
 const HALF_LIFE = DAY
-/** Fewer intervals than this and the age's usual one is used. */
+/** Samples from this close in time of day count (minutes), the closer the more. */
+const CLOCK_REACH = 120
+/** Fewer samples than this and the age's usual value is used. */
 const MIN_SAMPLES = 3
 /** Awake less than this between two sleeps (a stir, a transfer) and they are one sleep. */
-const SLEEP_JOIN = 15 * MINUTE
-/** Feeds this close together are one feed, at most. */
-const FEED_JOIN_MAX = 45 * MINUTE
-const BEDTIME = 20 * 60
-const WAKE_TIME = 7 * 60
+const STIR = 15 * MINUTE
+const HORIZON = 12 * 60 * MINUTE
+const PLAN_LIMIT = 16
 const MINUTES_A_DAY = 24 * 60
-const PLAN_LIMIT = 12
-/** Up this long past bedtime with no night's sleep logged, bedtime is still suggested. */
-const LATE_BEDTIME = 3 * 60 * MINUTE
+/** Formula leaves the stomach about half as fast as breast milk; it counts for more. */
+const FORMULA_WEIGHT = 1.5
+/** Milk a minute at the breast, roughly (about 125 ml over 20 minutes). */
+const BREAST_ML_A_MINUTE = 6
+/**
+ * How much a meal's size moves the next one: a little. Feed size goes with the interval
+ * before a feed more than the one after it.
+ */
+const SIZE_EFFECT = 0.3
 
 const deviceMinute = (at: number) => {
   const date = new Date(at)
@@ -78,48 +84,49 @@ const deviceMinute = (at: number) => {
 }
 
 type Range = readonly [number, number]
+const minutes = ([min, max]: Range): Range => [min * MINUTE, max * MINUTE]
 
 interface Sample {
   value: number
+  /** The instant whose time of day the sample belongs to. */
   at: number
 }
 
-/** Feeds or sleeps close enough together to count as one. */
-interface Session {
-  startAt: number
-  /** Null while it runs. */
-  endAt: number | null
-  night: boolean
-}
-
-function sessions(events: readonly Event[], join: number): Session[] {
-  const joined: Session[] = []
-  for (const event of events.toSorted((a, b) => a.startAt - b.startAt)) {
-    const night = event.type === 'sleep' && event.data.kind === 'night'
-    const last = joined.at(-1)
-    if (last && (last.endAt === null || event.startAt - last.endAt <= join)) {
-      last.endAt =
-        last.endAt === null || event.endAt === null ? null : Math.max(last.endAt, event.endAt)
-      last.night ||= night
-    } else {
-      joined.push({ startAt: event.startAt, endAt: event.endAt, night })
-    }
-  }
-  return joined
-}
-
-/** The value where half the weight lies on each side; recent samples weigh more. */
-function weightedMedian(samples: readonly Sample[], now: number): number {
-  const weighted = samples
-    .map((sample) => ({ value: sample.value, weight: 0.5 ** ((now - sample.at) / HALF_LIFE) }))
-    .toSorted((a, b) => a.value - b.value)
-  const half = weighted.reduce((sum, sample) => sum + sample.weight, 0) / 2
+/** The value where half the weight lies on each side. */
+function weightedMedian(samples: readonly { value: number; weight: number }[]): number | null {
+  const sorted = samples.toSorted((a, b) => a.value - b.value)
+  const half = sorted.reduce((sum, sample) => sum + sample.weight, 0) / 2
   let sum = 0
-  for (const sample of weighted) {
+  for (const sample of sorted) {
     sum += sample.weight
     if (sum >= half) return sample.value
   }
-  return weighted.at(-1)?.value ?? 0
+  return null
+}
+
+const mid = ({ from, to }: Window) => (from + to) / 2
+
+/** Rounds to the nearest 5 minutes, so suggestions read as plain clock times. */
+const round = (time: number) => Math.round(time / (5 * MINUTE)) * 5 * MINUTE
+
+/** The usual value over the last week; with a `clock`, only from around its time of day. */
+function usual(
+  samples: readonly Sample[],
+  now: number,
+  clock?: { at: number; minuteOfDay: (at: number) => number },
+): number | null {
+  const near = samples.flatMap((sample) => {
+    if (sample.at < now - HISTORY) return []
+    let weight = 0.5 ** ((now - sample.at) / HALF_LIFE)
+    if (clock) {
+      const apart = Math.abs(clock.minuteOfDay(sample.at) - clock.minuteOfDay(clock.at))
+      const distance = Math.min(apart, MINUTES_A_DAY - apart)
+      if (distance >= CLOCK_REACH) return []
+      weight *= 1 - distance / CLOCK_REACH
+    }
+    return [{ value: sample.value, weight }]
+  })
+  return near.length >= MIN_SAMPLES ? weightedMedian(near) : null
 }
 
 interface Rhythm {
@@ -132,267 +139,263 @@ interface Rhythm {
   personalized: boolean
 }
 
-/** The usual interval: the baby's own when there are enough samples, near the age's. */
-function rhythm(samples: readonly Sample[], [min, max]: Range, now: number): Rhythm {
-  const personalized = samples.length >= MIN_SAMPLES
-  const center = personalized
-    ? Math.min(Math.max(weightedMedian(samples, now), min * 0.75), max * 1.25)
-    : (min + max) / 2
+/** The usual interval around `at`'s time of day: the baby's own once there are enough. */
+function rhythmAt(
+  samples: readonly Sample[],
+  [min, max]: Range,
+  at: number,
+  now: number,
+  minuteOfDay: (at: number) => number,
+): Rhythm {
+  const own = usual(samples, now, { at, minuteOfDay })
+  // The baby's own, kept within reach of the age's (nights run longer than days).
+  const center = own === null ? (min + max) / 2 : Math.min(Math.max(own, min * 0.5), max * 2)
   const spread = Math.max(15 * MINUTE, (max - min) / 4)
-  return { center, spread, giveUp: center + spread + max, personalized }
+  return { center, spread, giveUp: center + spread + max, personalized: own !== null }
 }
 
-const window = (start: number, { center, spread, personalized }: Rhythm): Window => ({
-  from: round(start + center - spread),
-  to: round(start + center + spread),
-  personalized,
+const window = (start: number, center: number, rhythm: Rhythm): Window => ({
+  from: round(start + center - rhythm.spread),
+  to: round(start + center + rhythm.spread),
+  personalized: rhythm.personalized,
 })
 
-/** Rounds to the nearest 5 minutes, so suggestions read as plain clock times. */
-const round = (time: number) => Math.round(time / (5 * MINUTE)) * 5 * MINUTE
-
-const minutes = ([min, max]: Range): Range => [min * MINUTE, max * MINUTE]
-
-/** Gaps from the start of one session to the start of the next, within the last week. */
-function startGaps(list: readonly Session[], now: number, cap: number): Sample[] {
-  const samples: Sample[] = []
-  for (let i = 1; i < list.length; i++) {
-    const before = list[i - 1]
-    const after = list[i]
-    if (!before || !after || before.startAt < now - HISTORY) continue
-    const gap = after.startAt - before.startAt
-    if (gap > 0 && gap <= cap) samples.push({ value: gap, at: before.startAt })
+/** Gaps from one start to the next, each at the first's time of day. */
+function startGaps(starts: readonly number[], cap: number): Sample[] {
+  const gaps: Sample[] = []
+  for (let i = 1; i < starts.length; i++) {
+    const before = starts[i - 1] ?? 0
+    const gap = (starts[i] ?? 0) - before
+    if (gap > 0 && gap <= cap) gaps.push({ value: gap, at: before })
   }
-  return samples
+  return gaps
 }
 
-/** The typical minute of day of `times`, around `pivot` so 23:50 and 00:10 sit together. */
-function usualMinute(
-  times: readonly number[],
-  minuteOfDay: (at: number) => number,
-  pivot: number,
-  now: number,
-): number | null {
-  if (times.length < MIN_SAMPLES) return null
-  const samples = times.map((at) => {
-    const minute = minuteOfDay(at)
-    // Unwrapped onto the 24 hours that start half a day before the pivot.
-    const value = minute < pivot - MINUTES_A_DAY / 2 ? minute + MINUTES_A_DAY : minute
-    return { value, at }
-  })
-  return Math.round(weightedMedian(samples, now)) % MINUTES_A_DAY
+/** A sleep, with any that followed after only a stir. */
+interface Sleep {
+  startAt: number
+  /** Null while it runs. */
+  endAt: number | null
+}
+
+function sleepsOf(events: readonly Event[]): Sleep[] {
+  const joined: Sleep[] = []
+  for (const event of events) {
+    if (event.type !== 'sleep') continue
+    const last = joined.at(-1)
+    if (last && (last.endAt === null || event.startAt - last.endAt < STIR)) {
+      last.endAt =
+        last.endAt === null || event.endAt === null ? null : Math.max(last.endAt, event.endAt)
+    } else {
+      joined.push({ startAt: event.startAt, endAt: event.endAt })
+    }
+  }
+  return joined
+}
+
+/** How much a feed fills the stomach, in ml of breast milk; formula counts for more. */
+function fill(event: FeedingEvent, norms: AgeNorms): number {
+  const typical = (norms.bottleMlPerFeed[0] + norms.bottleMlPerFeed[1]) / 2
+  const { data } = event
+  if (data.kind === 'bottle') {
+    if (data.breastMl !== undefined && data.formulaMl !== undefined) {
+      return data.breastMl + data.formulaMl * FORMULA_WEIGHT
+    }
+    const weight = { breast: 1, formula: FORMULA_WEIGHT, mixed: (1 + FORMULA_WEIGHT) / 2 }
+    return data.amountMl * weight[data.milk]
+  }
+  if (data.kind === 'breast') {
+    const fed = (event.endAt ?? event.startAt) - event.startAt
+    return fed > 0 ? (fed / MINUTE) * BREAST_ML_A_MINUTE : typical
+  }
+  return typical
+}
+
+/** One meal: a feed and any that followed while most of it was still in the stomach. */
+interface Meal {
+  startAt: number
+  /** Null while a feed in it runs. */
+  endAt: number | null
+  fill: number
 }
 
 /**
- * What comes next for a baby, from their age and their own last week: the next feed, sleep
- * and diaper change, and roughly how the rest of the day goes.
+ * Feeds as meals. The stomach is a bucket that fills with each feed and drains at the
+ * baby's own pace (their milk a day, or the age's); a feed that starts while it is still at
+ * least half full tops up the meal before it rather than starting a new one.
+ */
+function mealsOf(events: readonly Event[], norms: AgeNorms, now: number): Meal[] {
+  const feeds = events.filter((event): event is FeedingEvent => event.type === 'feeding')
+  const recent = feeds.filter((feed) => feed.startAt >= now - HISTORY)
+  const span = now - (recent[0]?.startAt ?? now)
+  const ageDrain = (norms.milkMlPerDay[0] + norms.milkMlPerDay[1]) / 2 / DAY
+  const drain =
+    span >= 2 * DAY ? recent.reduce((sum, feed) => sum + fill(feed, norms), 0) / span : ageDrain
+
+  const meals: Meal[] = []
+  for (const feed of feeds) {
+    const amount = fill(feed, norms)
+    const meal = meals.at(-1)
+    const left = meal && meal.endAt !== null ? meal.fill - drain * (feed.startAt - meal.endAt) : 0
+    if (meal && (meal.endAt === null || left >= meal.fill / 2)) {
+      meal.fill += amount
+      meal.endAt =
+        meal.endAt === null || feed.endAt === null ? null : Math.max(meal.endAt, feed.endAt)
+    } else {
+      meals.push({ startAt: feed.startAt, endAt: feed.endAt, fill: amount })
+    }
+  }
+  return meals
+}
+
+/**
+ * What comes next for a baby, from their age and their own last week.
  *
- * Feeds a few minutes apart (a top-up, a bottle after the breast) are one feed, and sleeps
- * with only a short stir between them one sleep. Intervals run start to start, are read
- * from the last 7 days with the latest counting most, and day and night are kept apart:
- * night runs from the baby's usual bedtime to their usual wake-up.
+ * Sleep is just sleep: the baby is awake a while, then asleep a while, and how long each
+ * lasts depends on the time of day (sleep pressure builds while awake; the body clock makes
+ * the night's sleep long). Both are read from the baby's own days around the same time.
+ *
+ * Feeds fill the stomach like a bucket that drains at the baby's pace, so a top-up joins the
+ * meal before it. The next meal comes after the baby's usual interval at that time of day,
+ * nudged a little by how big the meal was.
  */
 export function nextUp(events: readonly Event[], options: NextUpOptions): NextUp {
   const { months, now, minuteOfDay = deviceMinute } = options
   const norms = ageNorms(months)
-  const live = events.filter((event) => event.deletedAt === null && event.startAt <= now)
+  const live = events
+    .filter((event) => event.deletedAt === null && event.startAt <= now)
+    .toSorted((a, b) => a.startAt - b.startAt)
 
-  // Night, from the baby's own night sleeps when there are enough.
-  const sleeps = sessions(
-    live.filter((event) => event.type === 'sleep'),
-    SLEEP_JOIN,
-  )
-  const nights = sleeps.filter((sleep) => sleep.night && sleep.startAt >= now - 2 * HISTORY)
-  const bedtime =
-    usualMinute(
-      nights.map((sleep) => sleep.startAt),
-      minuteOfDay,
-      BEDTIME,
-      now,
-    ) ?? BEDTIME
-  const wakeTime =
-    usualMinute(
-      nights.flatMap((sleep) => (sleep.endAt === null ? [] : [sleep.endAt])),
-      minuteOfDay,
-      WAKE_TIME,
-      now,
-    ) ?? WAKE_TIME
-  const isNight = (at: number) => {
-    const minute = minuteOfDay(at)
-    return bedtime > wakeTime
-      ? minute >= bedtime || minute < wakeTime
-      : minute >= bedtime && minute < wakeTime
+  // Sleep: awake spells and sleeps, each by the time of day it starts.
+  const sleeps = sleepsOf(live)
+  const wakeRange = minutes(norms.wakeMinutes)
+  const awakeSpells: Sample[] = []
+  const sleepLengths: Sample[] = []
+  for (const [i, sleep] of sleeps.entries()) {
+    if (sleep.endAt === null) continue
+    sleepLengths.push({ value: sleep.endAt - sleep.startAt, at: sleep.startAt })
+    const after = sleeps[i + 1]
+    const awake = after ? after.startAt - sleep.endAt : 0
+    if (awake > 0 && awake <= wakeRange[1] * 3) awakeSpells.push({ value: awake, at: sleep.endAt })
   }
-  /** The next time the clock reads `minute`, after `at`. */
-  const nextAt = (at: number, minute: number) =>
-    at + ((minute - minuteOfDay(at) + MINUTES_A_DAY) % MINUTES_A_DAY) * MINUTE
+  const awakeAt = (wokeAt: number) => rhythmAt(awakeSpells, wakeRange, wokeAt, now, minuteOfDay)
+  const ownLength = (startAt: number) => usual(sleepLengths, now, { at: startAt, minuteOfDay })
+  const lengthAt = (startAt: number) =>
+    ownLength(startAt) ?? RECORD_KINDS.sleep.usualMinutes * MINUTE
 
   const lastSleep = sleeps.at(-1)
-  // Night by the clock, whether or not the night's sleep was logged; a nap running late
-  // keeps it day.
-  const napping = lastSleep?.endAt === null && !lastSleep.night
-  const night = isNight(now) && !napping
-  /** When tonight's bedtime was, during the night. */
-  const tonight = now - ((minuteOfDay(now) - bedtime + MINUTES_A_DAY) % MINUTES_A_DAY) * MINUTE
-  const asleepTonight = sleeps.some(
-    (sleep) => sleep.night && (sleep.endAt === null || sleep.endAt >= tonight),
-  )
-
-  // Feeds: close ones joined, day and night intervals apart.
-  const feedRange = minutes(norms.feedIntervalMinutes)
-  const feeds = sessions(
-    live.filter((event) => event.type === 'feeding'),
-    Math.min(FEED_JOIN_MAX, feedRange[0] / 4),
-  )
-  const gaps = startGaps(feeds, now, 12 * 60 * MINUTE)
-  const dayFeeds = rhythm(
-    gaps.filter((gap) => !isNight(gap.at) && gap.value <= feedRange[1] * 2.5),
-    feedRange,
-    now,
-  )
-  const nightFeeds = rhythm(
-    gaps.filter((gap) => isNight(gap.at)),
-    [feedRange[0], feedRange[1] * 2],
-    now,
-  )
-  const feedRhythm = (at: number) => (isNight(at) ? nightFeeds : dayFeeds)
-
-  const lastFeed = feeds.at(-1)
-  let feed: NextFeed = { status: 'unknown' }
-  if (lastFeed?.endAt === null) feed = { status: 'feeding' }
-  else if (lastFeed && now <= lastFeed.startAt + feedRhythm(lastFeed.startAt).giveUp) {
-    feed = {
-      status: 'predicted',
-      since: lastFeed.startAt,
-      ...window(lastFeed.startAt, feedRhythm(lastFeed.startAt)),
-    }
-  }
-
-  // Sleep: the wake window after the last wake-up, or bedtime once that comes first.
-  const wakeRange = minutes(norms.wakeMinutes)
-  const wakes: Sample[] = []
-  for (let i = 1; i < sleeps.length; i++) {
-    const before = sleeps[i - 1]
-    const after = sleeps[i]
-    if (!before?.endAt || !after || after.startAt < now - HISTORY) continue
-    const gap = after.startAt - before.endAt
-    if (gap > 0 && gap <= wakeRange[1] * 2) wakes.push({ value: gap, at: after.startAt })
-  }
-  const awake = rhythm(wakes, wakeRange, now)
-  const naps = sleeps.filter(
-    (sleep) => !sleep.night && sleep.endAt !== null && sleep.startAt >= now - HISTORY,
-  )
-  const napLength =
-    naps.length >= MIN_SAMPLES
-      ? weightedMedian(
-          naps.map((nap) => ({ value: (nap.endAt ?? nap.startAt) - nap.startAt, at: nap.startAt })),
-          now,
-        )
-      : RECORD_KINDS.sleep.usualMinutes * MINUTE
-  const bedtimePersonalized = nights.length >= MIN_SAMPLES
-
-  /** The next sleep after waking at `wokeAt`: a nap, or the night's once bedtime is near. */
-  const sleepAfter = (wokeAt: number) => {
-    const nap = wokeAt + awake.center
-    const bed = nextAt(wokeAt, bedtime)
-    return nap + awake.spread >= bed || isNight(nap)
-      ? { at: bed, bedtime: true }
-      : { at: nap, bedtime: false }
-  }
-
-  const bedtimeWindow = (at: number) => ({
-    from: round(at - 15 * MINUTE),
-    to: round(at + 15 * MINUTE),
-    personalized: bedtimePersonalized,
-  })
   let sleep: NextSleep = { status: 'unknown' }
-  if (lastSleep?.endAt === null) sleep = { status: 'sleeping', night: lastSleep.night }
-  else if (night) {
-    // Still up past bedtime, the night's sleep not logged yet: bedtime, a little late.
-    if (!asleepTonight && now < tonight + LATE_BEDTIME) {
+  if (lastSleep?.endAt === null) {
+    const length = lengthAt(lastSleep.startAt)
+    const spread = Math.max(15 * MINUTE, length / 6)
+    const wakeAt = lastSleep.startAt + length
+    sleep = {
+      status: 'sleeping',
+      since: lastSleep.startAt,
+      // Long past it, the timer was probably left running.
+      wake:
+        now > wakeAt + length + 60 * MINUTE
+          ? null
+          : {
+              from: round(wakeAt - spread),
+              to: round(wakeAt + spread),
+              personalized: ownLength(lastSleep.startAt) !== null,
+            },
+    }
+  } else if (lastSleep?.endAt) {
+    const rhythm = awakeAt(lastSleep.endAt)
+    if (now <= lastSleep.endAt + rhythm.giveUp) {
       sleep = {
         status: 'predicted',
-        since: lastSleep?.endAt ?? tonight,
-        bedtime: true,
-        ...bedtimeWindow(tonight),
+        since: lastSleep.endAt,
+        length: lengthAt(lastSleep.endAt + rhythm.center),
+        ...window(lastSleep.endAt, rhythm.center, rhythm),
       }
     }
-  } else if (lastSleep?.endAt && now <= lastSleep.endAt + awake.giveUp) {
-    const next = sleepAfter(lastSleep.endAt)
-    sleep = next.bedtime
-      ? {
-          status: 'predicted',
-          since: lastSleep.endAt,
-          bedtime: true,
-          ...bedtimeWindow(next.at),
-        }
-      : {
-          status: 'predicted',
-          since: lastSleep.endAt,
-          bedtime: false,
-          ...window(lastSleep.endAt, awake),
-        }
   }
 
-  // Diapers: daytime changes only.
-  const diaperRange = minutes(norms.diaperIntervalMinutes)
-  const diapers = live
-    .filter((event) => event.type === 'diaper')
-    .toSorted((a, b) => a.startAt - b.startAt)
-    .map((event) => ({ startAt: event.startAt, endAt: event.startAt, night: false }))
-  const diaperRhythm = rhythm(
-    startGaps(diapers, now, diaperRange[1] * 2.5).filter((gap) => !isNight(gap.at)),
-    diaperRange,
+  // Feeds: meals, and the time from one meal's start to the next by time of day.
+  const feedRange = minutes(norms.feedIntervalMinutes)
+  const meals = mealsOf(live, norms, now)
+  const mealGaps = startGaps(
+    meals.map((meal) => meal.startAt),
+    12 * 60 * MINUTE,
+  )
+  const feedAt = (at: number) => rhythmAt(mealGaps, feedRange, at, now, minuteOfDay)
+  const usualFill = usual(
+    meals.map((meal) => ({ value: meal.fill, at: meal.startAt })),
     now,
   )
-  const lastDiaper = diapers.at(-1)
-  const diaper: NextDiaper =
-    !night && lastDiaper && now <= lastDiaper.startAt + diaperRhythm.giveUp
-      ? {
-          status: 'predicted',
-          since: lastDiaper.startAt,
-          ...window(lastDiaper.startAt, diaperRhythm),
-        }
-      : { status: 'unknown' }
-
-  // The rest of the day: feeds and naps in turn until bedtime, or feeds until morning.
-  const plan: PlanItem[] = []
-  const end = night ? nextAt(now, wakeTime) : nextAt(now, bedtime)
-  let nextFeed =
-    feed.status === 'predicted'
-      ? (feed.from + feed.to) / 2
-      : feed.status === 'feeding' && lastFeed
-        ? lastFeed.startAt + feedRhythm(lastFeed.startAt).center
-        : null
-  let nextSleep: { at: number; bedtime: boolean } | null = null
-  if (!night) {
-    if (sleep.status === 'predicted') {
-      nextSleep = { at: (sleep.from + sleep.to) / 2, bedtime: sleep.bedtime }
-    } else if (sleep.status === 'sleeping' && lastSleep && !lastSleep.night) {
-      nextSleep = sleepAfter(Math.max(now, lastSleep.startAt + napLength))
+  const lastMeal = meals.at(-1)
+  let feed: NextFeed = { status: 'unknown' }
+  if (lastMeal?.endAt === null) feed = { status: 'feeding' }
+  else if (lastMeal) {
+    const rhythm = feedAt(lastMeal.startAt)
+    const size =
+      usualFill === null
+        ? 1
+        : Math.min(Math.max((lastMeal.fill / usualFill) ** SIZE_EFFECT, 0.85), 1.15)
+    if (now <= lastMeal.startAt + rhythm.giveUp) {
+      feed = {
+        status: 'predicted',
+        since: lastMeal.startAt,
+        ...window(lastMeal.startAt, rhythm.center * size, rhythm),
+      }
     }
   }
+
+  // Diapers: the usual interval by time of day.
+  const diaperRange = minutes(norms.diaperIntervalMinutes)
+  const changes = live.filter((event) => event.type === 'diaper').map((event) => event.startAt)
+  const diaperGaps = startGaps(changes, diaperRange[1] * 3)
+  const lastChange = changes.at(-1)
+  let diaper: NextDiaper = { status: 'unknown' }
+  if (lastChange !== undefined) {
+    const rhythm = rhythmAt(diaperGaps, diaperRange, lastChange, now, minuteOfDay)
+    if (now <= lastChange + rhythm.giveUp) {
+      diaper = {
+        status: 'predicted',
+        since: lastChange,
+        ...window(lastChange, rhythm.center, rhythm),
+      }
+    }
+  }
+
+  // The next 12 hours: sleep and wake in turn, meals at their rhythm.
+  const plan: PlanItem[] = []
+  const end = now + HORIZON
+  let nextFeed =
+    feed.status === 'predicted'
+      ? mid(feed)
+      : feed.status === 'feeding' && lastMeal
+        ? lastMeal.startAt + feedAt(lastMeal.startAt).center
+        : null
+  let nextSleep =
+    sleep.status === 'predicted'
+      ? mid(sleep)
+      : sleep.status === 'sleeping' && sleep.wake
+        ? mid(sleep.wake) + awakeAt(mid(sleep.wake)).center
+        : null
   while (plan.length < PLAN_LIMIT) {
-    const feedFirst = nextFeed !== null && (nextSleep === null || nextFeed <= nextSleep.at)
-    if (feedFirst && nextFeed !== null && nextFeed < end) {
+    if (nextFeed !== null && nextFeed < end && (nextSleep === null || nextFeed <= nextSleep)) {
       plan.push({ kind: 'feed', at: round(nextFeed) })
-      nextFeed += feedRhythm(nextFeed).center
-    } else if (nextSleep !== null) {
-      plan.push({ kind: nextSleep.bedtime ? 'bedtime' : 'nap', at: round(nextSleep.at) })
-      if (nextSleep.bedtime) break
-      nextSleep = sleepAfter(nextSleep.at + napLength)
+      nextFeed += feedAt(nextFeed).center
+    } else if (nextSleep !== null && nextSleep < end) {
+      const length = lengthAt(nextSleep)
+      plan.push({ kind: 'sleep', at: round(nextSleep), length })
+      const wokeAt = nextSleep + length
+      nextSleep = wokeAt + awakeAt(wokeAt).center
     } else {
       break
     }
   }
 
   return {
-    night,
     feed,
     sleep,
     diaper,
     plan,
-    feedEvery: dayFeeds.center,
-    diaperEvery: diaperRhythm.center,
+    feedEvery: usual(mealGaps, now) ?? (feedRange[0] + feedRange[1]) / 2,
+    diaperEvery: usual(diaperGaps, now) ?? (diaperRange[0] + diaperRange[1]) / 2,
   }
 }

@@ -45,44 +45,27 @@ describe('ageNorms', () => {
 })
 
 describe('nextUp', () => {
-  it('knows nothing without records, and waits while a feed or sleep runs', () => {
-    const empty = nextUp([], options(at(1, 10)))
-    expect(empty).toMatchObject({
+  it('knows nothing without records, and waits while a feed runs', () => {
+    expect(nextUp([], options(at(1, 10)))).toMatchObject({
       feed: { status: 'unknown' },
       sleep: { status: 'unknown' },
       diaper: { status: 'unknown' },
     })
-    const running = nextUp([bottle(at(1, 9, 50), null), sleep(at(1, 9), null)], options(at(1, 10)))
-    expect(running.feed).toEqual({ status: 'feeding' })
-    expect(running.sleep).toEqual({ status: 'sleeping', night: false })
+    expect(nextUp([bottle(at(1, 9, 50), null)], options(at(1, 10))).feed).toEqual({
+      status: 'feeding',
+    })
   })
 
   it('uses the age’s wake window without enough history', () => {
     const next = nextUp([sleep(at(1, 8), at(1, 9))], options(at(1, 9, 30)))
-    // Centered on 2 hours, give or take 15 minutes.
+    // Centered on 2 hours, give or take 15 minutes; an hour's sleep until there are more.
     expect(next.sleep).toEqual({
       status: 'predicted',
       since: at(1, 9),
-      bedtime: false,
+      length: 60 * MINUTE,
       from: at(1, 10, 45),
       to: at(1, 11, 15),
       personalized: false,
-    })
-  })
-
-  it('follows the baby’s own wake windows, a short stir not counting as waking', () => {
-    // Awake 100 minutes between naps; the 10:30 nap had a 5-minute stir in it.
-    const events = [
-      sleep(at(1, 7), at(1, 8)),
-      sleep(at(1, 9, 40), at(1, 10)),
-      sleep(at(1, 10, 5), at(1, 10, 30)),
-      sleep(at(1, 12, 10), at(1, 13)),
-      sleep(at(1, 14, 40), at(1, 15)),
-    ]
-    expect(nextUp(events, options(at(1, 15, 10))).sleep).toMatchObject({
-      personalized: true,
-      from: at(1, 16, 25),
-      to: at(1, 16, 55),
     })
   })
 
@@ -92,121 +75,103 @@ describe('nextUp', () => {
     expect(next.feed).toEqual({ status: 'unknown' })
   })
 
-  it('counts a top-up as part of the feed before it', () => {
-    // A little at 9:00, more at 9:30: one feed from 9:00, the next about 3.5 hours later.
-    const events = [bottle(at(1, 9), 10, 40), bottle(at(1, 9, 30), 15, 100)]
-    expect(nextUp(events, options(at(1, 10))).feed).toEqual({
-      status: 'predicted',
-      since: at(1, 9),
-      from: at(1, 12, 15),
-      to: at(1, 12, 45),
-      personalized: false,
-    })
-  })
-
-  it('reads the feeding rhythm from the week, not the last gap', () => {
-    // Every 3 hours for three days; today's quick second feed doesn't shorten it.
-    const events = [1, 2, 3].flatMap((day) => [8, 11, 14, 17].map((hour) => bottle(at(day, hour))))
-    events.push(bottle(at(4, 8)), bottle(at(4, 9, 30)))
-    const next = nextUp(events, options(at(4, 10)))
-    expect(next.feed).toMatchObject({
-      personalized: true,
-      since: at(4, 9, 30),
-      from: at(4, 12, 15),
-      to: at(4, 12, 45),
-    })
-    expect(next.feedEvery).toBe(180 * MINUTE)
-  })
-
-  it('suggests diaper changes from the day’s rhythm', () => {
-    const events = [diaper(at(1, 8)), diaper(at(1, 11)), diaper(at(1, 14)), diaper(at(1, 17))]
-    expect(nextUp(events, options(at(1, 17, 30))).diaper).toMatchObject({
-      personalized: true,
-      from: at(1, 19, 45),
-      to: at(1, 20, 15),
-    })
-  })
-
-  describe('at night', () => {
-    // Three nights from 20:30 to 6:30, fed at 19:00, 23:00 and 3:00.
-    const nights = [1, 2, 3].flatMap((day) => [
-      sleep(at(day, 20, 30), at(day + 1, 6, 30), 'night'),
-      bottle(at(day, 19)),
-      bottle(at(day, 23)),
-      bottle(at(day + 1, 3)),
+  describe('sleep, by the time of day', () => {
+    // Three days: asleep 23:00–05:00, then 6:30–7:30, 9:30–10:30, 13:00–14:30, 17:00–18:00.
+    // The nap/night label is left as "nap" throughout: it plays no part.
+    const days = [1, 2, 3].flatMap((day) => [
+      sleep(at(day - 1, 23), at(day, 5)),
+      sleep(at(day, 6, 30), at(day, 7, 30)),
+      sleep(at(day, 9, 30), at(day, 10, 30)),
+      sleep(at(day, 13), at(day, 14, 30)),
+      sleep(at(day, 17), at(day, 18)),
     ])
 
-    it('suggests only feeds, at the night’s own pace, until morning', () => {
-      const events = [
-        ...nights,
-        bottle(at(4, 19)),
-        sleep(at(4, 20, 30), null, 'night'),
-        bottle(at(4, 23)),
-      ]
-      const next = nextUp(events, options(at(5, 1)))
-      expect(next.night).toBe(true)
-      expect(next.sleep).toEqual({ status: 'sleeping', night: true })
-      expect(next.diaper).toEqual({ status: 'unknown' })
-      expect(next.feed).toMatchObject({ personalized: true, since: at(4, 23) })
-      expect(next.plan).toEqual([{ kind: 'feed', at: at(5, 3) }])
-    })
-
-    it('suggests bedtime at the baby’s usual time once it comes before another nap', () => {
-      const events = [...nights, sleep(at(4, 17), at(4, 18, 30))]
-      expect(nextUp(events, options(at(4, 19))).sleep).toEqual({
+    it('after the night, suggests the morning sleep, not another night', () => {
+      const events = [...days, sleep(at(3, 23), at(4, 5))]
+      expect(nextUp(events, options(at(4, 5, 30))).sleep).toEqual({
         status: 'predicted',
-        since: at(4, 18, 30),
-        bedtime: true,
-        from: at(4, 20, 15),
-        to: at(4, 20, 45),
+        since: at(4, 5),
+        length: 60 * MINUTE,
+        from: at(4, 6, 15),
+        to: at(4, 6, 45),
         personalized: true,
       })
     })
-  })
 
-  describe('when sleep goes unlogged', () => {
-    it('still keeps to the night by the clock: feeds only, until morning', () => {
-      const events = [bottle(at(1, 23)), diaper(at(1, 23))]
-      const next = nextUp(events, options(at(2, 2)))
-      expect(next.night).toBe(true)
-      expect(next.diaper).toEqual({ status: 'unknown' })
-      expect(next.plan.every((item) => item.kind === 'feed')).toBe(true)
-      expect(next.plan.at(-1)?.at).toBeLessThan(at(2, 7))
-    })
-
-    it('suggests bedtime, late, while the baby is still up', () => {
-      const next = nextUp([sleep(at(1, 16), at(1, 17))], options(at(1, 21)))
-      expect(next.sleep).toMatchObject({
-        status: 'predicted',
-        bedtime: true,
-        from: at(1, 19, 45),
-        to: at(1, 20, 15),
+    it('in the evening, suggests the long sleep from the evenings before', () => {
+      const events = [...days, sleep(at(3, 23), at(4, 5)), sleep(at(4, 17), at(4, 18))]
+      expect(nextUp(events, options(at(4, 21)))).toMatchObject({
+        sleep: { from: at(4, 22, 45), to: at(4, 23, 15), length: 6 * 60 * MINUTE },
       })
-      // Once the night's sleep is logged, nothing more until morning.
-      const asleep = nextUp([sleep(at(1, 20, 30), at(1, 23), 'night')], options(at(1, 23, 30)))
-      expect(asleep.sleep).toEqual({ status: 'unknown' })
     })
 
-    it('is day while a nap runs late', () => {
-      expect(nextUp([sleep(at(1, 19, 30), null)], options(at(1, 20, 30))).night).toBe(false)
+    it('while asleep, says roughly when the baby wakes', () => {
+      const events = [...days, sleep(at(3, 23), null)]
+      expect(nextUp(events, options(at(4, 1))).sleep).toEqual({
+        status: 'sleeping',
+        since: at(3, 23),
+        wake: { from: at(4, 4), to: at(4, 6), personalized: true },
+      })
+      // Hours past that, the timer was probably left running.
+      expect(nextUp(events, options(at(4, 13))).sleep).toMatchObject({ wake: null })
+    })
+
+    it('lays out the next 12 hours: sleeps with how long, feeds between', () => {
+      const events = [...days, sleep(at(3, 23), at(4, 5)), bottle(at(4, 5, 10))]
+      const { plan } = nextUp(events, options(at(4, 5, 30)))
+      expect(plan[0]).toEqual({ kind: 'sleep', at: at(4, 6, 30), length: 60 * MINUTE })
+      expect(plan.map((item) => item.at)).toEqual(
+        plan.map((item) => item.at).toSorted((a, b) => a - b),
+      )
+      expect(plan.some((item) => item.kind === 'feed')).toBe(true)
+      expect(plan.at(-1)?.at).toBeLessThan(at(4, 17, 30))
+    })
+
+    it('counts a short stir as part of the sleep', () => {
+      const events = [sleep(at(1, 8), at(1, 8, 40)), sleep(at(1, 8, 50), at(1, 9))]
+      expect(nextUp(events, options(at(1, 9, 30))).sleep).toMatchObject({ since: at(1, 9) })
     })
   })
 
-  it('lays out the rest of the day: feeds and naps in turn, then bedtime', () => {
-    const events = [sleep(at(1, 7), at(1, 8)), bottle(at(1, 8))]
-    const { plan } = nextUp(events, options(at(1, 8, 30)))
-    expect(plan.map((item) => item.kind)).toEqual([
-      'nap',
-      'feed',
-      'nap',
-      'feed',
-      'nap',
-      'feed',
-      'nap',
-      'bedtime',
-    ])
-    expect(plan[0]).toEqual({ kind: 'nap', at: at(1, 10) })
-    expect(plan[1]).toEqual({ kind: 'feed', at: at(1, 11, 30) })
-    expect(plan.at(-1)).toEqual({ kind: 'bedtime', at: at(1, 20) })
+  describe('feeds', () => {
+    it('counts a top-up as part of the meal before it', () => {
+      // A little at 9:00, more at 9:30: one meal from 9:00, the next about 3.5 hours later.
+      const events = [bottle(at(1, 9), 10, 40), bottle(at(1, 9, 30), 15, 100)]
+      expect(nextUp(events, options(at(1, 10))).feed).toEqual({
+        status: 'predicted',
+        since: at(1, 9),
+        from: at(1, 12, 15),
+        to: at(1, 12, 45),
+        personalized: false,
+      })
+    })
+
+    it('follows the baby’s rhythm at that time of day, longer at night', () => {
+      // Every 3 hours by day, then 23:00 to 4:00 at night, for four days.
+      const days = [1, 2, 3, 4].flatMap((day) =>
+        [4, 8, 11, 14, 17, 20, 23].map((hour) => bottle(at(day, hour))),
+      )
+      const morning = days.filter((event) => event.startAt <= at(4, 8))
+      const day = nextUp(morning, options(at(4, 8, 30)))
+      expect(day.feed).toMatchObject({ personalized: true, from: at(4, 10, 45), to: at(4, 11, 15) })
+      expect(day.feedEvery).toBe(180 * MINUTE)
+      const night = nextUp(days, options(at(5, 0, 30)))
+      expect(night.feed).toMatchObject({ from: at(5, 3, 45), to: at(5, 4, 15) })
+      // Another bottle within the hour tops up that meal rather than starting the clock again.
+      const topUp = nextUp([...days, bottle(at(4, 23, 50), 10, 60)], options(at(5, 0, 30)))
+      expect(topUp.feed).toMatchObject({ since: at(4, 23) })
+    })
+  })
+
+  it('suggests diaper changes from the rhythm at that time of day', () => {
+    const events = [1, 2, 3, 4].flatMap((day) =>
+      [8, 11, 14, 17].map((hour) => diaper(at(day, hour))),
+    )
+    const today = events.filter((event) => event.startAt <= at(4, 14))
+    expect(nextUp(today, options(at(4, 14, 30))).diaper).toMatchObject({
+      personalized: true,
+      from: at(4, 16, 45),
+      to: at(4, 17, 15),
+    })
   })
 })

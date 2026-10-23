@@ -9,7 +9,7 @@ import {
   nextUp,
 } from '@bobo/shared'
 
-import { type VoiceBaby, formatClock, localDay, minuteOfDayIn } from '../voice/plan'
+import { type VoiceBaby, durationLabel, formatClock, localDay, minuteOfDayIn } from '../voice/plan'
 import { recentEvents } from './data'
 
 // What is usual at each age (ageNorms) lets the assistant tell a misheard value ("十五毫升"
@@ -173,8 +173,6 @@ export async function describeBabies(
   })
 }
 
-const PLAN_LABEL = { feed: '喂奶', nap: '小睡', bedtime: '晚上入睡' } as const
-
 /**
  * What likely comes next for a baby, in a few short lines: from their age and last week's
  * feeds, sleeps and diapers (nextUp), for questions like "下次什么时候喂？".
@@ -197,16 +195,19 @@ export function nextUpLines(
   const lines: string[] = []
   if (next.feed.status === 'feeding') lines.push('正在喂')
   else if (next.feed.status === 'predicted') lines.push(`下次喂奶${span(next.feed)}`)
-  if (next.sleep.status === 'sleeping') lines.push(next.sleep.night ? '晚上正在睡' : '正在睡')
-  else if (next.sleep.status === 'predicted') {
-    lines.push(`${next.sleep.bedtime ? '晚上入睡' : '下次小睡'}${span(next.sleep)}`)
+  if (next.sleep.status === 'sleeping') {
+    lines.push(next.sleep.wake ? `正在睡，${span(next.sleep.wake)}醒` : '正在睡')
+  } else if (next.sleep.status === 'predicted') {
+    lines.push(`下次睡觉${span(next.sleep)}，约睡 ${durationLabel(next.sleep.length)}`)
   }
   if (next.diaper.status === 'predicted') lines.push(`下次换尿布${span(next.diaper)}`)
   if (next.plan.length > 1) {
     const plan = next.plan.map(
-      (item) => `${formatClock(item.at, timeZone)} ${PLAN_LABEL[item.kind]}`,
+      (item) =>
+        `${formatClock(item.at, timeZone)} ` +
+        (item.kind === 'feed' ? '喂奶' : `睡觉（约 ${durationLabel(item.length)}）`),
     )
-    lines.push(`${next.night ? '今晚' : '今天'}接下来：${plan.join('，')}`)
+    lines.push(`接下来 12 小时：${plan.join('，')}`)
   }
   return lines
 }

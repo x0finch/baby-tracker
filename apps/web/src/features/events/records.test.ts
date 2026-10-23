@@ -1,4 +1,4 @@
-import { eventSchema, isRunning, newId } from '@bobo/shared'
+import { eventSchema, isRunning, newId, sleepKindFor } from '@bobo/shared'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -12,7 +12,6 @@ import {
   restoreEvent,
   setBreastSides,
   setEventNote,
-  sleepKindFor,
   startBreastFeed,
   startRecord,
   startSleep,
