@@ -1,4 +1,6 @@
-import { expect, test } from '@playwright/test'
+import { createHash } from 'node:crypto'
+
+import { type Page, expect, test } from '@playwright/test'
 
 import { onboard, sheet, sheetClosed, signIn } from '../support/app'
 
@@ -20,7 +22,22 @@ test('a window signed out here picks up a sign-in finished elsewhere when it com
   await expect(page.getByText('elsewhere@example.com')).toBeVisible({ timeout: 15_000 })
 })
 
+/** Stands in for Have I Been Pwned, so the test never leaves the machine. */
+async function breachList(page: Page, breached: string[]) {
+  const hashes = breached.map((password) =>
+    createHash('sha1').update(password).digest('hex').toUpperCase(),
+  )
+  await page.route('https://api.pwnedpasswords.com/range/*', (route) => {
+    const prefix = route.request().url().slice(-5)
+    const lines = hashes
+      .filter((hash) => hash.startsWith(prefix))
+      .map((hash) => `${hash.slice(5)}:9`)
+    return route.fulfill({ body: lines.join('\r\n') })
+  })
+}
+
 test('signs up with email, renames the account and changes the password', async ({ page }) => {
+  await breachList(page, ['password1234'])
   // A page that needs an account sends you to sign in and back.
   await page.goto('/settings/reminders')
   await page.getByRole('link', { name: '登录 / 注册' }).click()
@@ -32,6 +49,9 @@ test('signs up with email, renames the account and changes the password', async 
   const email = `new-${Date.now()}@example.com`
   await page.getByLabel('邮箱').fill(email)
   await page.getByLabel(/昵称/).fill('妈妈')
+  await page.getByLabel('密码').fill('password1234')
+  await page.locator('form button[type=submit]').click()
+  await expect(page.getByText('这个密码在泄露的数据里出现过，换一个吧')).toBeVisible()
   await page.getByLabel('密码').fill('first-password')
   await page.locator('form button[type=submit]').click()
   await expect(page).toHaveURL(/\/settings\/reminders$/)
