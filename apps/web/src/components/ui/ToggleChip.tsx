@@ -59,9 +59,10 @@ export interface ChipGroupProps<T> {
 }
 
 /**
- * Single-choice chips in one row that scrolls sideways, for quick picks like "5 分钟前". About
- * three and a half fit, so the cut-off chip on the right shows there are more. Native radio
- * buttons underneath give the group its name, arrow keys and one tab stop.
+ * Single-choice chips in one row that scrolls sideways, for quick picks like "5 分钟前". Each
+ * chip is 28% of the row, so on any screen three fit and the next is cut off at the right
+ * edge, showing there are more; on narrow rows the label shrinks to fit. Native radio buttons
+ * underneath give the group its name, arrow keys and one tab stop.
  */
 export function ChipGroup<T extends string | number | null>({
   legend,
@@ -85,14 +86,14 @@ export function ChipGroup<T extends string | number | null>({
   return (
     <fieldset className="m-0 min-w-0 border-0 p-0">
       <legend className={showLegend ? 'mb-1.5 p-0 font-bold' : 'sr-only'}>{legend}</legend>
-      <div ref={row} className="relative flex snap-x gap-2 overflow-x-auto pb-1">
+      <div ref={row} className="@container relative flex snap-x gap-2 overflow-x-auto pb-1">
         {options.map((option) => {
           const checked = value === option
           return (
             <label
               key={String(option)}
               className={clsx(
-                'press flex min-h-11 w-[28%] shrink-0 snap-start items-center justify-center rounded-lg border-2 border-b-4 px-1 text-center font-extrabold whitespace-nowrap',
+                'press flex min-h-11 w-[28%] shrink-0 snap-start items-center justify-center rounded-lg border-2 border-b-4 text-center text-[min(1rem,4.6cqw)] font-extrabold whitespace-nowrap',
                 'has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-diaper',
                 checked
                   ? [pressedTones[tone].box, pressedTones[tone].text]
