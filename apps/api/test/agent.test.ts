@@ -13,14 +13,23 @@ const diaper = {
   time: null,
   minutesAgo: null,
   durationMinutes: null,
+  timer: null,
+  stops: null,
   diaper: null,
   amountMl: null,
   milk: null,
+  breastMl: null,
+  formulaMl: null,
   side: null,
+  leftMinutes: null,
+  rightMinutes: null,
   food: null,
   celsius: null,
   medicine: null,
   dose: null,
+  weightKg: null,
+  lengthCm: null,
+  headCm: null,
   text: null,
 }
 
@@ -211,8 +220,14 @@ describe('voice agent', () => {
               id: stored?.id,
               time: null,
               endTime: null,
+              durationMinutes: null,
               amountMl: null,
+              milk: null,
+              breastMl: null,
+              formulaMl: null,
               diaper: 'dirty',
+              food: null,
+              celsius: null,
               note: null,
               confirmed: false,
             },
@@ -292,5 +307,44 @@ describe('voice agent', () => {
       event.type === 'feeding' && event.data.kind === 'bottle' ? [event.data.amountMl] : [],
     )
     expect(amounts).toContain(60)
+  })
+
+  it('changes how long a breastfeed took, moving its last side', async () => {
+    const feed = { ...diaper, type: 'breast', leftMinutes: 10, rightMinutes: 10 }
+    fake.setResponses([
+      { toolCalls: [{ name: 'record', input: { actions: [feed], confirmed: false } }] },
+      { text: '记好了。' },
+    ])
+    await runAgent(fake, scope, '左边十分钟右边十分钟', LATER + 4000)
+    const stored = (await events()).find(
+      (event) => event.type === 'feeding' && event.data.kind === 'breast',
+    )
+    const edit = {
+      id: stored?.id,
+      time: null,
+      endTime: null,
+      durationMinutes: 30,
+      amountMl: null,
+      milk: null,
+      breastMl: null,
+      formulaMl: null,
+      diaper: null,
+      food: null,
+      celsius: null,
+      note: null,
+      confirmed: false,
+    }
+    fake.setResponses([
+      { toolCalls: [{ name: 'update_event', input: edit }] },
+      { text: '改好了。' },
+    ])
+    await runAgent(fake, scope, '其实喂了半个小时', LATER + 5000)
+    const edited = (await events()).find((event) => event.id === stored?.id)
+    if (edited?.type !== 'feeding' || edited.data.kind !== 'breast') throw new Error('gone')
+    expect(edited.endAt).toBe(edited.startAt + 30 * 60_000)
+    expect(edited.data.segments.map((segment) => (segment.endAt ?? 0) - segment.startAt)).toEqual([
+      10 * 60_000,
+      20 * 60_000,
+    ])
   })
 })

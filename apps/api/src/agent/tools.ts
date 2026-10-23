@@ -1,10 +1,17 @@
-import { type Event, eventSchema } from '@bobo/shared'
+import { type BreastSegment, type Event, eventSchema, hasDuration } from '@bobo/shared'
 import { toolDefinition } from '@tanstack/ai'
 import { z } from 'zod'
 
 import type { Access, FamilyAccess } from '../access'
 import { voiceActionSchema } from '../voice/action'
-import { type VoiceBaby, clockToTime, describe, formatClock, planActions } from '../voice/plan'
+import {
+  type VoiceBaby,
+  clockToTime,
+  describe,
+  editedBottle,
+  formatClock,
+  planActions,
+} from '../voice/plan'
 import {
   type Change,
   eventsByIds,
@@ -53,6 +60,24 @@ const confirmedSchema = z
   .boolean()
   .meta({ description: 'True only after the parent confirmed a value that looked misheard' })
 
+/**
+ * Breastfeed sides moved with a new start, the last side ending at the new end. A side that
+ * would end before it starts is dropped (the feed got shorter than it was).
+ */
+function retimed(segments: BreastSegment[], startAt: number, endAt: number | null) {
+  const shift = startAt - (segments[0]?.startAt ?? startAt)
+  const moved = segments
+    .map((segment) => ({
+      ...segment,
+      startAt: segment.startAt + shift,
+      endAt: segment.endAt === null ? null : segment.endAt + shift,
+    }))
+    .filter((segment, index) => index === 0 || endAt === null || segment.startAt < endAt)
+  const last = moved.at(-1)
+  if (last) last.endAt = endAt
+  return moved
+}
+
 /** The first change that looks misheard, as a refusal telling the assistant to ask. */
 function doubt(changes: Change[], babies: VoiceBaby[], now: number, timeZone: string) {
   for (const { event, before } of changes) {
@@ -90,7 +115,7 @@ export function agentTools(ctx: AgentContext) {
 
   const listBabies = toolDefinition({
     name: 'list_babies',
-    description: "The family's babies, and any sleep or breastfeed timer still running.",
+    description: "The family's babies, and the timers each has running.",
     inputSchema: z.object({}),
     outputSchema: z.object({
       babies: z.array(z.object({ name: z.string(), running: z.array(z.string()) })),
@@ -151,7 +176,7 @@ export function agentTools(ctx: AgentContext) {
   const record = toolDefinition({
     name: 'record',
     description:
-      'Add records, or start and stop timers (type sleep starts a sleep, wake ends it). Use ' +
+      'Add records, start timers and stop them (type stop: "醒了", "喂完了", "吸完了"). Use ' +
       'one call for everything said in one sentence.',
     inputSchema: z.object({
       actions: z.array(voiceActionSchema).min(1),
@@ -165,9 +190,7 @@ export function agentTools(ctx: AgentContext) {
       actions.filter((action) => action.type !== 'undo'),
       {
         babies: known,
-        runningSleeps: new Map(
-          running.filter((event) => event.type === 'sleep').map((event) => [event.babyId, event]),
-        ),
+        running,
         userId,
         now,
         timeZone,
@@ -187,42 +210,86 @@ export function agentTools(ctx: AgentContext) {
   const updateEvent = toolDefinition({
     name: 'update_event',
     description:
-      'Change one record (its id from find_events). Only the fields given change. It changes ' +
-      'at once; tell the user what changed, as the result says.',
+      'Change one record (its id from find_events). Only the fields given change; leave the ' +
+      'rest null. It changes at once; tell the user what changed, as the result says.',
     inputSchema: z.object({
       id: z.string(),
       time: z.string().nullable().meta({ description: 'New start time, HH:MM' }),
       endTime: z.string().nullable().meta({ description: 'New end time for timed records, HH:MM' }),
-      amountMl: z.number().nullable(),
+      durationMinutes: z
+        .number()
+        .nullable()
+        .meta({ description: 'New length of a finished timed record; the start stays' }),
+      amountMl: z.number().nullable().meta({ description: 'Bottle total, or pumped amount' }),
+      milk: voiceActionSchema.shape.milk,
+      breastMl: voiceActionSchema.shape.breastMl,
+      formulaMl: voiceActionSchema.shape.formulaMl,
       diaper: z.enum(['wet', 'dirty', 'mixed']).nullable(),
+      food: z.string().nullable(),
+      celsius: z.number().nullable(),
       note: z.string().nullable(),
       confirmed: confirmedSchema,
     }),
     outputSchema: resultSchema,
-  }).server(async ({ id, time, endTime, amountMl, diaper, note, confirmed }) => {
-    const found = await ownEvent(id)
+  }).server(async (input) => {
+    const found = await ownEvent(input.id)
     if (!found) return { ok: false, message: '找不到这条记录。' }
     const { event, known } = found
     const at = (clock: string | null) => (clock ? clockToTime(clock, now, timeZone) : null)
-    const next: Record<string, unknown> = { ...event, updatedAt: now }
-    const startAt = at(time)
-    if (startAt !== null) next.startAt = startAt
-    const endAt = at(endTime)
-    if (endAt !== null) next.endAt = endAt
-    if (note !== null) next.note = note.trim() || null
-    if (
-      amountMl !== null &&
-      (event.type === 'pumping' || (event.type === 'feeding' && event.data.kind === 'bottle'))
-    ) {
-      next.data = { ...event.data, amountMl: Math.round(amountMl) }
-    }
-    if (diaper !== null && event.type === 'diaper') {
-      next.data = { contents: diaper, ...(diaper === 'dirty' ? {} : { pee: { amount: 'normal' } }) }
+    const startAt = at(input.time) ?? event.startAt
+    const endAt =
+      at(input.endTime) ??
+      (input.durationMinutes !== null && input.durationMinutes > 0 && event.endAt !== null
+        ? startAt + Math.round(input.durationMinutes) * 60_000
+        : event.endAt === null
+          ? null
+          : event.endAt + (startAt - event.startAt))
+    const next: Record<string, unknown> = { ...event, startAt, endAt, updatedAt: now }
+    if (!hasDuration(event)) next.endAt = event.endAt
+    if (input.note !== null) next.note = input.note.trim() || null
+    switch (event.type) {
+      case 'feeding': {
+        const { data } = event
+        if (data.kind === 'breast')
+          next.data = { ...data, segments: retimed(data.segments, startAt, endAt) }
+        if (data.kind === 'solids' && input.food?.trim())
+          next.data = { ...data, food: input.food.trim() }
+        if (
+          data.kind === 'bottle' &&
+          (input.amountMl !== null ||
+            input.milk !== null ||
+            input.breastMl !== null ||
+            input.formulaMl !== null)
+        ) {
+          const edited = editedBottle(input, data)
+          if ('reply' in edited) return { ok: false, message: edited.reply }
+          next.data = edited.data
+        }
+        break
+      }
+      case 'pumping':
+        if (input.amountMl !== null)
+          next.data = { ...event.data, amountMl: Math.round(input.amountMl) }
+        break
+      case 'diaper':
+        if (input.diaper !== null) {
+          const { diaper } = input
+          next.data = {
+            contents: diaper,
+            ...(diaper === 'dirty' ? {} : { pee: { amount: 'normal' } }),
+          }
+        }
+        break
+      case 'temperature':
+        if (input.celsius !== null) next.data = { celsius: Math.round(input.celsius * 10) / 10 }
+        break
+      default:
+        break
     }
     const parsed = eventSchema.safeParse(next)
     if (!parsed.success) return { ok: false, message: '这样改不行，请换个说法。' }
     const change: Change = { event: parsed.data, before: event }
-    if (!confirmed) {
+    if (!input.confirmed) {
       // Checked as said, not as a stopped timer: an edit sets the times on purpose.
       const doubted = doubt([{ event: parsed.data, before: null }], known, now, timeZone)
       if (doubted) return doubted
