@@ -10,6 +10,7 @@ import {
   logSolids,
   moveEventStart,
   restoreEvent,
+  setBreastSides,
   setEventNote,
   sleepKindFor,
   startBreastFeed,
@@ -66,6 +67,25 @@ describe('duration records', () => {
     expect(oneSide.type === 'feeding' && oneSide.data).toEqual({
       kind: 'breast',
       segments: [{ side: 'right', startAt: T0, endAt: T0 + 8 * MINUTE }],
+    })
+  })
+
+  it('set new minutes per side on a finished breastfeed, from its first side', () => {
+    const fed = logRecord(
+      BABY,
+      { kind: 'breast', side: 'right', sides: { left: 4 * MINUTE, right: 6 * MINUTE } },
+      T0,
+      T0 + 10 * MINUTE,
+      T0,
+    )
+    if (fed.type !== 'feeding') throw new Error('expected a feed')
+    const edited = setBreastSides(fed, { left: 12 * MINUTE, right: 8 * MINUTE }, T0 + MINUTE)
+    expect(eventSchema.safeParse(edited).success).toBe(true)
+    expect(edited.endAt).toBe(T0 + 20 * MINUTE)
+    expect(edited.data.kind === 'breast' && edited.data.segments[0]).toEqual({
+      side: 'right',
+      startAt: T0,
+      endAt: T0 + 8 * MINUTE,
     })
   })
 

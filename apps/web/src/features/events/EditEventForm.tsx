@@ -1,4 +1,13 @@
-import { type Event, MINUTE, hasDuration, isRunning } from '@bobo/shared'
+import {
+  type BreastSide,
+  type Event,
+  MINUTE,
+  breastSideDurations,
+  eventDurationMs,
+  hasKnownDuration,
+  isRunning,
+  recordKind,
+} from '@bobo/shared'
 import { type FormEvent, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
@@ -19,6 +28,8 @@ import {
 } from '../growth/growth-input'
 import { saveEvent } from './actions'
 import { type DiaperData, DiaperFields } from './DiaperFields'
+import { durationLabel } from './duration-label'
+import { DurationTimes, type DurationTimesValue, totalMinutes } from './DurationTimes'
 import {
   draftFromBottle,
   draftFromMedication,
@@ -40,9 +51,9 @@ import {
   SolidsField,
   TemperatureField,
 } from './EventFields'
-import { FeedDurationField } from './FeedDurationField'
+import { DURATION_LOOK, durationTone, isDurationKind } from './kinds'
 import { optionsOf, sleepKindLabel } from './labels'
-import { deleteEvent, moveEventStart, setEventNote } from './records'
+import { deleteEvent, moveEventStart, setBreastSides, setEventNote, stopEvent } from './records'
 import { toDateTimeLocal } from './time'
 import { TimeField } from './TimeField'
 import { overlapsSleep, validateTime } from './validation'
@@ -51,6 +62,21 @@ type Errors = Partial<
   Record<'start' | 'end' | 'amount' | 'food' | 'celsius' | 'name' | 'note' | 'form', string>
 > &
   GrowthErrors
+
+const toMinutes = (ms: number) => (ms > 0 ? Math.max(1, Math.round(ms / MINUTE)) : null)
+
+/** A finished record's start, duration and end as the form shows them. */
+function timesOf(event: Event): DurationTimesValue {
+  const sides =
+    event.type === 'feeding' && event.data.kind === 'breast' && event.endAt !== null
+      ? breastSideDurations(event.data.segments, event.endAt)
+      : { left: 0, right: 0 }
+  return {
+    start: toDateTimeLocal(event.startAt),
+    minutes: hasKnownDuration(event) ? toMinutes(eventDurationMs(event, event.startAt)) : null,
+    sides: { left: toMinutes(sides.left), right: toMinutes(sides.right) },
+  }
+}
 
 /** Edits any event; changes are applied through the pure helpers in records.ts. */
 export function EditEventForm({
@@ -69,8 +95,12 @@ export function EditEventForm({
   const readOnly = !useAccess().canEditEvent(event)
   const author = useMemberName(event.familyId, event.createdBy)
   const running = isRunning(event)
+  const kind = recordKind(event)
+  const durationKind = isDurationKind(kind) ? kind : null
   const [start, setStart] = useState(() => toDateTimeLocal(event.startAt))
-  const [end, setEnd] = useState(() => (event.endAt === null ? '' : toDateTimeLocal(event.endAt)))
+  // Finished duration records: start, duration and end together (see DurationTimes).
+  const [initialTimes] = useState(() => timesOf(event))
+  const [times, setTimes] = useState(initialTimes)
   const [note, setNote] = useState(event.note ?? '')
   const [bottle, setBottle] = useState(() =>
     event.type === 'feeding' && event.data.kind === 'bottle'
@@ -95,19 +125,14 @@ export function EditEventForm({
   const [diaper, setDiaper] = useState<DiaperData>(() =>
     event.type === 'diaper' ? event.data : { contents: 'wet' },
   )
-  // Bottles and solids show how long they took (until #170 brings this to every duration record).
-  const feedDuration = event.type === 'feeding' && event.data.kind !== 'breast'
-  const [duration, setDuration] = useState<number | null>(() =>
-    feedDuration && event.endAt !== null && event.endAt > event.startAt
-      ? Math.round((event.endAt - event.startAt) / MINUTE)
-      : null,
-  )
   const [sleepKind, setSleepKind] = useState(() =>
     event.type === 'sleep' ? event.data.kind : 'nap',
   )
   const [errors, setErrors] = useState<Errors>({})
-  // Only finished sleeps have an editable end; breastfeed ends follow their segments.
-  const editableEnd = event.type === 'sleep' && !running
+  const firstSide: BreastSide =
+    event.type === 'feeding' && event.data.kind === 'breast'
+      ? (event.data.segments[0]?.side ?? 'left')
+      : 'left'
 
   /** The edited record with this form's values, or the field errors. */
   function parseData(current: Event): { event: Event } | { errors: Errors } {
@@ -125,6 +150,10 @@ export function EditEventForm({
       case 'diaper':
         return { event: { ...current, data: diaper } }
       case 'pumping':
+        // A running pumping may not have an amount yet.
+        if (current.endAt === null && !pumping.amount.trim()) {
+          return { event: { ...current, data: { side: pumping.side } } }
+        }
         return result(parsePumping(pumping), (data) => ({ ...current, data }))
       case 'temperature':
         return result(parseCelsius(celsius), (data) => ({ ...current, data }))
@@ -137,23 +166,43 @@ export function EditEventForm({
     }
   }
 
+  /** The record with this form's start (and, when finished, duration and end), or errors. */
+  function timed(current: number): { event: Event } | { errors: Errors } {
+    const value = durationKind && !running ? times : { ...times, start }
+    const startResult = validateTime(value.start, current)
+    if ('error' in startResult) return { errors: { start: startResult.error } }
+    const moved = moveEventStart(event, startResult.at, current)
+    if (!durationKind || running) return { event: moved }
+
+    const total = totalMinutes(durationKind, times)
+    if (total === null && (durationKind === 'sleep' || durationKind === 'breast')) {
+      return { errors: { end: m.durationRequired() } }
+    }
+    const endAt = moved.startAt + (total ?? 0) * MINUTE
+    if (endAt > current + MINUTE) return { errors: { end: m.durationEndFuture() } }
+    const sidesChanged =
+      times.sides.left !== initialTimes.sides.left || times.sides.right !== initialTimes.sides.right
+    if (moved.type === 'feeding' && moved.data.kind === 'breast') {
+      // Unchanged sides keep the recorded switches; new ones become one stretch per side.
+      const sides = {
+        left: (times.sides.left ?? 0) * MINUTE,
+        right: (times.sides.right ?? 0) * MINUTE,
+      }
+      return { event: sidesChanged ? setBreastSides(moved, sides, current) : moved }
+    }
+    return { event: { ...moved, endAt } }
+  }
+
   function submit(formEvent: FormEvent) {
     formEvent.preventDefault()
     if (readOnly) return
     const current = Date.now()
     const nextErrors: Errors = {}
-    const startResult = validateTime(start, current)
-    if ('error' in startResult) nextErrors.start = startResult.error
-    const endResult = editableEnd ? validateTime(end, current) : undefined
-    if (endResult && 'error' in endResult) nextErrors.end = endResult.error
-
+    const timing = timed(current)
     let next: Event = event
-    if ('at' in startResult) next = moveEventStart(next, startResult.at, current)
+    if ('errors' in timing) Object.assign(nextErrors, timing.errors)
+    else next = timing.event
     if (next.type === 'sleep') {
-      if (endResult && 'at' in endResult && 'at' in startResult) {
-        if (endResult.at < startResult.at) nextErrors.end = m.eventEndBeforeStart()
-        else next = { ...next, endAt: endResult.at }
-      }
       next = { ...next, data: { kind: sleepKind } }
       if (overlapsSleep(events, next.startAt, next.endAt ?? current, current, next.id)) {
         nextErrors.form = m.sleepOverlap()
@@ -162,16 +211,27 @@ export function EditEventForm({
     const parsed = parseData(next)
     if ('errors' in parsed) Object.assign(nextErrors, parsed.errors)
     else next = parsed.event
-    if (feedDuration) {
-      const endAt = next.startAt + (duration ?? 0) * MINUTE
-      if (endAt > current + MINUTE) nextErrors.start = m.feedEndFuture()
-      else next = { ...next, endAt }
-    }
     if (next.type === 'note' && !note.trim()) nextErrors.note = m.noteRequired()
 
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
     saveEvent(store, setEventNote(next, note, current))
+    onDone()
+  }
+
+  /** Stops a running record from here, with this form's other changes. */
+  function stopNow() {
+    const current = Date.now()
+    const parsed = parseData(event)
+    if ('errors' in parsed) {
+      setErrors(parsed.errors)
+      return
+    }
+    if (parsed.event.type === 'pumping' && parsed.event.data.amountMl === undefined) {
+      setErrors({ amount: m.pumpingAmountToStop() })
+      return
+    }
+    saveEvent(store, setEventNote(stopEvent(parsed.event, current), note, current))
     onDone()
   }
 
@@ -216,22 +276,33 @@ export function EditEventForm({
             onChange={setSleepKind}
           />
         )}
-        {feedDuration && <FeedDurationField value={duration} onChange={setDuration} />}
-        <TimeField
-          label={hasDuration(event) ? m.eventStart() : m.eventTime()}
-          value={start}
-          onChange={setStart}
-          error={errors.start}
-          now={now}
-        />
-        {editableEnd && (
+        {durationKind && !running ? (
+          <DurationTimes
+            kind={durationKind}
+            value={times}
+            onChange={setTimes}
+            firstSide={firstSide}
+            now={now}
+            errors={errors}
+          />
+        ) : (
           <TimeField
-            label={m.eventEnd()}
-            value={end}
-            onChange={setEnd}
-            error={errors.end}
+            label={durationKind ? m.eventStart() : m.eventTime()}
+            value={start}
+            onChange={setStart}
+            error={errors.start}
             now={now}
           />
+        )}
+        {durationKind && running && (
+          <div className="flex items-center justify-between gap-3">
+            <p className="m-0 text-fg-muted">
+              {m.eventRunningFor({ duration: durationLabel(eventDurationMs(event, now)) })}
+            </p>
+            <Button tone={durationTone(durationKind)} onClick={stopNow}>
+              {DURATION_LOOK[durationKind].stop()}
+            </Button>
+          </div>
         )}
         <Input
           label={event.type === 'note' ? m.noteText() : m.eventNote()}

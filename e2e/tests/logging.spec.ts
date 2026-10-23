@@ -56,3 +56,20 @@ test('logs a breastfeed afterwards with minutes on each side', async ({ page }) 
   await sheetClosed(page)
   await expect(page.getByText('左 10 分钟 · 右 5 分钟')).toBeVisible()
 })
+
+test('edits a finished record by its start, duration and end', async ({ page }) => {
+  await onboard(page)
+  await page.locator('main').getByRole('button', { name: '睡眠', exact: true }).click()
+  // Logged afterwards: an hour that just ended.
+  await sheet(page).getByRole('button', { name: '保存' }).click()
+  await sheetClosed(page)
+  await openRow(page)
+  const end = sheet(page).getByLabel('结束时间')
+  const before = await end.inputValue()
+  await sheet(page).getByText('30 分钟', { exact: true }).click()
+  // A shorter sleep from the same start ends earlier.
+  await expect(end).not.toHaveValue(before)
+  await sheet(page).getByRole('button', { name: '保存' }).click()
+  await sheetClosed(page)
+  await expect(todayRows(page).first()).toContainText('30 分钟')
+})

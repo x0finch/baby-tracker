@@ -1,4 +1,4 @@
-import { type Event, inBabyScope, newId } from '@bobo/shared'
+import { type Event, inBabyScope, isRunning, newId } from '@bobo/shared'
 
 import { type Access, type FamilyAccess, checkEventWrite } from '../access'
 import { parseEvent } from '../sync/protocol'
@@ -51,20 +51,18 @@ export async function writableBabies(
   return babies
 }
 
-/** Timed events still running (sleeps, breastfeeds), latest per baby and type. */
+/** Duration records still running (sleeps, feeds, pumping), oldest first. */
 export async function runningEvents(db: D1Database, babies: VoiceBaby[]) {
   if (babies.length === 0) return []
   const { results } = await db
     .prepare(
       `select ${EVENT_COLUMNS} from events
        where baby_id in (select value from json_each(?)) and end_at is null
-         and deleted_at is null and type in ('sleep', 'feeding') order by start_at`,
+         and deleted_at is null order by start_at`,
     )
     .bind(JSON.stringify(babies.map((baby) => baby.id)))
     .all<EventRow>()
-  return toEvents(results).filter(
-    (event) => event.type === 'sleep' || (event.type === 'feeding' && event.data.kind === 'breast'),
-  )
+  return toEvents(results).filter(isRunning)
 }
 
 /** Recent events of the babies, newest first. */

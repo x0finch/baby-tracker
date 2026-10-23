@@ -98,6 +98,29 @@ function durationRecord(
   }
 }
 
+/**
+ * A finished breastfeed with new minutes per side, from its start, the side it began on
+ * first. Switches back and forth collapse into one stretch per side.
+ */
+export function setBreastSides(
+  event: FeedingEvent,
+  sides: Record<BreastSide, number>,
+  now: number,
+): FeedingEvent {
+  if (event.data.kind !== 'breast') return event
+  const side = event.data.segments[0]?.side ?? 'left'
+  const endAt = event.startAt + sides.left + sides.right
+  return {
+    ...event,
+    endAt,
+    updatedAt: touched(event, now),
+    data: {
+      kind: 'breast',
+      segments: breastSegments({ kind: 'breast', side, sides }, event.startAt, endAt),
+    },
+  }
+}
+
 /** Starts a timer now. */
 export const startRecord = (babyId: string, details: DurationDetails, now: number): Event =>
   durationRecord(babyId, details, now, null, now)

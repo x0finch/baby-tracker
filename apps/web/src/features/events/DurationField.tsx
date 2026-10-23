@@ -31,8 +31,9 @@ export function DurationField({
   error?: string
 }) {
   const quick = noneLabel === undefined ? choices : [0, ...choices]
-  const [custom, setCustom] = useState(value !== null && !quick.includes(value))
-  const [typed, setTyped] = useState(custom && value !== null ? String(value) : '')
+  // "自定义" stays chosen while typing; a value set from outside that isn't a choice shows there too.
+  const [customChosen, setCustomChosen] = useState(false)
+  const custom = customChosen || (value !== null && !quick.includes(value))
   return (
     <div className="flex flex-col gap-2">
       <ChipGroup<Choice>
@@ -40,11 +41,8 @@ export function DurationField({
         options={[...quick, 'custom']}
         value={custom ? 'custom' : value}
         onChange={(choice) => {
-          setCustom(choice === 'custom')
-          if (choice === 'custom') {
-            const minutes = Number.parseInt(typed, 10)
-            onChange(minutes > 0 ? minutes : null)
-          } else onChange(choice)
+          setCustomChosen(choice === 'custom')
+          if (choice !== 'custom') onChange(choice)
         }}
         optionLabel={(choice) =>
           choice === 'custom'
@@ -62,9 +60,8 @@ export function DurationField({
           inputMode="numeric"
           min={1}
           max={24 * 60}
-          value={typed}
+          value={value ?? ''}
           onChange={(event) => {
-            setTyped(event.target.value)
             const minutes = Number.parseInt(event.target.value, 10)
             onChange(minutes > 0 ? minutes : null)
           }}
