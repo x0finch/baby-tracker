@@ -1,5 +1,4 @@
 import {
-  type BreastSide,
   type Event,
   MINUTE,
   breastSideDurations,
@@ -8,7 +7,7 @@ import {
   isRunning,
   recordKind,
 } from '@bobo/shared'
-import { type FormEvent, useState } from 'react'
+import { type FormEvent, useReducer, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
 import { FormError } from '../../components/ui/FormError'
@@ -29,7 +28,14 @@ import {
 import { saveEvent } from './actions'
 import { type DiaperData, DiaperFields } from './DiaperFields'
 import { durationLabel } from './duration-label'
-import { DurationTimes, type DurationTimesValue, totalMinutes } from './DurationTimes'
+import {
+  type DurationTimes,
+  checkTimes,
+  resolveTimes,
+  storedTimes,
+  timesReducer,
+} from './duration-times'
+import { DurationTimesFields } from './DurationTimes'
 import {
   draftFromBottle,
   draftFromMedication,
@@ -51,31 +57,30 @@ import {
   SolidsField,
   TemperatureField,
 } from './EventFields'
-import { DURATION_LOOK, durationTone, isDurationKind } from './kinds'
+import { DURATION_LOOK, type DurationKind, durationTone, isDurationKind } from './kinds'
 import { optionsOf, sleepKindLabel } from './labels'
 import { deleteEvent, moveEventStart, setBreastSides, setEventNote, stopEvent } from './records'
-import { toDateTimeLocal } from './time'
-import { TimeField } from './TimeField'
-import { overlapsSleep, validateTime } from './validation'
+import { TimeRow } from './TimeRow'
+import { overlapsSleep } from './validation'
 
 type Errors = Partial<
-  Record<'start' | 'end' | 'amount' | 'food' | 'celsius' | 'name' | 'note' | 'form', string>
+  Record<
+    'start' | 'end' | 'duration' | 'amount' | 'food' | 'celsius' | 'name' | 'note' | 'form',
+    string
+  >
 > &
   GrowthErrors
 
-const toMinutes = (ms: number) => (ms > 0 ? Math.max(1, Math.round(ms / MINUTE)) : null)
-
-/** A finished record's start, duration and end as the form shows them. */
-function timesOf(event: Event): DurationTimesValue {
-  const sides =
-    event.type === 'feeding' && event.data.kind === 'breast' && event.endAt !== null
-      ? breastSideDurations(event.data.segments, event.endAt)
-      : { left: 0, right: 0 }
-  return {
-    start: toDateTimeLocal(event.startAt),
-    minutes: hasKnownDuration(event) ? toMinutes(eventDurationMs(event, event.startAt)) : null,
-    sides: { left: toMinutes(sides.left), right: toMinutes(sides.right) },
-  }
+/** A record's start, duration and end as the edit sheet holds them (duration-times.ts). */
+function timesOf(event: Event, kind: DurationKind): DurationTimes {
+  const breast = event.type === 'feeding' && event.data.kind === 'breast' ? event.data : null
+  return storedTimes(
+    kind,
+    event.startAt,
+    hasKnownDuration(event) ? eventDurationMs(event, event.startAt) : null,
+    breast && event.endAt !== null ? breastSideDurations(breast.segments, event.endAt) : null,
+    breast?.segments[0]?.side ?? 'left',
+  )
 }
 
 /** Edits any event; changes are applied through the pure helpers in records.ts. */
@@ -97,10 +102,11 @@ export function EditEventForm({
   const running = isRunning(event)
   const kind = recordKind(event)
   const durationKind = isDurationKind(kind) ? kind : null
-  const [start, setStart] = useState(() => toDateTimeLocal(event.startAt))
-  // Finished duration records: start, duration and end together (see DurationTimes).
-  const [initialTimes] = useState(() => timesOf(event))
-  const [times, setTimes] = useState(initialTimes)
+  // Instant and running records: when it happened or started.
+  const [start, setStart] = useState(event.startAt)
+  // Finished duration records: start, duration and end together (duration-times.ts).
+  const [initialTimes] = useState(() => timesOf(event, durationKind ?? 'sleep'))
+  const [times, dispatch] = useReducer(timesReducer, initialTimes)
   const [note, setNote] = useState(event.note ?? '')
   const [bottle, setBottle] = useState(() =>
     event.type === 'feeding' && event.data.kind === 'bottle'
@@ -129,10 +135,6 @@ export function EditEventForm({
     event.type === 'sleep' ? event.data.kind : 'nap',
   )
   const [errors, setErrors] = useState<Errors>({})
-  const firstSide: BreastSide =
-    event.type === 'feeding' && event.data.kind === 'breast'
-      ? (event.data.segments[0]?.side ?? 'left')
-      : 'left'
 
   /** The edited record with this form's values, or the field errors. */
   function parseData(current: Event): { event: Event } | { errors: Errors } {
@@ -168,18 +170,20 @@ export function EditEventForm({
 
   /** The record with this form's start (and, when finished, duration and end), or errors. */
   function timed(current: number): { event: Event } | { errors: Errors } {
-    const value = durationKind && !running ? times : { ...times, start }
-    const startResult = validateTime(value.start, current)
-    if ('error' in startResult) return { errors: { start: startResult.error } }
-    const moved = moveEventStart(event, startResult.at, current)
-    if (!durationKind || running) return { event: moved }
-
-    const total = totalMinutes(durationKind, times)
-    if (total === null && (durationKind === 'sleep' || durationKind === 'breast')) {
-      return { errors: { end: m.durationRequired() } }
+    if (!durationKind || running) {
+      if (start > current + MINUTE) return { errors: { start: m.timeInFuture() } }
+      return { event: moveEventStart(event, Math.min(start, current), current) }
     }
-    const endAt = moved.startAt + (total ?? 0) * MINUTE
-    if (endAt > current + MINUTE) return { errors: { end: m.durationEndFuture() } }
+    // Sleeps and breastfeeds always have a length; bottles, solids and pumping may not.
+    const timeErrors = checkTimes(
+      times,
+      current,
+      durationKind === 'sleep' || durationKind === 'breast',
+    )
+    if (Object.keys(timeErrors).length > 0) return { errors: timeErrors }
+    const resolved = resolveTimes(times, current)
+    const moved = moveEventStart(event, resolved.startAt, current)
+    const endAt = resolved.endAt ?? moved.startAt
     const sidesChanged =
       times.sides.left !== initialTimes.sides.left || times.sides.right !== initialTimes.sides.right
     if (moved.type === 'feeding' && moved.data.kind === 'breast') {
@@ -277,18 +281,11 @@ export function EditEventForm({
           />
         )}
         {durationKind && !running ? (
-          <DurationTimes
-            kind={durationKind}
-            value={times}
-            onChange={setTimes}
-            firstSide={firstSide}
-            now={now}
-            errors={errors}
-          />
+          <DurationTimesFields times={times} dispatch={dispatch} now={now} errors={errors} />
         ) : (
-          <TimeField
+          <TimeRow
             label={durationKind ? m.eventStart() : m.eventTime()}
-            value={start}
+            at={start}
             onChange={setStart}
             error={errors.start}
             now={now}

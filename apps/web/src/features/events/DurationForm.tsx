@@ -7,35 +7,29 @@ import {
   isRunning,
   recordKind,
 } from '@bobo/shared'
-import { type FormEvent, type ReactNode, useState } from 'react'
+import { type FormEvent, type ReactNode, useReducer, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
 import { FormError } from '../../components/ui/FormError'
 import { Input } from '../../components/ui/Input'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { useLocalStore } from '../../db'
-import { formatTime } from '../../lib/i18n'
 import { quantityInputProps, unitLabel } from '../../lib/units'
 import { useNow } from '../../lib/use-now'
 import { m } from '../../paraglide/messages.js'
 import { addEvent } from './actions'
-import { DurationField } from './DurationField'
+import { checkTimes, newTimes, resolveTimes, timesReducer } from './duration-times'
+import { DurationTimesFields } from './DurationTimes'
 import { emptyBottle, parseBottleDraft, parseSolids } from './event-draft'
 import { BottleFields, SolidsField } from './EventFields'
-import { type DurationKind, durationChipTone, durationTone } from './kinds'
+import { type DurationKind, durationTone } from './kinds'
 import { optionsOf, sideLabel } from './labels'
 import { parseVolume } from './measure-input'
-import { AgoChips } from './QuickTimeField'
 import { type DurationDetails, logRecord, startRecord, suggestedBreastSide } from './records'
-import { toDateTimeLocal } from './time'
-import { TimeField } from './TimeField'
 import { useEventsByBaby } from './use-events'
-import { overlapsSleep, validateTime } from './validation'
+import { overlapsSleep } from './validation'
 
-/** "How long ago it started" choices, in minutes. */
-const STARTED_AGO = [5, 15, 30, 60, 120, 180] as const
-
-type Errors = Partial<Record<'amount' | 'food' | 'start' | 'duration' | 'form', string>>
+type Errors = Partial<Record<'amount' | 'food' | 'start' | 'end' | 'duration' | 'form', string>>
 type PumpingSide = 'left' | 'right' | 'both'
 
 const runningOf = (events: readonly Event[], kind: DurationKind) =>
@@ -66,35 +60,24 @@ export function DurationForm({
   const definition = RECORD_KINDS[kind]
   // Time the sheet opened; the defaults and the latest selectable time derive from it.
   const now = useNow(60_000)
-  const usual = definition.usualMinutes
 
   const lastBreast = events.find(
     (event): event is FeedingEvent => event.type === 'feeding' && event.data.kind === 'breast',
   )
-  const [breastSide, setBreastSide] = useState<BreastSide>(() => suggestedBreastSide(lastBreast))
   const [pumpingSide, setPumpingSide] = useState<PumpingSide>('both')
   const [bottle, setBottle] = useState(emptyBottle)
   const [food, setFood] = useState('')
   const [amount, setAmount] = useState('')
 
-  // Until a start is picked, the record is taken to have just ended: start = now − duration.
-  const [startedAgo, setStartedAgo] = useState<number | null>(null)
-  const [pickedStart, setPickedStart] = useState<string | null>(null)
-  const [minutes, setMinutes] = useState<number | null>(usual)
-  // Breastfeeding afterwards: minutes on each side, the first side first.
-  const [sideMinutes, setSideMinutes] = useState<Record<BreastSide, number | null>>(() => ({
-    left: null,
-    right: null,
-    [suggestedBreastSide(lastBreast)]: usual,
-  }))
+  // Logging afterwards: the usual duration, just ended, until changed (duration-times.ts).
+  const [times, dispatch] = useReducer(timesReducer, null, () =>
+    newTimes(kind, definition.usualMinutes, suggestedBreastSide(lastBreast)),
+  )
+  // The side a breastfeed starts on, timed or logged afterwards.
+  const breastSide = times.firstSide
   const [errors, setErrors] = useState<Errors>({})
 
   const running = runningOf(events, kind)
-  const totalMinutes =
-    kind === 'breast' ? (sideMinutes.left ?? 0) + (sideMinutes.right ?? 0) : (minutes ?? 0)
-  const start = pickedStart ?? toDateTimeLocal(now - totalMinutes * MINUTE)
-  const startAt = validateTime(start, now)
-  const endsAt = 'at' in startAt && totalMinutes > 0 ? startAt.at + totalMinutes * MINUTE : null
 
   /** The details for one record, or the errors that block it. */
   function details(afterwards: boolean): DurationDetails | Errors {
@@ -105,8 +88,8 @@ export function DurationForm({
           side: breastSide,
           ...(afterwards && {
             sides: {
-              left: (sideMinutes.left ?? 0) * MINUTE,
-              right: (sideMinutes.right ?? 0) * MINUTE,
+              left: (times.sides.left ?? 0) * MINUTE,
+              right: (times.sides.right ?? 0) * MINUTE,
             },
           }),
         }
@@ -158,15 +141,14 @@ export function DurationForm({
     formEvent.preventDefault()
     const current = Date.now()
     const record = details(true)
-    const next: Errors = 'kind' in record ? {} : record
-    const startResult = validateTime(start, current)
-    if ('error' in startResult) next.start = startResult.error
-    if (totalMinutes <= 0) next.duration = m.durationRequired()
-    const from = 'at' in startResult ? startResult.at : current
-    const to = from + totalMinutes * MINUTE
-    if (!next.start && !next.duration) {
-      if (to > current + MINUTE) next.duration = m.durationEndFuture()
-      else if (kind === 'sleep') {
+    const next: Errors = {
+      ...('kind' in record ? {} : record),
+      ...checkTimes(times, current, true),
+    }
+    const { startAt: from, endAt } = resolveTimes(times, current)
+    const to = endAt ?? from
+    if (!next.start && !next.end && !next.duration) {
+      if (kind === 'sleep') {
         const clash = babyIds.find((id) => overlapsSleep(eventsOf(id), from, to, current))
         if (clash === babyIds[0]) next.form = m.sleepOverlap()
         else if (clash) next.form = m.sleepOverlapFor({ name: store.babies.get(clash)?.name ?? '' })
@@ -177,8 +159,6 @@ export function DurationForm({
     for (const babyId of babyIds) addEvent(store, logRecord(babyId, record, from, to, current))
     onDone()
   }
-
-  const chipTone = durationChipTone(kind)
 
   return (
     <div className="flex flex-col gap-4">
@@ -195,7 +175,7 @@ export function DurationForm({
                 : sideLabel[side](),
           }))}
           value={breastSide}
-          onChange={setBreastSide}
+          onChange={(side) => dispatch({ type: 'firstSide', side })}
         />
       )}
       {kind === 'pumping' && (
@@ -226,53 +206,13 @@ export function DurationForm({
         className="flex flex-col gap-4 border-t-2 border-border pt-4"
       >
         <h3 className="m-0 font-extrabold">{m.durationAfterwards()}</h3>
-        <div className="flex flex-col gap-2">
-          <AgoChips
-            legend={m.durationStartedWhen()}
-            showLegend
-            options={STARTED_AGO}
-            selected={startedAgo}
-            onSelect={(ago) => {
-              setStartedAgo(ago)
-              setPickedStart(toDateTimeLocal(Date.now() - ago * MINUTE))
-            }}
-          />
-          <TimeField
-            label={m.eventStart()}
-            value={start}
-            onChange={(value) => {
-              setPickedStart(value)
-              setStartedAgo(null)
-            }}
-            error={errors.start}
-            now={now}
-          />
-          {pickedStart === null && (
-            <p className="m-0 text-caption text-fg-muted">{m.durationStartDerived()}</p>
-          )}
-        </div>
-        {kind === 'breast' ? (
-          (['left', 'right'] as const).map((side) => (
-            <DurationField
-              key={side}
-              legend={m.breastSideHowLong({ side: sideLabel[side]() })}
-              choices={definition.durations}
-              noneLabel={m.breastSideNone()}
-              value={sideMinutes[side]}
-              onChange={(value) => setSideMinutes((sides) => ({ ...sides, [side]: value }))}
-              tone={chipTone}
-            />
-          ))
-        ) : (
-          <DurationField
-            legend={m.durationHowLong()}
-            choices={definition.durations}
-            value={minutes}
-            onChange={setMinutes}
-            tone={chipTone}
-          />
-        )}
-        {errors.duration && <FormError>{errors.duration}</FormError>}
+        <DurationTimesFields
+          times={times}
+          dispatch={dispatch}
+          now={now}
+          errors={errors}
+          quickStart
+        />
         {kind === 'pumping' && (
           <Input
             label={m.pumpingAmount({ unit: unitLabel('volume') })}
@@ -282,11 +222,6 @@ export function DurationForm({
             error={errors.amount}
             onChange={(event) => setAmount(event.target.value)}
           />
-        )}
-        {endsAt !== null && (
-          <p className="m-0 text-caption text-fg-muted">
-            {m.durationEndsAt({ time: formatTime(endsAt) })}
-          </p>
         )}
         {errors.form && <FormError>{errors.form}</FormError>}
         <Button type="submit" variant="soft" tone={durationTone(kind)} block>
