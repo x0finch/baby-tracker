@@ -96,7 +96,12 @@ test('key screens look as before', async ({ page, context }) => {
   await expect(page).toHaveScreenshot('account.png', { fullPage: true, mask: [syncTime] })
   await page.goto('/settings')
   await expect(page.getByRole('heading', { name: '家庭' })).toBeVisible()
-  await expect(page).toHaveScreenshot('settings.png', { fullPage: true, mask: [syncTime] })
+  await expect(syncTime).toBeVisible()
+  // The sync time, and the build id and date in the about row, change on every run.
+  await expect(page).toHaveScreenshot('settings.png', {
+    fullPage: true,
+    mask: [syncTime, page.getByText(/^版本 /)],
+  })
   await page.getByRole('link', { name: /的家/ }).click()
   await expect(page.getByRole('button', { name: '邀请家人' })).toBeVisible()
   await screen(page, 'family')
