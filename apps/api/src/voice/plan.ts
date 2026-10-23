@@ -124,6 +124,14 @@ export function formatClock(at: number, timeZone: string): string {
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
+/** Minutes since the zone's midnight, for reading a baby's day on its own clock. */
+export function minuteOfDayIn(timeZone: string): (at: number) => number {
+  return (at) => {
+    const p = zoneParts(at, timeZone)
+    return p.hour * 60 + p.minute
+  }
+}
+
 /** The zone's calendar day at `at`, "YYYY-MM-DD". */
 export function localDay(at: number, timeZone: string): string {
   const p = zoneParts(at, timeZone)

@@ -1,4 +1,4 @@
-import { type BreastSegment, type Event, eventSchema, hasDuration } from '@bobo/shared'
+import { type BreastSegment, DAY, type Event, eventSchema, hasDuration } from '@bobo/shared'
 import { toolDefinition } from '@tanstack/ai'
 import { z } from 'zod'
 
@@ -21,7 +21,7 @@ import {
   writableBabies,
   writeChanges,
 } from './data'
-import { implausible } from './guide'
+import { implausible, nextUpLines } from './guide'
 
 /** Everything a turn's tools act on: one user, their families, one thread. */
 export interface AgentContext {
@@ -37,6 +37,9 @@ export interface AgentContext {
   /** Set by end_conversation: the shortcut stops asking. */
   state: { done: boolean }
 }
+
+/** Enough of the last week for nextUp, and a night that started before it. */
+const NEXT_UP_HISTORY = 15 * DAY
 
 const resultSchema = z.object({ ok: z.boolean(), message: z.string() })
 const EVENT_TYPES = [
@@ -115,20 +118,37 @@ export function agentTools(ctx: AgentContext) {
 
   const listBabies = toolDefinition({
     name: 'list_babies',
-    description: "The family's babies, and the timers each has running.",
+    description:
+      "The family's babies, the timers each has running, and what likely comes next for " +
+      'each (feeds, sleep, diapers), from their age and last week.',
     inputSchema: z.object({}),
     outputSchema: z.object({
-      babies: z.array(z.object({ name: z.string(), running: z.array(z.string()) })),
+      babies: z.array(
+        z.object({ name: z.string(), running: z.array(z.string()), next: z.array(z.string()) }),
+      ),
     }),
   }).server(async () => {
     const known = await babies()
     const running = await runningEvents(db, known)
+    const recent = await recentEvents(
+      db,
+      known.map((baby) => baby.id),
+      now - NEXT_UP_HISTORY,
+      null,
+      2000,
+    )
     return {
       babies: known.map((baby) => ({
         name: baby.name,
         running: running
           .filter((event) => event.babyId === baby.id)
           .map((event) => line(event, null, known, timeZone)),
+        next: nextUpLines(
+          recent.filter((event) => event.babyId === baby.id),
+          baby.birthDate,
+          now,
+          timeZone,
+        ),
       })),
     }
   })
