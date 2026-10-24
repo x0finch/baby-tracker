@@ -339,7 +339,7 @@
   "nextDiaper": "换尿布",
   "nextFeed": "喂奶",
   "nextIn": "约 {duration} 后",
-  "nextLate": "已过一会儿",
+  "nextLate": "已过 {duration}",
   "nextNow": "差不多了",
   "nextPlan": "接下来 12 小时",
   "nextSleep": "睡觉",
