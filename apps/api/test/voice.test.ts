@@ -58,18 +58,13 @@ describe('siri voice logging', () => {
       body: JSON.stringify({ text }),
     })
   /** Says something with the model recording `actions`, then answering `reply`. */
-  const record = async (
-    token: string,
-    text: string,
-    actions: VoiceAction[],
-    reply = '记好了。',
-  ) => {
+  // One model call: once saved, the record's summary is the answer.
+  const record = async (token: string, text: string, actions: VoiceAction[]) => {
     fake.setResponses([
       ({ request }) => {
         system = JSON.stringify(request.systemPrompts ?? [])
         return { toolCalls: [{ name: 'record', input: { actions, confirmed: false } }] }
       },
-      { text: reply },
     ])
     return answerOf(await siri(token, text))
   }
@@ -178,7 +173,8 @@ describe('siri voice logging', () => {
       action({ type: 'diaper', baby: '小米粒' }),
       action({ type: 'bottle', baby: '小米粒', amountMl: 120, milk: 'formula' }),
     ])
-    expect(result).toMatchObject({ ok: true, done: false, reply: '记好了。' })
+    expect(result).toMatchObject({ ok: true, done: false })
+    expect(result.reply).toMatch(/^已记录：小米粒 .*换尿布.*；小米粒 .*瓶喂 120 毫升.*。还有吗？$/)
     const stored = (await events()).filter((event) => !earlier.has(event.id))
     expect(stored.map((event) => event.type).toSorted()).toEqual(['diaper', 'feeding'])
     expect(stored.every((event) => event.createdBy !== null)).toBe(true)
@@ -214,7 +210,7 @@ describe('siri voice logging', () => {
 
   it('chats in the app, in the same conversation as Siri', async () => {
     const { token } = await newToken()
-    await record(token, '换尿布', [action({ type: 'diaper' })], '记好了，还有吗？')
+    await record(token, '换尿布', [action({ type: 'diaper' })])
     fake.setResponses([{ text: '今天换了几次尿布。' }])
     const res = await t.send('POST', '/api/voice/chat', headers, { text: '今天怎么样' })
     expect(await res.json()).toEqual({
@@ -226,7 +222,7 @@ describe('siri voice logging', () => {
     const { lines } = (await chat.json()) as { lines: Array<{ role: string; text: string }> }
     expect(lines.slice(-4).map(({ role, text }) => ({ role, text }))).toEqual([
       { role: 'user', text: '换尿布' },
-      { role: 'assistant', text: '记好了，还有吗？' },
+      { role: 'assistant', text: expect.stringMatching(/^已记录：.*换尿布.*。还有吗？$/) },
       { role: 'user', text: '今天怎么样' },
       { role: 'assistant', text: '今天换了几次尿布。' },
     ])
