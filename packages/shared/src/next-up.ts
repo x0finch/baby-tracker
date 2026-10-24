@@ -66,6 +66,8 @@ const MIN_SAMPLES = 3
 /** Awake less than this between two sleeps (a stir, a transfer) and they are one sleep. */
 const STIR = 15 * MINUTE
 const HORIZON = 12 * 60 * MINUTE
+/** A suggestion stays this long past its window, then goes: by then it is late or unlogged. */
+const LATE = 60 * MINUTE
 const PLAN_LIMIT = 16
 const MINUTES_A_DAY = 24 * 60
 /** Formula leaves the stomach about half as fast as breast milk; it counts for more. */
@@ -134,8 +136,6 @@ interface Rhythm {
   center: number
   /** Give or take. */
   spread: number
-  /** Past this after the last one, it was probably not logged: don't guess. */
-  giveUp: number
   personalized: boolean
 }
 
@@ -151,7 +151,7 @@ function rhythmAt(
   // The baby's own, kept within reach of the age's (nights run longer than days).
   const center = own === null ? (min + max) / 2 : Math.min(Math.max(own, min * 0.5), max * 2)
   const spread = Math.max(15 * MINUTE, (max - min) / 4)
-  return { center, spread, giveUp: center + spread + max, personalized: own !== null }
+  return { center, spread, personalized: own !== null }
 }
 
 const window = (start: number, center: number, rhythm: Rhythm): Window => ({
@@ -266,6 +266,9 @@ export function nextUp(events: readonly Event[], options: NextUpOptions): NextUp
     .filter((event) => event.deletedAt === null && event.startAt <= now)
     .toSorted((a, b) => a.startAt - b.startAt)
 
+  /** Still worth showing: not yet an hour past its window. */
+  const due = ({ to }: Window) => now <= to + LATE
+
   // Sleep: awake spells and sleeps, each by the time of day it starts.
   const sleeps = sleepsOf(live)
   const wakeRange = minutes(norms.wakeMinutes)
@@ -289,27 +292,21 @@ export function nextUp(events: readonly Event[], options: NextUpOptions): NextUp
     const length = lengthAt(lastSleep.startAt)
     const spread = Math.max(15 * MINUTE, length / 6)
     const wakeAt = lastSleep.startAt + length
-    sleep = {
-      status: 'sleeping',
-      since: lastSleep.startAt,
-      // Long past it, the timer was probably left running.
-      wake:
-        now > wakeAt + length + 60 * MINUTE
-          ? null
-          : {
-              from: round(wakeAt - spread),
-              to: round(wakeAt + spread),
-              personalized: ownLength(lastSleep.startAt) !== null,
-            },
+    const wake = {
+      from: round(wakeAt - spread),
+      to: round(wakeAt + spread),
+      personalized: ownLength(lastSleep.startAt) !== null,
     }
+    sleep = { status: 'sleeping', since: lastSleep.startAt, wake: due(wake) ? wake : null }
   } else if (lastSleep?.endAt) {
     const rhythm = awakeAt(lastSleep.endAt)
-    if (now <= lastSleep.endAt + rhythm.giveUp) {
+    const next = window(lastSleep.endAt, rhythm.center, rhythm)
+    if (due(next)) {
       sleep = {
         status: 'predicted',
         since: lastSleep.endAt,
         length: lengthAt(lastSleep.endAt + rhythm.center),
-        ...window(lastSleep.endAt, rhythm.center, rhythm),
+        ...next,
       }
     }
   }
@@ -335,13 +332,8 @@ export function nextUp(events: readonly Event[], options: NextUpOptions): NextUp
       usualFill === null
         ? 1
         : Math.min(Math.max((lastMeal.fill / usualFill) ** SIZE_EFFECT, 0.85), 1.15)
-    if (now <= lastMeal.startAt + rhythm.giveUp) {
-      feed = {
-        status: 'predicted',
-        since: lastMeal.startAt,
-        ...window(lastMeal.startAt, rhythm.center * size, rhythm),
-      }
-    }
+    const next = window(lastMeal.startAt, rhythm.center * size, rhythm)
+    if (due(next)) feed = { status: 'predicted', since: lastMeal.startAt, ...next }
   }
 
   // Diapers: the usual interval by time of day.
@@ -352,13 +344,8 @@ export function nextUp(events: readonly Event[], options: NextUpOptions): NextUp
   let diaper: NextDiaper = { status: 'unknown' }
   if (lastChange !== undefined) {
     const rhythm = rhythmAt(diaperGaps, diaperRange, lastChange, now, minuteOfDay)
-    if (now <= lastChange + rhythm.giveUp) {
-      diaper = {
-        status: 'predicted',
-        since: lastChange,
-        ...window(lastChange, rhythm.center, rhythm),
-      }
-    }
+    const next = window(lastChange, rhythm.center, rhythm)
+    if (due(next)) diaper = { status: 'predicted', since: lastChange, ...next }
   }
 
   // The next 12 hours: sleep and wake in turn, meals at their rhythm.
@@ -377,12 +364,13 @@ export function nextUp(events: readonly Event[], options: NextUpOptions): NextUp
         ? mid(sleep.wake) + awakeAt(mid(sleep.wake)).center
         : null
   while (plan.length < PLAN_LIMIT) {
+    // Only what is still ahead: one already late shows on its own row, not in the plan.
     if (nextFeed !== null && nextFeed < end && (nextSleep === null || nextFeed <= nextSleep)) {
-      plan.push({ kind: 'feed', at: round(nextFeed) })
+      if (nextFeed >= now) plan.push({ kind: 'feed', at: round(nextFeed) })
       nextFeed += feedAt(nextFeed).center
     } else if (nextSleep !== null && nextSleep < end) {
       const length = lengthAt(nextSleep)
-      plan.push({ kind: 'sleep', at: round(nextSleep), length })
+      if (nextSleep >= now) plan.push({ kind: 'sleep', at: round(nextSleep), length })
       const wokeAt = nextSleep + length
       nextSleep = wokeAt + awakeAt(wokeAt).center
     } else {

@@ -88,7 +88,7 @@ export function NextUp({ baby, events }: { baby: Baby; events: readonly Event[] 
                   ? m.nextIn({ duration: durationLabel(row.window.from - now) })
                   : now <= row.window.to
                     ? m.nextNow()
-                    : m.nextLate()}
+                    : m.nextLate({ duration: durationLabel(now - row.window.to) })}
               </span>
             </li>
           ))}

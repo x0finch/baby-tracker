@@ -69,6 +69,16 @@ describe('nextUp', () => {
     })
   })
 
+  it('keeps a late suggestion for an hour past its window, then lets it go', () => {
+    // The age's window after 9:00: 10:45–11:15.
+    const events = [sleep(at(1, 8), at(1, 9))]
+    expect(nextUp(events, options(at(1, 12))).sleep).toMatchObject({ to: at(1, 11, 15) })
+    expect(nextUp(events, options(at(1, 12, 20))).sleep).toEqual({ status: 'unknown' })
+    // The plan keeps only what is still ahead.
+    const late = nextUp([...events, bottle(at(1, 8))], options(at(1, 12)))
+    expect(late.plan.every((item) => item.at >= at(1, 12))).toBe(true)
+  })
+
   it('gives up when the last one is long past, probably not logged', () => {
     const next = nextUp([sleep(at(1, 8), at(1, 9)), bottle(at(1, 8))], options(at(1, 18)))
     expect(next.sleep).toEqual({ status: 'unknown' })
