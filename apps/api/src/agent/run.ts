@@ -1,5 +1,6 @@
 import { newId } from '@bobo/shared'
 import {
+  type AgentLoopState,
   type AnyTextAdapter,
   EventType,
   type RunAgentResumeItem,
@@ -234,7 +235,10 @@ async function runChat(
     tools: agentTools(ctx),
     abortController,
     modelOptions: scope.modelOptions,
-    agentLoopStrategy: maxIterations(MAX_STEPS),
+    // Once a change is saved the turn ends: its summary is the answer, with no model call
+    // to word it, which would keep Siri waiting.
+    agentLoopStrategy: (state: AgentLoopState) =>
+      maxIterations(MAX_STEPS)(state) && ctx.state.saved.length === 0,
     middleware: [
       withPersistence(chatPersistence(scope.db)),
       withCompaction({
@@ -278,7 +282,7 @@ export async function runAgent(
   now: number,
 ): Promise<AgentTurn> {
   const threadId = await currentThread(scope.db, scope, now)
-  const state = { done: false }
+  const state = { done: false, saved: [] as string[] }
   const context = (): AgentContext => ({
     ...scope,
     threadId,
@@ -312,6 +316,11 @@ export async function runAgent(
         payload: { approved: approved && index === 0 },
       }))
       outcome = await runChat(adapter, context(), scope, { resume }, babyLines, abort)
+      // Answered either way, also when the run stopped early or ran out of time before the
+      // library marked them; left pending, the next message would be read as the answer.
+      await Promise.all(
+        resume.map((item) => persistence.stores.interrupts.resolve(item.interruptId, item.payload)),
+      )
       if (answer === null) outcome = null
     }
     outcome ??= await runChat(
@@ -323,6 +332,15 @@ export async function runAgent(
       abort,
     )
 
+    // What was saved is the answer, even when the run ran out of time afterwards. No model
+    // wrote it, so it joins the conversation here, for the chat box and the next message.
+    if (state.saved.length > 0) {
+      const reply = `${state.saved.join('。')}。还有吗？`
+      const { messages } = persistence.stores
+      const thread = await messages.loadThread(threadId)
+      await messages.saveThread(threadId, [...thread, { role: 'assistant', content: reply }])
+      return { reply, done: false, confirming: false }
+    }
     if (outcome.error || RAW_TOOL_CALL.test(outcome.text)) {
       if (!outcome.error)
         console.error('Model wrote a tool call as text', outcome.text.slice(0, 200))
@@ -333,5 +351,11 @@ export async function runAgent(
     return { reply: outcome.text || '好的。', done: state.done, confirming: false }
   } finally {
     clearTimeout(timer)
+    // How long Siri waited, to see in the Worker's logs when it gives up.
+    console.log('Voice turn', {
+      ms: Date.now() - now,
+      saved: state.saved.length,
+      timedOut: abort.signal.aborted,
+    })
   }
 }

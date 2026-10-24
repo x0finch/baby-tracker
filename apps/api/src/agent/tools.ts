@@ -34,8 +34,12 @@ export interface AgentContext {
   runId: string
   now: number
   timeZone: string
-  /** Set by end_conversation: the shortcut stops asking. */
-  state: { done: boolean }
+  state: {
+    /** Set by end_conversation: the shortcut stops asking. */
+    done: boolean
+    /** What this turn saved, in a line each: the turn answers with them, no model call. */
+    saved: string[]
+  }
 }
 
 /** Enough of the last week for nextUp, and a night that started before it. */
@@ -106,6 +110,11 @@ export function agentTools(ctx: AgentContext) {
   const { db, access, families, userId, now, timeZone } = ctx
   const babies = () => writableBabies(db, families)
   const log = { threadId: ctx.threadId, runId: ctx.runId }
+  /** A change made: kept for the turn's answer, and told to the model. */
+  const saved = (message: string) => {
+    ctx.state.saved.push(message)
+    return { ok: true, message }
+  }
 
   /** One of the family's events, if the user may see it. */
   async function ownEvent(id: string) {
@@ -224,7 +233,7 @@ export function agentTools(ctx: AgentContext) {
     }
     const refused = await writeChanges(db, access, userId, log, plan.changes, now)
     if (refused) return { ok: false, message: REFUSED[refused] ?? refused }
-    return { ok: true, message: `已记录：${plan.lines.join('；')}` }
+    return saved(`已记录：${plan.lines.join('；')}`)
   })
 
   const updateEvent = toolDefinition({
@@ -318,7 +327,7 @@ export function agentTools(ctx: AgentContext) {
     if (refused) return { ok: false, message: REFUSED[refused] ?? refused }
     const was = line(event, null, known, timeZone)
     const is = line(parsed.data, null, known, timeZone)
-    return { ok: true, message: `已修改：${was} → ${is}。说「撤销」可以改回来。` }
+    return saved(`已修改：${was} → ${is}。说「撤销」可以改回来`)
   })
 
   const deleteEvent = toolDefinition({
@@ -336,7 +345,7 @@ export function agentTools(ctx: AgentContext) {
     const change: Change = { event: { ...event, deletedAt: now, updatedAt: now }, before: event }
     const refused = await writeChanges(db, access, userId, log, [change], now)
     if (refused) return { ok: false, message: REFUSED[refused] ?? refused }
-    return { ok: true, message: `已删除：${line(event, null, known, timeZone)}` }
+    return saved(`已删除：${line(event, null, known, timeZone)}`)
   })
 
   const undo = toolDefinition({
@@ -351,10 +360,9 @@ export function agentTools(ctx: AgentContext) {
     if ('refused' in result)
       return { ok: false, message: REFUSED[result.refused] ?? result.refused }
     if (result.reverted.length === 0) return { ok: false, message: '没有可以撤销的操作。' }
-    return {
-      ok: true,
-      message: `已撤销：${result.reverted.map((event) => line(event, null, known, timeZone)).join('；')}`,
-    }
+    return saved(
+      `已撤销：${result.reverted.map((event) => line(event, null, known, timeZone)).join('；')}`,
+    )
   })
 
   const endConversation = toolDefinition({

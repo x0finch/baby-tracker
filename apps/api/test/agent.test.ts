@@ -75,13 +75,14 @@ describe('voice agent', () => {
   })
   afterAll(() => t.dispose())
 
-  it('records through the record tool and remembers the conversation', async () => {
+  it('records through the record tool, answers without another model call, and remembers', async () => {
+    // One model call: once the record is saved, its summary is the answer.
     fake.setResponses([
       { toolCalls: [{ name: 'record', input: { actions: [diaper], confirmed: false } }] },
-      { text: '记好了，换了尿布。还有吗？' },
     ])
     const turn = await runAgent(fake, scope, '换尿布了', NOW)
-    expect(turn).toEqual({ reply: '记好了，换了尿布。还有吗？', done: false, confirming: false })
+    expect(turn).toMatchObject({ done: false, confirming: false })
+    expect(turn.reply).toMatch(/^已记录：小米粒 \d\d:\d\d 换尿布（尿尿）。还有吗？$/)
     expect((await events()).map((event) => event.type)).toEqual(['diaper'])
 
     let seen = 0
@@ -113,12 +114,11 @@ describe('voice agent', () => {
         asked = JSON.stringify(request.messages)
         return { text: '{"answer":"yes"}' }
       },
-      { text: '删掉了。' },
     ])
     const done = await runAgent(fake, scope, 'yeah go ahead', NOW + 150_000)
     expect(asked).toContain('要删除「小米粒')
     expect(asked).toContain('yeah go ahead')
-    expect(done.reply).toBe('删掉了。')
+    expect(done.reply).toMatch(/^已删除：小米粒 \d\d:\d\d 换尿布（尿尿）。还有吗？$/)
     expect(await events()).toHaveLength(0)
   })
 
@@ -210,7 +210,6 @@ describe('voice agent', () => {
 
   it('changes a record at once and says what changed', async () => {
     const [stored] = await events()
-    let seen = ''
     fake.setResponses([
       {
         toolCalls: [
@@ -234,14 +233,10 @@ describe('voice agent', () => {
           },
         ],
       },
-      ({ request }) => {
-        seen = JSON.stringify(request.messages)
-        return { text: '改好了，换成便便了。' }
-      },
     ])
     const turn = await runAgent(fake, scope, '刚才那条是便便', NOW + 320_000)
-    expect(turn).toEqual({ reply: '改好了，换成便便了。', done: false, confirming: false })
-    expect(seen).toMatch(/已修改：[^"]*尿尿[^"]*→[^"]*便便/)
+    expect(turn).toMatchObject({ done: false, confirming: false })
+    expect(turn.reply).toMatch(/^已修改：.*尿尿.*→.*便便.*。还有吗？$/)
     expect((await events()).find((event) => event.id === stored?.id)).toMatchObject({
       data: { contents: 'dirty' },
     })
